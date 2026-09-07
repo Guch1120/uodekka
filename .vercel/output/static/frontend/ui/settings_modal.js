@@ -42,11 +42,11 @@ export class SettingsModal {
           <div class="setting-row">
             <div class="setting-label">
               <strong>ハンドル操作の向き（左右反転）</strong>
-              <div class="subtext">右に傾けた/倒したときに右に曲がるか、反転させるか</div>
+              <div class="subtext">右に傾けた/倒したときの旋回方向（直感的な向きが推奨です）</div>
             </div>
             <div class="toggle-group">
-              <button id="btn-steer-normal" class="toggle-btn active">標準</button>
-              <button id="btn-steer-inverted" class="toggle-btn">反転 (左右リバース)</button>
+              <button id="btn-steer-inverted" class="toggle-btn active">直感的 (推奨)</button>
+              <button id="btn-steer-normal" class="toggle-btn">リバース</button>
             </div>
           </div>
 

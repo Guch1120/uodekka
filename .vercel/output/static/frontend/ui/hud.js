@@ -22,7 +22,7 @@ export class HUD {
   init() {
     const hudDiv = document.createElement('div');
     hudDiv.id = 'game-hud';
-    hudDiv.className = 'hud-container';
+    hudDiv.className = 'hud-container hidden';
     hudDiv.innerHTML = `
       <div class="hud-top-left">
         <div class="hud-top-left-badges">
@@ -271,5 +271,17 @@ export class HUD {
         ctx.stroke();
       }
     });
+  }
+
+  show() {
+    if (this.element) {
+      this.element.classList.remove('hidden');
+    }
+  }
+
+  hide() {
+    if (this.element) {
+      this.element.classList.add('hidden');
+    }
   }
 }

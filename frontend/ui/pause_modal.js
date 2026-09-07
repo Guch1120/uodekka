@@ -24,7 +24,7 @@ export class PauseModal {
         </div>
         <div class="modal-body pause-body">
           <p class="pause-desc">レースを一時中断しています。</p>
-          <div class="pause-actions">
+          <div class="pause-actions" id="pause-main-actions">
             <button id="btn-pause-resume" class="primary-btn pause-action-btn">
               ▶ レースを続ける
             </button>
@@ -33,6 +33,17 @@ export class PauseModal {
             </button>
             <button id="btn-pause-quit" class="btn-secondary pause-action-btn quit-btn">
               🚪 レースをやめる (ロビーへ)
+            </button>
+          </div>
+
+          <!-- 確認パネル（ブラウザのネイティブダイアログを使わずモーダル内で完結） -->
+          <div class="pause-actions hidden" id="pause-confirm-quit-actions">
+            <p style="color: #f87171; font-weight: bold; font-size: 15px;">本当にレースをやめてロビーに戻りますか？</p>
+            <button id="btn-confirm-quit-yes" class="btn-secondary pause-action-btn quit-btn" style="background: #dc2626; color: #fff;">
+              はい、レースをやめる
+            </button>
+            <button id="btn-confirm-quit-no" class="action-btn pause-action-btn restart-btn">
+              キャンセル (ポーズに戻る)
             </button>
           </div>
         </div>
@@ -49,6 +60,10 @@ export class PauseModal {
     const btnResume = this.modalEl.querySelector('#btn-pause-resume');
     const btnRestart = this.modalEl.querySelector('#btn-pause-restart');
     const btnQuit = this.modalEl.querySelector('#btn-pause-quit');
+    const mainActions = this.modalEl.querySelector('#pause-main-actions');
+    const confirmActions = this.modalEl.querySelector('#pause-confirm-quit-actions');
+    const btnConfirmYes = this.modalEl.querySelector('#btn-confirm-quit-yes');
+    const btnConfirmNo = this.modalEl.querySelector('#btn-confirm-quit-no');
 
     btnResume.onclick = () => {
       this.hide();
@@ -62,11 +77,20 @@ export class PauseModal {
     };
 
     btnQuit.onclick = () => {
-      const confirmQuit = confirm('現在のレースを辞退してロビー画面に戻りますか？');
-      if (confirmQuit) {
-        this.hide();
-        if (this.onQuit) this.onQuit();
-      }
+      mainActions.classList.add('hidden');
+      confirmActions.classList.remove('hidden');
+    };
+
+    btnConfirmNo.onclick = () => {
+      confirmActions.classList.add('hidden');
+      mainActions.classList.remove('hidden');
+    };
+
+    btnConfirmYes.onclick = () => {
+      confirmActions.classList.add('hidden');
+      mainActions.classList.remove('hidden');
+      this.hide();
+      if (this.onQuit) this.onQuit();
     };
   }
 

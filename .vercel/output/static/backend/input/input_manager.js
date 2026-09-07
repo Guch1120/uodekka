@@ -20,7 +20,9 @@ export class InputManager {
 
     this.controlMode = localStorage.getItem('kart_control_mode') || 'gyro'; // 'gyro' or 'stick'
     this.gyroSensitivity = parseFloat(localStorage.getItem('kart_gyro_sens') || '0.7');
-    this.invertSteering = localStorage.getItem('kart_invert_steer') === 'true'; // ハンドル反転設定
+    // 直感的なステアリング操作（右傾けで右旋回）をデフォルトにするため、反転を初期値(true)に設定
+    const savedInvert = localStorage.getItem('kart_invert_steer');
+    this.invertSteering = savedInvert !== null ? savedInvert === 'true' : true;
 
     this.gyroGamma = 0;
     this.gyroActive = false;
@@ -191,7 +193,7 @@ export class InputManager {
   initUI() {
     const root = document.createElement('div');
     root.id = 'touch-controls-container';
-    root.className = 'touch-controls-layer';
+    root.className = 'touch-controls-layer hidden';
 
     const stickContainer = document.createElement('div');
     stickContainer.id = 'ctrl-stick';
@@ -503,5 +505,17 @@ export class InputManager {
       cleanupFns.forEach(fn => fn());
       this.updateStickVisibility();
     };
+  }
+
+  showControls() {
+    if (this.controlsRoot) {
+      this.controlsRoot.classList.remove('hidden');
+    }
+  }
+
+  hideControls() {
+    if (this.controlsRoot) {
+      this.controlsRoot.classList.add('hidden');
+    }
   }
 }

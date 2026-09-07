@@ -162,6 +162,12 @@ canvas {
   transition: transform 0.1s;
 }
 
+.icon-btn svg {
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
 .icon-btn:active {
   transform: scale(0.92);
 }
@@ -707,6 +713,11 @@ canvas {
     width: 100vw !important;
     height: 100vh !important;
     transform: none !important;
+  }
+
+  /* 横向き時に上下逆さ（逆向き横持ち）になった場合の180度反転 */
+  body.rotate-reverse #app {
+    transform: rotate(180deg) !important;
   }
 }
 

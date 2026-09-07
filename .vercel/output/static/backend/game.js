@@ -132,6 +132,11 @@ export class Game {
   quitRace() {
     this.isPaused = false;
     this.isRunning = false;
+
+    // HUDおよび操作UIを非表示
+    if (this.hud) this.hud.hide();
+    if (this.inputManager) this.inputManager.hideControls();
+
     // P2P接続中なら切断
     if (this.p2p && this.p2p.peer) {
       try {
@@ -279,6 +284,11 @@ export class Game {
     this.currentGameConfig = config;
     this.isPaused = false;
     this.isRunning = true;
+
+    // レース開始時にHUDとタッチコントロールを表示
+    if (this.hud) this.hud.show();
+    if (this.inputManager) this.inputManager.showControls();
+
     this.showItemNotification('レーススタート！ GO!', 2500);
   }
 
