@@ -281,6 +281,9 @@ export const Items = {
         if (!this.active) return;
         this.destroy();
         targetKart.spinOut();
+        if (this.ownerId === gameState.localPlayerKart?.id && targetKart !== gameState.localPlayerKart) {
+          gameState.showItemNotification('仕掛けたバナナに敵がスリップ！🍌', 2500);
+        }
       }
     };
   },
@@ -358,6 +361,10 @@ export const Items = {
         if (!this.active) return;
         this.destroy();
         targetKart.spinOut();
+        if (this.ownerId === gameState.localPlayerKart?.id && targetKart !== gameState.localPlayerKart) {
+          const name = colorType === 'green' ? 'ミドリカメ' : 'アカカメ';
+          gameState.showItemNotification(`${name}が敵カートに命中！💥`, 2500);
+        }
       }
     };
   },
@@ -432,6 +439,8 @@ export const Items = {
           targetKart.spinOut();
           if (targetKart === gameState.localPlayerKart) {
             gameState.showItemNotification('1位を狙う青こうらに被弾！！');
+          } else if (this.ownerId === gameState.localPlayerKart?.id) {
+            gameState.showItemNotification('青こうらが首位カートに命中・大爆発！💥', 2800);
           }
         }
       }
@@ -448,19 +457,21 @@ export const Items = {
     let vy = 0;
     let hasLanded = false;
     let fuseTimer = 3.2;
+    let ownerGraceTimer = 1.0; // 投擲主への当たり判定無効時間（自爆防止）
 
     if (throwDirection === 'forward') {
       const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(kart.rotation);
-      group.position.copy(kart.position).addScaledVector(forward, 2.5);
-      group.position.y = kart.position.y + 1.2;
-      const kartSpeed = (kart.speed || 0);
-      velocity = forward.clone().multiplyScalar(Math.max(24, kartSpeed + 20));
-      vy = 14.0;
+      // カートの前方上方から発射
+      group.position.copy(kart.position).addScaledVector(forward, 3.8);
+      group.position.y = kart.position.y + 1.5;
+      const kartSpeed = Math.max(0, kart.speed || 0);
+      velocity = forward.clone().multiplyScalar(Math.max(28, kartSpeed + 26));
+      vy = 13.0; // 前方放物線の初速
       hasLanded = false;
     } else {
       // 単押し後方ドロップ
       const backward = new THREE.Vector3(0, 0, 1).applyQuaternion(kart.rotation);
-      group.position.copy(kart.position).addScaledVector(backward, 3.0);
+      group.position.copy(kart.position).addScaledVector(backward, 3.2);
       group.position.y = kart.position.y + 0.4;
       hasLanded = true;
       fuseTimer = 4.0; // 後方に置いた場合は少し長めの起爆時間
@@ -471,10 +482,17 @@ export const Items = {
       type: 'bobomb',
       mesh: group,
       ownerId: kart.id,
-      radius: 3.5,
+      radius: 2.2, // 接触起爆半径（爆風は9.0）
       active: true,
       canBlockShell: true,
+      hasLanded,
+      ownerGraceTimer,
       update(dt) {
+        if (ownerGraceTimer > 0) {
+          ownerGraceTimer -= dt;
+          this.ownerGraceTimer = ownerGraceTimer;
+        }
+
         fuseTimer -= dt;
         if (fuseTimer <= 0) {
           this.explode();
@@ -482,7 +500,7 @@ export const Items = {
         }
 
         if (!hasLanded) {
-          vy -= 28.0 * dt;
+          vy -= 26.0 * dt;
           group.position.addScaledVector(velocity, dt);
           group.position.y += vy * dt;
 
@@ -490,6 +508,7 @@ export const Items = {
           if (group.position.y <= groundY + 0.4) {
             group.position.y = groundY + 0.4;
             hasLanded = true;
+            this.hasLanded = true;
             velocity.set(0, 0, 0);
           }
         } else {
@@ -506,11 +525,19 @@ export const Items = {
         this.destroy();
 
         const allKarts = [gameState.localPlayerKart, ...Array.from(gameState.otherPlayers.values()).map(p => p.physics)];
+        let hitEnemy = false;
         allKarts.forEach(k => {
           if (k && group.position.distanceTo(k.position) < 9.0) {
             k.spinOut();
+            if (k !== gameState.localPlayerKart) {
+              hitEnemy = true;
+            }
           }
         });
+
+        if (this.ownerId === gameState.localPlayerKart?.id && hitEnemy) {
+          gameState.showItemNotification('ボムへいの爆風が敵に命中！💣💥', 2600);
+        }
       },
       destroy() {
         if (!this.active) return;

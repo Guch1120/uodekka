@@ -195,6 +195,18 @@ export class LobbyModal {
     };
 
     const startGameWithGyroCheck = async (gameConfig) => {
+      // 横画面・フルスクリーンの自動要求
+      try {
+        if (screen.orientation && screen.orientation.lock) {
+          screen.orientation.lock('landscape').catch(() => {});
+        }
+        if (document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        } else if (document.documentElement.webkitRequestFullscreen) {
+          document.documentElement.webkitRequestFullscreen().catch(() => {});
+        }
+      } catch (e) {}
+
       if (this.inputManager && this.inputManager.controlMode === 'gyro' && !this.inputManager.gyroActive) {
         if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
           const wantGyro = confirm('ジャイロ操作（スマホの傾き操作）が有効です。センサーへのアクセスを許可しますか？\n（「キャンセル」を押すと画面スティック操作に切り替わります）');

@@ -43,7 +43,26 @@ canvas {
   top: 16px;
   left: 16px;
   display: flex;
-  gap: 12px;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.hud-top-left-badges {
+  display: flex;
+  gap: 10px;
+}
+
+.hud-minimap-wrapper {
+  margin-top: 2px;
+  pointer-events: none;
+}
+
+#hud-minimap {
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  display: block;
 }
 
 .hud-badge {
@@ -172,9 +191,52 @@ canvas {
   color: #ecf0f1;
 }
 
-#hud-minimap {
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.3);
+.pause-dialog {
+  max-width: 420px;
+  text-align: center;
+}
+
+.pause-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 24px 20px;
+}
+
+.pause-desc {
+  font-size: 15px;
+  color: #94a3b8;
+}
+
+.pause-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.pause-action-btn {
+  width: 100%;
+  font-size: 16px;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 14px;
+}
+
+.restart-btn {
+  background: #334155;
+  color: #f8fafc;
+  border: 1px solid #475569;
+}
+
+.quit-btn {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid #ef4444;
 }
 
 /* ================= タッチ操作コントロール ================= */
@@ -593,11 +655,27 @@ canvas {
   line-height: 1.6;
 }
 
-/* 縦画面のときはオーバーレイを表示 */
+/* 縦画面のときはオーバーレイを表示（強制モード時は非表示） */
 @media (orientation: portrait) {
   .orientation-prompt {
     display: flex;
   }
+}
+
+.orientation-prompt.dismissed {
+  display: none !important;
+}
+
+/* CSSによる横持ち強制モード（端末の回転ロック有効時） */
+body.force-landscape #app {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vh;
+  height: 100vw;
+  transform-origin: top left;
+  transform: rotate(90deg) translateY(-100%);
+  overflow: hidden;
 }
 
 /* ================= デウス・エクス・マキナ 復帰演出 ================= */

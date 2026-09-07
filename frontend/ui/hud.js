@@ -25,11 +25,17 @@ export class HUD {
     hudDiv.className = 'hud-container';
     hudDiv.innerHTML = `
       <div class="hud-top-left">
-        <div class="hud-badge position-badge">
-          <span id="hud-pos-num">1</span><span class="pos-suffix">st</span>
+        <div class="hud-top-left-badges">
+          <div class="hud-badge position-badge">
+            <span id="hud-pos-num">1</span><span class="pos-suffix">st</span>
+          </div>
+          <div class="hud-badge lap-badge">
+            LAP <span id="hud-lap-current">1</span>/<span id="hud-lap-total">3</span>
+          </div>
         </div>
-        <div class="hud-badge lap-badge">
-          LAP <span id="hud-lap-current">1</span>/<span id="hud-lap-total">3</span>
+        <!-- 指の邪魔にならない左上配置のミニマップ -->
+        <div class="hud-minimap-wrapper">
+          <canvas id="hud-minimap" width="130" height="130"></canvas>
         </div>
       </div>
 
@@ -49,6 +55,9 @@ export class HUD {
         <div id="hud-item-slot" class="item-slot-box empty">
           <div class="item-icon-wrapper" id="hud-item-icon"></div>
         </div>
+        <button id="btn-open-pause" class="icon-btn" title="一時停止・中断">
+          ${Icons.getSvg('pause')}
+        </button>
         <button id="btn-open-settings" class="icon-btn" title="設定">
           ${Icons.getSvg('gear')}
         </button>
@@ -64,7 +73,6 @@ export class HUD {
         <div class="speedometer">
           <span id="hud-speed-val">0</span> <span class="unit">km/h</span>
         </div>
-        <canvas id="hud-minimap" width="120" height="120"></canvas>
       </div>
     `;
 
@@ -175,12 +183,13 @@ export class HUD {
 
     ctx.clearRect(0, 0, w, h);
 
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+    // 背景円
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
     ctx.beginPath();
-    ctx.arc(w / 2, h / 2, w / 2 - 2, 0, Math.PI * 2);
+    ctx.arc(w / 2, h / 2, w / 2 - 3, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = '#555';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
+    ctx.lineWidth = 2.5;
     ctx.stroke();
 
     let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
@@ -193,19 +202,19 @@ export class HUD {
 
     const rangeX = (maxX - minX) || 1;
     const rangeZ = (maxZ - minZ) || 1;
-    const maxRange = Math.max(rangeX, rangeZ) * 1.3;
+    const maxRange = Math.max(rangeX, rangeZ) * 1.25;
     const centerX = (minX + maxX) / 2;
     const centerZ = (minZ + maxZ) / 2;
 
-    const toMapX = (x) => (w / 2) + ((x - centerX) / maxRange) * (w - 24);
-    const toMapY = (z) => (h / 2) + ((z - centerZ) / maxRange) * (h - 24);
+    const toMapX = (x) => (w / 2) + ((x - centerX) / maxRange) * (w - 28);
+    const toMapY = (z) => (h / 2) + ((z - centerZ) / maxRange) * (h - 28);
 
+    // コースアウトライン（黒縁）
     ctx.beginPath();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-    ctx.lineWidth = 5;
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.lineWidth = 8;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-
     trackPoints.forEach((p, idx) => {
       const mx = toMapX(p.x);
       const my = toMapY(p.z);
@@ -215,17 +224,49 @@ export class HUD {
     ctx.closePath();
     ctx.stroke();
 
+    // コースライン本体（明るい白線）
+    ctx.beginPath();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    trackPoints.forEach((p, idx) => {
+      const mx = toMapX(p.x);
+      const my = toMapY(p.z);
+      if (idx === 0) ctx.moveTo(mx, my);
+      else ctx.lineTo(mx, my);
+    });
+    ctx.closePath();
+    ctx.stroke();
+
+    // カートアイコン描画
     kartPositions.forEach(k => {
       const mx = toMapX(k.x);
       const my = toMapY(k.z);
 
-      ctx.beginPath();
-      ctx.arc(mx, my, k.isLocal ? 5.5 : 3.8, 0, Math.PI * 2);
-      ctx.fillStyle = k.isLocal ? '#3498db' : (k.color || '#e74c3c');
-      ctx.fill();
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
+      if (k.isLocal) {
+        // 自機：大きく目立つシアンブルー + 外枠パルスリング
+        ctx.beginPath();
+        ctx.arc(mx, my, 7, 0, Math.PI * 2);
+        ctx.fillStyle = '#0284c7';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(mx, my, 5, 0, Math.PI * 2);
+        ctx.fillStyle = '#38bdf8';
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      } else {
+        // ライバルカート：鮮やかな赤/黄色
+        ctx.beginPath();
+        ctx.arc(mx, my, 4.5, 0, Math.PI * 2);
+        ctx.fillStyle = k.color || '#ef4444';
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
     });
   }
 }

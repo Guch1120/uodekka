@@ -13,6 +13,7 @@ import { Items } from '../frontend/items/items.js';
 import { HUD } from '../frontend/ui/hud.js';
 import { SettingsModal } from '../frontend/ui/settings_modal.js';
 import { LobbyModal } from '../frontend/ui/lobby_modal.js';
+import { PauseModal } from '../frontend/ui/pause_modal.js';
 
 export class Game {
   constructor() {
@@ -33,9 +34,17 @@ export class Game {
     // UI
     this.hud = new HUD(this.appContainer);
     this.settingsModal = new SettingsModal(this.appContainer, this.inputManager);
+    this.pauseModal = new PauseModal(
+      this.appContainer,
+      () => this.resumeRace(),
+      () => this.restartRace(),
+      () => this.quitRace()
+    );
 
     // レース状態
     this.isRunning = false;
+    this.isPaused = false;
+    this.currentGameConfig = null;
     this.currentCourseConfig = null;
     this.courseTrack = null;
     this.courseObstacles = []; // 木や岩などの当たり判定オブジェクト
@@ -64,6 +73,82 @@ export class Game {
     document.getElementById('btn-open-settings').onclick = () => {
       this.settingsModal.show();
     };
+
+    const btnPause = document.getElementById('btn-open-pause');
+    if (btnPause) {
+      btnPause.onclick = () => {
+        this.openPauseMenu();
+      };
+    }
+
+    // 画面強制横持ちボタン
+    const btnForceLandscape = document.getElementById('btn-force-landscape');
+    if (btnForceLandscape) {
+      btnForceLandscape.onclick = () => {
+        this.enableForcedLandscape();
+      };
+    }
+  }
+
+  openPauseMenu() {
+    const isMulti = this.currentGameConfig && (this.currentGameConfig.mode === 'multi_host' || this.currentGameConfig.mode === 'multi_guest');
+    if (!isMulti) {
+      this.isPaused = true;
+    }
+    this.pauseModal.show(isMulti ? 'multi' : 'solo');
+  }
+
+  resumeRace() {
+    this.isPaused = false;
+    this.clock.getDelta(); // ポーズ中の経過時間をクリア
+  }
+
+  restartRace() {
+    this.isPaused = false;
+    if (this.currentGameConfig) {
+      this.startRace(this.currentGameConfig);
+    }
+  }
+
+  quitRace() {
+    this.isPaused = false;
+    this.isRunning = false;
+    // P2P接続中なら切断
+    if (this.p2p && this.p2p.peer) {
+      try {
+        this.p2p.peer.destroy();
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+    // ロビー画面を再表示
+    this.lobbyModal.show();
+  }
+
+  enableForcedLandscape() {
+    const orientationPrompt = document.getElementById('orientation-prompt');
+    if (orientationPrompt) {
+      orientationPrompt.classList.add('dismissed');
+    }
+
+    // 全画面リクエストを試行
+    if (document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    } else if (document.documentElement.webkitRequestFullscreen) {
+      document.documentElement.webkitRequestFullscreen().catch(() => {});
+    }
+
+    // Orientation Lock を試行
+    if (screen.orientation && screen.orientation.lock) {
+      screen.orientation.lock('landscape').catch(() => {
+        // OS等の制約でロック不可の場合、CSSで90度回転
+        document.body.classList.add('force-landscape');
+        window.dispatchEvent(new Event('resize'));
+      });
+    } else {
+      document.body.classList.add('force-landscape');
+      window.dispatchEvent(new Event('resize'));
+    }
   }
 
   setupNetworkEvents() {
@@ -155,6 +240,8 @@ export class Game {
       this.spawnAICarts(config.vehicleKey);
     }
 
+    this.currentGameConfig = config;
+    this.isPaused = false;
     this.isRunning = true;
     this.showItemNotification('レーススタート！ GO!', 2500);
   }
@@ -230,7 +317,7 @@ export class Game {
 
     const dt = Math.min(this.clock.getDelta(), 0.1);
 
-    if (this.isRunning && this.localPlayerKart) {
+    if (this.isRunning && this.localPlayerKart && !this.isPaused) {
       this.updateGame(dt);
     }
 
@@ -471,8 +558,15 @@ export class Game {
 
       for (const kart of karts) {
         if (!kart) continue;
-        if (item.ownerId === kart.id && item.type !== 'banana' && (item.lifetime || 0) > 7.5) {
-          continue;
+
+        // 投擲主自身への当たり判定判定（発射直後や空中飛行中の自爆防止）
+        if (item.ownerId === kart.id) {
+          if (item.type === 'bobomb' && ((item.ownerGraceTimer && item.ownerGraceTimer > 0) || !item.hasLanded)) {
+            continue;
+          }
+          if (item.type.includes('shell') && (item.lifetime || 0) > 7.4) {
+            continue;
+          }
         }
 
         if (kart.trailingItemMesh && item.canBlockShell) {
