@@ -956,6 +956,7 @@ canvas {
   display: flex;
   align-items: center;
   justify-content: center;
+  touch-action: none;
 }
 
 #editor-canvas {
@@ -963,6 +964,7 @@ canvas {
   height: 100%;
   display: block;
   cursor: crosshair;
+  touch-action: none;
 }
 
 .editor-help-text {

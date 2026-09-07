@@ -85,7 +85,7 @@ export class EditorModal {
         <div class="editor-canvas-container">
           <canvas id="editor-canvas" width="800" height="520"></canvas>
           <div class="editor-help-text">
-            ドラッグで頂点移動 / マウスホイールで拡大縮小 / 右ボタンドラッグで画面スクロール
+            頂点をタップ＆ドラッグで移動 / 2本指でパン・ピンチズーム (マウス: 左ドラッグで頂点移動 / ホイールでズーム / 右ドラッグで移動)
           </div>
         </div>
       </div>
@@ -173,7 +173,7 @@ export class EditorModal {
       this.render();
     };
 
-    // Canvas マウス/タッチ操作
+    // Canvas マウス/タッチ操作 (Pointer Events で統一対応)
     const canvas = this.canvas;
 
     const toWorldPos = (screenX, screenY) => {
@@ -185,7 +185,36 @@ export class EditorModal {
       return { x, z };
     };
 
-    canvas.onmousedown = (e) => {
+    // アクティブなポインタ追跡 (ピンチズーム・2本指パン対応)
+    const activePointers = new Map();
+    let initialPinchDistance = null;
+    let initialPinchZoom = 1;
+    let pinchMidX = 0;
+    let pinchMidY = 0;
+
+    canvas.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      try {
+        canvas.setPointerCapture(e.pointerId);
+      } catch (err) {}
+
+      activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      // 2本指以上の場合: ピンチズーム/2本指パンスクロール開始
+      if (activePointers.size === 2) {
+        const pts = Array.from(activePointers.values());
+        initialPinchDistance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        initialPinchZoom = this.zoom;
+        pinchMidX = (pts[0].x + pts[1].x) / 2;
+        pinchMidY = (pts[0].y + pts[1].y) / 2;
+        this.draggingPointIdx = -1;
+        this.isPanning = false;
+        return;
+      }
+
+      if (activePointers.size > 2) return;
+
+      // 1本指またはマウスクリック
       if (e.button === 2) {
         // 右ボタンドラッグ: パン
         this.isPanning = true;
@@ -197,7 +226,6 @@ export class EditorModal {
       const world = toWorldPos(e.clientX, e.clientY);
 
       if (this.currentTool === 'add') {
-        // 最も近い線分を見つけて間に挿入
         this.insertPointNear(world.x, world.z);
         this.render();
         return;
@@ -219,21 +247,56 @@ export class EditorModal {
 
       // 'move' ツール: 頂点選択とドラッグ開始
       let clickedIdx = -1;
-      const clickThreshold = 18 / this.zoom;
+      // スマホの指でも確実に掴めるよう、タッチ時は当たり判定を拡大 (32px相当)
+      const touchRadius = (e.pointerType === 'touch') ? 32 : 20;
+      const clickThreshold = touchRadius / this.zoom;
 
+      let nearestDist = Infinity;
       this.courseData.points.forEach((p, idx) => {
         const dist = Math.hypot(p.x - world.x, p.z - world.z);
-        if (dist < clickThreshold) {
+        if (dist < clickThreshold && dist < nearestDist) {
+          nearestDist = dist;
           clickedIdx = idx;
         }
       });
 
-      this.selectedPointIdx = clickedIdx;
-      this.draggingPointIdx = clickedIdx;
+      if (clickedIdx >= 0) {
+        this.selectedPointIdx = clickedIdx;
+        this.draggingPointIdx = clickedIdx;
+      } else {
+        // 頂点以外を1本指でドラッグした場合は画面のスクロール(パン)
+        this.selectedPointIdx = -1;
+        this.isPanning = true;
+        this.panStartX = e.clientX - this.panX;
+        this.panStartY = e.clientY - this.panY;
+      }
       this.render();
-    };
+    });
 
-    window.addEventListener('mousemove', (e) => {
+    canvas.addEventListener('pointermove', (e) => {
+      if (!activePointers.has(e.pointerId)) return;
+      e.preventDefault();
+
+      activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      // 2本指ジェスチャー (ピンチズーム & パン)
+      if (activePointers.size === 2 && initialPinchDistance) {
+        const pts = Array.from(activePointers.values());
+        const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        const ratio = dist / initialPinchDistance;
+        this.zoom = Math.max(0.2, Math.min(2.5, initialPinchZoom * ratio));
+
+        const curMidX = (pts[0].x + pts[1].x) / 2;
+        const curMidY = (pts[0].y + pts[1].y) / 2;
+        this.panX += (curMidX - pinchMidX);
+        this.panY += (curMidY - pinchMidY);
+        pinchMidX = curMidX;
+        pinchMidY = curMidY;
+
+        this.render();
+        return;
+      }
+
       if (this.isPanning) {
         this.panX = e.clientX - this.panStartX;
         this.panY = e.clientY - this.panStartY;
@@ -249,10 +312,25 @@ export class EditorModal {
       }
     });
 
-    window.addEventListener('mouseup', () => {
-      this.isPanning = false;
-      this.draggingPointIdx = -1;
-    });
+    const endPointer = (e) => {
+      if (activePointers.has(e.pointerId)) {
+        activePointers.delete(e.pointerId);
+      }
+      try {
+        canvas.releasePointerCapture(e.pointerId);
+      } catch (err) {}
+
+      if (activePointers.size < 2) {
+        initialPinchDistance = null;
+      }
+      if (activePointers.size === 0) {
+        this.isPanning = false;
+        this.draggingPointIdx = -1;
+      }
+    };
+
+    canvas.addEventListener('pointerup', endPointer);
+    canvas.addEventListener('pointercancel', endPointer);
 
     canvas.oncontextmenu = (e) => e.preventDefault();
 
@@ -262,6 +340,13 @@ export class EditorModal {
       this.zoom = Math.max(0.2, Math.min(2.5, this.zoom * zoomFactor));
       this.render();
     };
+
+    window.addEventListener('resize', () => {
+      if (!this.modalEl.classList.contains('hidden')) {
+        this.resizeCanvas();
+        this.render();
+      }
+    });
   }
 
   resetDefault() {
@@ -333,9 +418,24 @@ export class EditorModal {
     }
   }
 
+  resizeCanvas() {
+    if (!this.canvas) return;
+    const rect = this.canvas.parentElement.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      if (this.canvas.width !== Math.round(rect.width) || this.canvas.height !== Math.round(rect.height)) {
+        this.canvas.width = Math.round(rect.width);
+        this.canvas.height = Math.round(rect.height);
+      }
+    }
+  }
+
   show() {
     this.modalEl.classList.remove('hidden');
-    this.render();
+    // コンテナの実際の寸法に合わせて描画バッファ解像度をフィット
+    requestAnimationFrame(() => {
+      this.resizeCanvas();
+      this.render();
+    });
   }
 
   hide() {
@@ -344,6 +444,7 @@ export class EditorModal {
 
   render() {
     if (!this.ctx || !this.canvas) return;
+    this.resizeCanvas();
     const ctx = this.ctx;
     const w = this.canvas.width;
     const h = this.canvas.height;
@@ -459,18 +560,27 @@ export class EditorModal {
       const px = toScreenX(p.x);
       const py = toScreenY(p.z);
       const isSelected = idx === this.selectedPointIdx;
-
+      // 選択中頂点は大きめのリングと目立つ赤、通常時は操作しやすい10px
+      const radius = isSelected ? 12 : 9;
       ctx.beginPath();
-      ctx.arc(px, py, isSelected ? 8 : 6, 0, Math.PI * 2);
+      ctx.arc(px, py, radius, 0, Math.PI * 2);
       ctx.fillStyle = isSelected ? '#ef4444' : '#38bdf8';
       ctx.fill();
       ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2.5;
       ctx.stroke();
 
+      if (isSelected) {
+        ctx.beginPath();
+        ctx.arc(px, py, radius + 5, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.5)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
       ctx.fillStyle = '#ffffff';
-      ctx.font = '10px sans-serif';
-      ctx.fillText(idx + 1, px + 8, py - 4);
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText(idx + 1, px + 10, py - 4);
     });
   }
 }
