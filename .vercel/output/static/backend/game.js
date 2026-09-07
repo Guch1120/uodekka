@@ -138,16 +138,33 @@ export class Game {
       document.documentElement.webkitRequestFullscreen().catch(() => {});
     }
 
+    const applyLandscapeLayout = () => {
+      document.body.classList.add('force-landscape');
+      if (this.renderer) {
+        this.renderer.onResize();
+      }
+      window.dispatchEvent(new Event('resize'));
+      setTimeout(() => {
+        if (this.renderer) this.renderer.onResize();
+        window.dispatchEvent(new Event('resize'));
+      }, 100);
+      setTimeout(() => {
+        if (this.renderer) this.renderer.onResize();
+        window.dispatchEvent(new Event('resize'));
+      }, 300);
+    };
+
     // Orientation Lock を試行
     if (screen.orientation && screen.orientation.lock) {
-      screen.orientation.lock('landscape').catch(() => {
-        // OS等の制約でロック不可の場合、CSSで90度回転
-        document.body.classList.add('force-landscape');
+      screen.orientation.lock('landscape').then(() => {
+        if (this.renderer) this.renderer.onResize();
         window.dispatchEvent(new Event('resize'));
+      }).catch(() => {
+        // OS等の制約でロック不可の場合、CSSで90度回転
+        applyLandscapeLayout();
       });
     } else {
-      document.body.classList.add('force-landscape');
-      window.dispatchEvent(new Event('resize'));
+      applyLandscapeLayout();
     }
   }
 

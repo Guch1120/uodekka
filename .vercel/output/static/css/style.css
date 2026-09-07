@@ -667,14 +667,21 @@ canvas {
 }
 
 /* CSSによる横持ち強制モード（端末の回転ロック有効時） */
+body.force-landscape {
+  overflow: hidden;
+  position: fixed;
+  width: 100vw;
+  height: 100vh;
+}
+
 body.force-landscape #app {
   position: fixed;
   top: 0;
-  left: 0;
+  left: 100vw;
   width: 100vh;
   height: 100vw;
-  transform-origin: top left;
-  transform: rotate(90deg) translateY(-100%);
+  transform-origin: 0 0;
+  transform: rotate(90deg);
   overflow: hidden;
 }
 

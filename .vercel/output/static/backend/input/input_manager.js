@@ -110,7 +110,10 @@ export class InputManager {
 
       let tiltAngle = 0;
 
-      if (orientationAngle === 90) {
+      if (document.body.classList.contains('force-landscape')) {
+        // OSが縦持ち(0度)と認識している状態で端末を時計回りまたは反時計回りに横持ちしている場合
+        tiltAngle = -e.beta;
+      } else if (orientationAngle === 90) {
         tiltAngle = -e.beta;
       } else if (orientationAngle === -90 || orientationAngle === 270) {
         tiltAngle = e.beta;
@@ -322,6 +325,14 @@ export class InputManager {
 
       let dx = clientX - centerX;
       let dy = clientY - centerY;
+
+      // CSSによる90度強制横持ちモードの場合、タッチ座標系を要素ローカル系（時計回り90度回転）に合わせて変換
+      if (document.body.classList.contains('force-landscape')) {
+        const tempX = dx;
+        dx = dy;
+        dy = -tempX;
+      }
+
       const dist = Math.hypot(dx, dy);
 
       if (dist > maxRadius) {
