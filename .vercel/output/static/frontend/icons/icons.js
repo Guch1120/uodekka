@@ -129,6 +129,12 @@ export const Icons = {
     pause: `<svg viewBox="0 0 100 100" width="100%" height="100%">
       <rect x="24" y="20" width="18" height="60" rx="6" fill="#ecf0f1"/>
       <rect x="58" y="20" width="18" height="60" rx="6" fill="#ecf0f1"/>
+    </svg>`,
+
+    rotate: `<svg viewBox="0 0 100 100" width="100%" height="100%">
+      <path d="M50 15 A35 35 0 1 1 20 35" fill="none" stroke="#ecf0f1" stroke-width="8" stroke-linecap="round"/>
+      <polygon points="10,20 20,40 38,28" fill="#ecf0f1"/>
+      <rect x="42" y="38" width="16" height="24" rx="3" fill="none" stroke="#f59e0b" stroke-width="4"/>
     </svg>`
   },
 

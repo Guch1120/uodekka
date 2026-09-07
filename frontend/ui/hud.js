@@ -55,6 +55,9 @@ export class HUD {
         <div id="hud-item-slot" class="item-slot-box empty">
           <div class="item-icon-wrapper" id="hud-item-icon"></div>
         </div>
+        <button id="btn-toggle-rotate" class="icon-btn" title="画面の向き切替（左右反転）">
+          ${Icons.getSvg('rotate')}
+        </button>
         <button id="btn-open-pause" class="icon-btn" title="一時停止・中断">
           ${Icons.getSvg('pause')}
         </button>

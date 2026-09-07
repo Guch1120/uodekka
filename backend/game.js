@@ -88,6 +88,25 @@ export class Game {
         this.enableForcedLandscape();
       };
     }
+
+    // HUDの画面向き左右反転トグルボタン
+    const btnToggleRotate = document.getElementById('btn-toggle-rotate');
+    if (btnToggleRotate) {
+      btnToggleRotate.onclick = () => {
+        document.body.classList.toggle('rotate-reverse');
+        if (this.renderer) this.renderer.onResize();
+        window.dispatchEvent(new Event('resize'));
+      };
+    }
+
+    // 画面サイズ・向き変化監視（横向きになったらプロンプトを閉じ、サイズ再計算）
+    window.addEventListener('resize', () => {
+      if (window.innerWidth > window.innerHeight) {
+        const orientationPrompt = document.getElementById('orientation-prompt');
+        if (orientationPrompt) orientationPrompt.classList.add('dismissed');
+      }
+      if (this.renderer) this.renderer.onResize();
+    });
   }
 
   openPauseMenu() {
