@@ -11,7 +11,6 @@ export const Course1 = {
   trackWidth: 32,
   totalLaps: 3,
 
-  // サーキットのウェイポイント（CatmullRomスプライン補間用）
   points: [
     new THREE.Vector3(0, 0, 0),
     new THREE.Vector3(120, 0, 20),
@@ -25,11 +24,11 @@ export const Course1 = {
     new THREE.Vector3(-20, 0, 0)
   ],
 
-  // アイテムボックスの配置位置（スプライン上のT値 0.0〜1.0）
   itemBoxLocations: [0.15, 0.45, 0.75],
 
   createEnvironment(scene) {
     const group = new THREE.Group();
+    const obstacles = [];
 
     // 地面（芝生）
     const groundGeo = new THREE.PlaneGeometry(1200, 1200);
@@ -39,30 +38,55 @@ export const Course1 = {
     ground.receiveShadow = true;
     group.add(ground);
 
-    // 木・装飾オブジェクトのランダム配置
-    const treeTrunkGeo = new THREE.CylinderGeometry(0.5, 0.7, 4, 8);
-    const treeLeavesGeo = new THREE.ConeGeometry(3.5, 7, 8);
-    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x795548 });
-    const leavesMat = new THREE.MeshStandardMaterial({ color: 0x2e7d32 });
+    // 木・装飾オブジェクト（幹と葉）
+    const treeTrunkGeo = new THREE.CylinderGeometry(0.8, 1.1, 4.5, 8);
+    const treeLeavesGeo = new THREE.ConeGeometry(4.0, 8, 8);
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x795548, roughness: 0.8 });
+    const leavesMat = new THREE.MeshStandardMaterial({ color: 0x2e7d32, roughness: 0.6 });
 
-    for (let i = 0; i < 70; i++) {
-      const angle = (i / 70) * Math.PI * 2;
-      const dist = 120 + Math.sin(i * 3) * 60 + (Math.random() * 80);
+    // 一時的なコーススプラインで道路上の重複配置を避ける
+    const curve = new THREE.CatmullRomCurve3(this.points, true, 'centripetal');
+
+    for (let i = 0; i < 80; i++) {
+      const angle = (i / 80) * Math.PI * 2;
+      const dist = 100 + Math.sin(i * 3) * 60 + (Math.random() * 90);
       const x = Math.cos(angle) * dist + 60;
       const z = Math.sin(angle) * dist + 160;
 
+      // 道路中心線からの距離をチェック（道路上なら外側にずらす）
+      const testPos = new THREE.Vector3(x, 0, z);
+      let minDist = Infinity;
+      for (let s = 0; s < 40; s++) {
+        const pt = curve.getPointAt(s / 40);
+        const d = testPos.distanceTo(pt);
+        if (d < minDist) minDist = d;
+      }
+
+      // コース幅（32m / 2 = 16m）のすぐ外側や内側に配置
+      if (minDist < 18.0) {
+        continue; // 道路に近すぎる場合はスキップして道路外に安全配置
+      }
+
       const tree = new THREE.Group();
       const trunk = new THREE.Mesh(treeTrunkGeo, trunkMat);
-      trunk.position.y = 2;
+      trunk.position.y = 2.25;
       const leaves = new THREE.Mesh(treeLeavesGeo, leavesMat);
-      leaves.position.y = 6;
+      leaves.position.y = 6.5;
       tree.add(trunk);
       tree.add(leaves);
       tree.position.set(x, 0, z);
       tree.castShadow = true;
       group.add(tree);
+
+      // 当たり判定用コライダー情報
+      obstacles.push({
+        position: tree.position,
+        radius: 1.6, // 幹の衝突半径
+        type: 'tree'
+      });
     }
 
+    group.userData = { obstacles };
     return group;
   }
 };

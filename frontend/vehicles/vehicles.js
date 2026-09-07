@@ -1,5 +1,5 @@
 // frontend/vehicles/vehicles.js
-// カート機体の定義（Three.jsメッシュ生成、性能パラメータ、カラー設定など）
+// カート機体の定義（Three.jsメッシュ生成、物理走行パラメータ）
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 
 export const Vehicles = {
@@ -9,45 +9,50 @@ export const Vehicles = {
       name: 'レッド・ストリーム',
       color: 0xe74c3c,
       accentColor: 0xffffff,
-      topSpeed: 42,
-      acceleration: 24,
-      handling: 1.6,         // 旋回感度を適度にマイルド化 (旧: 2.8)
+      topSpeed: 42.0,        // 最高速度 (km/h換算 ~126km/h)
+      acceleration: 24.0,    // 前進加速度
+      brakeForce: 36.0,      // ブレーキ減速力
+      inertiaDamping: 1.4,   // アクセルOFF時の慣性滑走・自然減速
+      offroadFriction: 0.35, // コース外ダートでの最高速・加速度制限 (35%に大幅低下)
+      handling: 1.5,         // ステアリング旋回力
       weight: 1.0,
-      driftMultiplier: 1.3
+      driftMultiplier: 1.25
     },
     speed_blue: {
       id: 'speed_blue',
       name: 'ブルー・ファルコン',
       color: 0x3498db,
       accentColor: 0xf1c40f,
-      topSpeed: 48,
-      acceleration: 20,
-      handling: 1.3,         // 旋回感度を適度にマイルド化 (旧: 2.2)
+      topSpeed: 47.0,
+      acceleration: 20.0,
+      brakeForce: 32.0,
+      inertiaDamping: 1.1,   // 滑りやすい高速慣性
+      offroadFriction: 0.30,
+      handling: 1.25,
       weight: 1.2,
-      driftMultiplier: 1.35
+      driftMultiplier: 1.3
     },
     handling_green: {
       id: 'handling_green',
       name: 'グリーン・ツイスター',
       color: 0x2ecc71,
       accentColor: 0x27ae60,
-      topSpeed: 38,
-      acceleration: 30,
-      handling: 1.9,         // 旋回感度を適度にマイルド化 (旧: 3.4)
+      topSpeed: 38.0,
+      acceleration: 30.0,
+      brakeForce: 42.0,
+      inertiaDamping: 1.6,
+      offroadFriction: 0.40, // ダートでも比較的粘る
+      handling: 1.8,
       weight: 0.8,
-      driftMultiplier: 1.25
+      driftMultiplier: 1.2
     }
   },
 
-  /**
-   * カートの3Dモデル（Three.js Group）
-   * 前方を -Z 方向、後方を +Z 方向として整列
-   */
   createKartMesh(vehicleTypeKey = 'standard_red') {
     const config = this.types[vehicleTypeKey] || this.types.standard_red;
     const group = new THREE.Group();
 
-    // 1. シャーシ（車体下部）
+    // 1. シャーシ
     const chassisGeo = new THREE.BoxGeometry(1.6, 0.35, 2.6);
     const chassisMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.8, metalness: 0.2 });
     const chassis = new THREE.Mesh(chassisGeo, chassisMat);
@@ -55,7 +60,7 @@ export const Vehicles = {
     chassis.castShadow = true;
     group.add(chassis);
 
-    // 2. ボディ（メインカウル）
+    // 2. メインボディ
     const bodyGeo = new THREE.BoxGeometry(1.2, 0.45, 1.8);
     const bodyMat = new THREE.MeshStandardMaterial({
       color: config.color,
@@ -67,23 +72,23 @@ export const Vehicles = {
     body.castShadow = true;
     group.add(body);
 
-    // ノーズコーン (前方: -Z 方向を尖らせる)
+    // ノーズコーン (-Z前方)
     const noseGeo = new THREE.ConeGeometry(0.6, 0.9, 4);
-    noseGeo.rotateX(-Math.PI / 2); // 先端を -Z に向ける
+    noseGeo.rotateX(-Math.PI / 2);
     const noseMat = new THREE.MeshStandardMaterial({ color: config.accentColor, roughness: 0.3 });
     const nose = new THREE.Mesh(noseGeo, noseMat);
     nose.position.set(0, 0.55, -1.2);
     nose.castShadow = true;
     group.add(nose);
 
-    // 3. コックピット & ドライバー（ヘルメット）
+    // 3. ドライバーシート
     const seatGeo = new THREE.BoxGeometry(0.7, 0.5, 0.5);
     const seatMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
     const seat = new THREE.Mesh(seatGeo, seatMat);
     seat.position.set(0, 0.7, 0.2);
     group.add(seat);
 
-    // ヘルメット（ドライバーの頭部）
+    // ヘルメット
     const headGeo = new THREE.SphereGeometry(0.35, 16, 16);
     const headMat = new THREE.MeshStandardMaterial({ color: config.color, roughness: 0.2 });
     const head = new THREE.Mesh(headGeo, headMat);
@@ -91,14 +96,14 @@ export const Vehicles = {
     head.castShadow = true;
     group.add(head);
 
-    // バイザー (前方を向く: -Z)
+    // バイザー (-Z)
     const visorGeo = new THREE.BoxGeometry(0.35, 0.15, 0.2);
     const visorMat = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.1, metalness: 0.9 });
     const visor = new THREE.Mesh(visorGeo, visorMat);
     visor.position.set(0, 1.25, 0.05);
     group.add(visor);
 
-    // 4. リアウイング (後方: +Z)
+    // 4. リアウイング (+Z後方)
     const wingGeo = new THREE.BoxGeometry(1.5, 0.1, 0.4);
     const wingMat = new THREE.MeshStandardMaterial({ color: config.accentColor, roughness: 0.3 });
     const wing = new THREE.Mesh(wingGeo, wingMat);
@@ -121,10 +126,10 @@ export const Vehicles = {
 
     const wheels = [];
     const wheelPositions = [
-      { x: -0.9, y: 0.35, z: -0.8 },  // 前左 (Z = -0.8)
-      { x: 0.9, y: 0.35, z: -0.8 },   // 前右 (Z = -0.8)
-      { x: -0.95, y: 0.38, z: 0.8 },  // 後左 (Z = +0.8)
-      { x: 0.95, y: 0.38, z: 0.8 }   // 後右 (Z = +0.8)
+      { x: -0.9, y: 0.35, z: -0.8 },
+      { x: 0.9, y: 0.35, z: -0.8 },
+      { x: -0.95, y: 0.38, z: 0.8 },
+      { x: 0.95, y: 0.38, z: 0.8 }
     ];
 
     wheelPositions.forEach(pos => {

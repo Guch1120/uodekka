@@ -8,18 +8,20 @@ export class InputManager {
 
     // 入力状態
     this.state = {
-      steering: 0,      // -1.0 (左) 〜 +1.0 (右)
-      accelerating: 0,  // 0.0 〜 1.0
-      braking: 0,       // 0.0 〜 1.0
-      drift: false,     // ドリフト/ミニターボ
-      useItem: false    // アイテム使用
+      steering: 0,        // -1.0 (左) 〜 +1.0 (右)
+      accelerating: 0,    // 0.0 〜 1.0
+      braking: 0,         // 0.0 〜 1.0
+      drift: false,       // ドリフト/ミニターボ
+      itemHeld: false,    // アイテム長押し（後方保持）
+      useItemTrigger: false, // アイテム離した瞬間の発射
+      isForwardThrow: false, // 前方投げフラグ (長押し後リリース: 前方放物線 / 単押し: 後方設置)
+      itemPressStartTime: 0
     };
 
     this.controlMode = localStorage.getItem('kart_control_mode') || 'gyro'; // 'gyro' or 'stick'
     this.gyroSensitivity = parseFloat(localStorage.getItem('kart_gyro_sens') || '0.7');
     this.invertSteering = localStorage.getItem('kart_invert_steer') === 'true'; // ハンドル反転設定
 
-    // ジャイロ値
     this.gyroGamma = 0;
     this.gyroActive = false;
 
@@ -46,12 +48,10 @@ export class InputManager {
       const saved = localStorage.getItem('kart_ui_layout');
       if (saved) {
         const parsed = JSON.parse(saved);
-        // 旧キー名 'accelerator' の互換性吸収
         if (parsed.accelerator && !parsed.accel) {
           parsed.accel = parsed.accelerator;
           delete parsed.accelerator;
         }
-        // 画面上部にはみ出すなど異常値がある場合の安全マージ
         return Object.assign({}, this.defaultLayout, parsed);
       }
     } catch (e) {
@@ -104,25 +104,19 @@ export class InputManager {
     window.addEventListener('deviceorientation', (e) => {
       if (this.controlMode !== 'gyro') return;
 
-      // 画面の向き取得 (screen.orientation.angle または window.orientation)
       const orientationAngle = (screen.orientation && screen.orientation.angle !== undefined)
         ? screen.orientation.angle
         : (window.orientation || 0);
 
       let tiltAngle = 0;
 
-      // 横持ち（ランドスケープ）の場合
       if (orientationAngle === 90) {
-        // 右に90度倒した横持ち (ノッチ左側)
         tiltAngle = -e.beta;
       } else if (orientationAngle === -90 || orientationAngle === 270) {
-        // 左に90度倒した横持ち (ノッチ右側)
         tiltAngle = e.beta;
       } else if (window.innerWidth > window.innerHeight) {
-        // orientationAngleが0だが画面が横長の場合（PCエミュレータや一部端末）
         tiltAngle = -e.beta;
       } else {
-        // 縦持ちの場合
         tiltAngle = e.gamma;
       }
 
@@ -175,9 +169,17 @@ export class InputManager {
     this.state.accelerating = (keys['ArrowUp'] || keys['KeyW']) ? 1 : 0;
     this.state.braking = (keys['ArrowDown'] || keys['KeyS']) ? 1 : 0;
     this.state.drift = !!keys['ShiftLeft'] || !!keys['ShiftRight'] || !!keys['Space'];
-    if (keys['KeyE'] || keys['KeyQ'] || keys['Enter']) {
-      this.state.useItem = true;
-      setTimeout(() => { this.state.useItem = false; }, 100);
+
+    // キーボードのアイテム長押し判定 (E/Q/Enter)
+    const itemKey = keys['KeyE'] || keys['KeyQ'] || keys['Enter'];
+    if (itemKey && !this.state.itemHeld) {
+      this.state.itemHeld = true;
+      this.state.itemPressStartTime = performance.now();
+    } else if (!itemKey && this.state.itemHeld) {
+      const duration = performance.now() - this.state.itemPressStartTime;
+      this.state.isForwardThrow = duration >= 250; // 250ms以上押し続けて離したら前方投げ
+      this.state.itemHeld = false;
+      this.state.useItemTrigger = true; // 離した瞬間に使用
     }
   }
 
@@ -186,35 +188,30 @@ export class InputManager {
     root.id = 'touch-controls-container';
     root.className = 'touch-controls-layer';
 
-    // 1. バーチャルスティック (左下)
     const stickContainer = document.createElement('div');
     stickContainer.id = 'ctrl-stick';
     stickContainer.className = 'touch-control-element stick-base';
     stickContainer.innerHTML = '<div class="stick-knob" id="stick-knob"></div>';
     root.appendChild(stickContainer);
 
-    // 2. アクセルボタン（右下）
     const btnAccel = document.createElement('button');
     btnAccel.id = 'ctrl-accel';
     btnAccel.className = 'touch-control-element touch-btn btn-gas';
     btnAccel.innerHTML = '<span>アクセル<br><small>GO</small></span>';
     root.appendChild(btnAccel);
 
-    // 3. ブレーキ/バック
     const btnBrake = document.createElement('button');
     btnBrake.id = 'ctrl-brake';
     btnBrake.className = 'touch-control-element touch-btn btn-brake';
     btnBrake.innerHTML = '<span>ブレーキ</span>';
     root.appendChild(btnBrake);
 
-    // 4. アイテムボタン
     const btnItem = document.createElement('button');
     btnItem.id = 'ctrl-item';
     btnItem.className = 'touch-control-element touch-btn btn-item';
-    btnItem.innerHTML = '<span>アイテム<br>発動</span>';
+    btnItem.innerHTML = '<span>アイテム<br><small>長押し保持</small></span>';
     root.appendChild(btnItem);
 
-    // 5. ドリフトボタン
     const btnDrift = document.createElement('button');
     btnDrift.id = 'ctrl-drift';
     btnDrift.className = 'touch-control-element touch-btn btn-drift';
@@ -295,17 +292,25 @@ export class InputManager {
       () => { this.state.drift = false; btnDrift.classList.remove('pressed'); }
     );
 
-    // アイテム
+    // アイテム（長押しで後方保持、離した瞬間に使用。単押し=後方、長押し保持後リリース=前方投げ）
     bindPress(btnItem,
       () => {
-        this.state.useItem = true;
+        this.state.itemHeld = true;
+        this.state.itemPressStartTime = performance.now();
         btnItem.classList.add('pressed');
-        setTimeout(() => { this.state.useItem = false; btnItem.classList.remove('pressed'); }, 150);
       },
-      () => {}
+      () => {
+        if (this.state.itemHeld) {
+          const duration = performance.now() - this.state.itemPressStartTime;
+          this.state.isForwardThrow = duration >= 250; // 250ms以上保持して離したら前方投げ、短ければ後方
+          this.state.itemHeld = false;
+          this.state.useItemTrigger = true;
+        }
+        btnItem.classList.remove('pressed');
+      }
     );
 
-    // スティックのドラッグ操作
+    // スティックのドラッグ操作 (dxがプラスなら右旋回: steer = +dx / maxRadius)
     let stickTouchId = null;
     let stickRect = null;
 
@@ -325,6 +330,7 @@ export class InputManager {
       }
 
       stickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+      // 右に倒したら dx > 0 なので steer > 0（右旋回）
       let steer = dx / maxRadius;
       if (this.invertSteering) steer = -steer;
       this.state.steering = steer;
@@ -367,7 +373,6 @@ export class InputManager {
       }
     });
 
-    // 画面右半分全体のタップでもアクセル可能にする
     window.addEventListener('touchstart', (e) => {
       if (this.isEditingLayout) return;
       const touch = e.changedTouches[0];

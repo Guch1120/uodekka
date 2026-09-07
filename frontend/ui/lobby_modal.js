@@ -1,10 +1,11 @@
 // frontend/ui/lobby_modal.js
 // サーバーレスP2Pマルチプレイ（ルーム作成・参加・QRコード表示）
 export class LobbyModal {
-  constructor(container, p2pManager, onStartGame) {
+  constructor(container, p2pManager, onStartGame, inputManager = null) {
     this.container = container;
     this.p2pManager = p2pManager;
     this.onStartGame = onStartGame;
+    this.inputManager = inputManager;
     this.modalEl = null;
     this.init();
   }
@@ -193,13 +194,27 @@ export class LobbyModal {
       }
     };
 
+    const startGameWithGyroCheck = async (gameConfig) => {
+      if (this.inputManager && this.inputManager.controlMode === 'gyro' && !this.inputManager.gyroActive) {
+        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+          const wantGyro = confirm('ジャイロ操作（スマホの傾き操作）が有効です。センサーへのアクセスを許可しますか？\n（「キャンセル」を押すと画面スティック操作に切り替わります）');
+          if (wantGyro) {
+            await this.inputManager.requestGyroPermission();
+          } else {
+            this.inputManager.setControlMode('stick');
+          }
+        }
+      }
+      this.hide();
+      this.onStartGame(gameConfig);
+    };
+
     // ホスト: レース開始
-    modal.querySelector('#btn-host-start').onclick = () => {
+    modal.querySelector('#btn-host-start').onclick = async () => {
       const courseId = modal.querySelector('#select-host-course').value;
       const vehicleKey = modal.querySelector('#select-host-vehicle').value;
       this.p2pManager.broadcastStartRace({ courseId });
-      this.hide();
-      this.onStartGame({
+      await startGameWithGyroCheck({
         mode: 'multi_host',
         courseId,
         vehicleKey,
@@ -225,9 +240,8 @@ export class LobbyModal {
         await this.p2pManager.joinRoom(roomId, { vehicleKey });
         statusEl.textContent = '接続完了！ホストの開始を待機しています...';
 
-        this.p2pManager.onGameStart = (gameData) => {
-          this.hide();
-          this.onStartGame({
+        this.p2pManager.onGameStart = async (gameData) => {
+          await startGameWithGyroCheck({
             mode: 'multi_guest',
             courseId: gameData.courseId,
             vehicleKey,
@@ -242,11 +256,10 @@ export class LobbyModal {
     };
 
     // ソロプレイ開始
-    modal.querySelector('#btn-start-solo').onclick = () => {
+    modal.querySelector('#btn-start-solo').onclick = async () => {
       const courseId = modal.querySelector('#select-solo-course').value;
       const vehicleKey = modal.querySelector('#select-solo-vehicle').value;
-      this.hide();
-      this.onStartGame({
+      await startGameWithGyroCheck({
         mode: 'solo',
         courseId,
         vehicleKey,

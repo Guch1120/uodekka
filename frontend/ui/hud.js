@@ -1,5 +1,5 @@
 // frontend/ui/hud.js
-// レース中のHUD（順位、ラップ、速度メーター、アイテムスロット、ミニマップ）
+// レース中のHUD（順位、ラップ、速度メーター、アイテムスロット、ミニマップ、復帰カウントダウン、逆走警告）
 import { Icons } from '../icons/icons.js';
 
 export class HUD {
@@ -13,6 +13,9 @@ export class HUD {
     this.minimapCanvas = null;
     this.minimapCtx = null;
     this.notificationEl = null;
+    this.respawnBannerEl = null;
+    this.respawnTimerNumEl = null;
+    this.wrongWayEl = null;
     this.init();
   }
 
@@ -32,6 +35,14 @@ export class HUD {
 
       <div class="hud-top-center">
         <div id="hud-notification" class="hud-notification hidden"></div>
+        <!-- ファイナルラップ大バナー -->
+        <div id="hud-final-lap" class="final-lap-banner hidden">
+          🏁 FINAL LAP! 🏁
+        </div>
+        <!-- 逆走警告バナー -->
+        <div id="hud-wrong-way" class="wrong-way-banner hidden">
+          ⚠️ 逆走中！ WRONG WAY ⚠️
+        </div>
       </div>
 
       <div class="hud-top-right">
@@ -41,6 +52,12 @@ export class HUD {
         <button id="btn-open-settings" class="icon-btn" title="設定">
           ${Icons.getSvg('gear')}
         </button>
+      </div>
+
+      <!-- デウス・エクス・マキナ 復帰カウントダウン -->
+      <div id="hud-respawn-banner" class="respawn-banner hidden">
+        <div class="respawn-title">RESCUE & RESTORE</div>
+        <div class="respawn-timer-circle" id="hud-respawn-timer">2</div>
       </div>
 
       <div class="hud-bottom-right-info">
@@ -61,28 +78,47 @@ export class HUD {
     this.lapTotalEl = hudDiv.querySelector('#hud-lap-total');
     this.speedEl = hudDiv.querySelector('#hud-speed-val');
     this.notificationEl = hudDiv.querySelector('#hud-notification');
+    this.finalLapEl = hudDiv.querySelector('#hud-final-lap');
+    this.wrongWayEl = hudDiv.querySelector('#hud-wrong-way');
+
+    this.respawnBannerEl = hudDiv.querySelector('#hud-respawn-banner');
+    this.respawnTimerNumEl = hudDiv.querySelector('#hud-respawn-timer');
 
     this.minimapCanvas = hudDiv.querySelector('#hud-minimap');
     this.minimapCtx = this.minimapCanvas.getContext('2d');
+    this.lastRecordedLap = 1;
+  }
+
+  showRespawnCountdown(remainingSeconds) {
+    this.respawnBannerEl.classList.remove('hidden');
+    this.respawnTimerNumEl.textContent = Math.ceil(remainingSeconds);
+  }
+
+  hideRespawnCountdown() {
+    this.respawnBannerEl.classList.add('hidden');
   }
 
   update(playerState, trackPoints = []) {
     if (!playerState) return;
 
-    // 順位
     this.positionEl.textContent = playerState.position || 1;
     const suffixEl = this.element.querySelector('.pos-suffix');
     const pos = playerState.position || 1;
     suffixEl.textContent = pos === 1 ? 'st' : (pos === 2 ? 'nd' : (pos === 3 ? 'rd' : 'th'));
 
-    // ラップ
-    this.lapEl.textContent = Math.min(playerState.currentLap || 1, playerState.totalLaps || 3);
-    this.lapTotalEl.textContent = playerState.totalLaps || 3;
+    const curLap = playerState.currentLap || 1;
+    const totLaps = playerState.totalLaps || 3;
 
-    // 速度
+    // ファイナルラップ突入演出
+    if (curLap === totLaps && this.lastRecordedLap < totLaps) {
+      this.showFinalLapBanner();
+    }
+    this.lastRecordedLap = curLap;
+
+    this.lapEl.textContent = Math.min(curLap, totLaps);
+    this.lapTotalEl.textContent = totLaps;
     this.speedEl.textContent = Math.round(Math.abs(playerState.speed || 0) * 3);
 
-    // アイテム
     if (playerState.holdingItem) {
       this.itemSlotEl.classList.remove('empty');
       this.itemIconEl.innerHTML = Icons.getSvg(playerState.holdingItem.icon);
@@ -91,8 +127,32 @@ export class HUD {
       this.itemIconEl.innerHTML = '';
     }
 
-    // ミニマップ描画
+    if (playerState.isRespawning) {
+      this.showRespawnCountdown(playerState.respawnTimer);
+    } else {
+      this.hideRespawnCountdown();
+    }
+
+    // 逆走警告表示
+    if (playerState.isWrongWay && !playerState.isRespawning) {
+      this.wrongWayEl.classList.remove('hidden');
+    } else {
+      this.wrongWayEl.classList.add('hidden');
+    }
+
     this.drawMinimap(trackPoints, playerState.allKartPositions || []);
+  }
+
+  showFinalLapBanner() {
+    if (!this.finalLapEl) return;
+    this.finalLapEl.classList.remove('hidden');
+    setTimeout(() => {
+      this.finalLapEl.classList.add('hidden');
+    }, 3200);
+  }
+
+  resetLaps() {
+    this.lastRecordedLap = 1;
   }
 
   showNotification(msg, durationMs = 2000) {
@@ -115,7 +175,6 @@ export class HUD {
 
     ctx.clearRect(0, 0, w, h);
 
-    // 背景
     ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
     ctx.beginPath();
     ctx.arc(w / 2, h / 2, w / 2 - 2, 0, Math.PI * 2);
@@ -124,7 +183,6 @@ export class HUD {
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // コース境界をスケーリングして中央に配置
     let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
     trackPoints.forEach(p => {
       if (p.x < minX) minX = p.x;
@@ -142,7 +200,6 @@ export class HUD {
     const toMapX = (x) => (w / 2) + ((x - centerX) / maxRange) * (w - 24);
     const toMapY = (z) => (h / 2) + ((z - centerZ) / maxRange) * (h - 24);
 
-    // コース線
     ctx.beginPath();
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
     ctx.lineWidth = 5;
@@ -158,7 +215,6 @@ export class HUD {
     ctx.closePath();
     ctx.stroke();
 
-    // カート位置描画
     kartPositions.forEach(k => {
       const mx = toMapX(k.x);
       const my = toMapY(k.z);
