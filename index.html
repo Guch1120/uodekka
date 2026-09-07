@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>HTML5 3D カートレーシング (P2Pマルチプレイ)</title>
+  <link rel="stylesheet" href="css/style.css">
+
+  <!-- Three.js CDN -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+      }
+    }
+  </script>
+
+  <!-- PeerJS (サーバーレス WebRTC P2P通信ライブラリ) -->
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+</head>
+<body>
+  <!-- 縦持ち時の横画面案内オーバーレイ -->
+  <div id="orientation-prompt" class="orientation-prompt">
+    <div class="rotate-phone-icon">
+      <svg viewBox="0 0 100 100" fill="none" stroke="#f1c40f" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="25" y="15" width="50" height="70" rx="8"/>
+        <line x1="45" y1="78" x2="55" y2="78" stroke-width="4"/>
+        <path d="M78 35 A 35 35 0 0 1 78 65" stroke-dasharray="6,6"/>
+        <polygon points="75,60 82,70 70,70" fill="#f1c40f"/>
+      </svg>
+    </div>
+    <h3>画面を横向きにしてください</h3>
+    <p>このゲームはスマートフォンを横持ちにしてプレイする設計になっています。端末の回転ロックを解除し、横向きにしてお楽しみください。</p>
+  </div>
+
+  <div id="app"></div>
+
+  <!-- ゲームエントリースクリプト -->
+  <script type="module">
+    import { Game } from './backend/game.js';
+
+    window.addEventListener('DOMContentLoaded', () => {
+      window.gameInstance = new Game();
+    });
+  </script>
+</body>
+</html>
