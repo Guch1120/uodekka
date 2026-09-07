@@ -55,9 +55,6 @@ export class HUD {
         <div id="hud-item-slot" class="item-slot-box empty">
           <div class="item-icon-wrapper" id="hud-item-icon"></div>
         </div>
-        <button id="btn-toggle-rotate" class="icon-btn" title="画面の向き切替（左右反転）">
-          ${Icons.getSvg('rotate')}
-        </button>
         <button id="btn-open-pause" class="icon-btn" title="一時停止・中断">
           ${Icons.getSvg('pause')}
         </button>
@@ -65,6 +62,9 @@ export class HUD {
           ${Icons.getSvg('gear')}
         </button>
       </div>
+
+      <!-- ダッシュキノコ／ブースト加速時の集中線Canvas -->
+      <canvas id="hud-speedlines" class="speedlines-canvas hidden"></canvas>
 
       <!-- デウス・エクス・マキナ 復帰カウントダウン -->
       <div id="hud-respawn-banner" class="respawn-banner hidden">
@@ -98,6 +98,54 @@ export class HUD {
     this.minimapCanvas = hudDiv.querySelector('#hud-minimap');
     this.minimapCtx = this.minimapCanvas.getContext('2d');
     this.lastRecordedLap = 1;
+
+    this.speedlinesCanvas = hudDiv.querySelector('#hud-speedlines');
+    if (this.speedlinesCanvas) {
+      this.speedlinesCtx = this.speedlinesCanvas.getContext('2d');
+    }
+  }
+
+  renderSpeedlines(isBoosting) {
+    if (!this.speedlinesCanvas || !this.speedlinesCtx) return;
+    const canvas = this.speedlinesCanvas;
+    const ctx = this.speedlinesCtx;
+
+    if (!isBoosting) {
+      canvas.classList.add('hidden');
+      return;
+    }
+
+    canvas.classList.remove('hidden');
+    if (canvas.width !== window.innerWidth || canvas.height !== window.innerHeight) {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+
+    const w = canvas.width;
+    const h = canvas.height;
+    const cx = w / 2;
+    const cy = h / 2;
+    ctx.clearRect(0, 0, w, h);
+
+    const numLines = 36;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+    ctx.lineWidth = 2.5;
+
+    for (let i = 0; i < numLines; i++) {
+      const angle = (Math.PI * 2 / numLines) * i + (Math.random() * 0.15);
+      const innerDist = Math.min(w, h) * (0.35 + Math.random() * 0.2);
+      const outerDist = Math.max(w, h) * 0.8;
+
+      const x1 = cx + Math.cos(angle) * innerDist;
+      const y1 = cy + Math.sin(angle) * innerDist;
+      const x2 = cx + Math.cos(angle) * outerDist;
+      const y2 = cy + Math.sin(angle) * outerDist;
+
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
   }
 
   showRespawnCountdown(remainingSeconds) {
@@ -152,6 +200,7 @@ export class HUD {
     }
 
     this.drawMinimap(trackPoints, playerState.allKartPositions || []);
+    this.renderSpeedlines(playerState.isBoosting || (playerState.boostTimer > 0));
   }
 
   showFinalLapBanner() {

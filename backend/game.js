@@ -14,6 +14,7 @@ import { HUD } from '../frontend/ui/hud.js';
 import { SettingsModal } from '../frontend/ui/settings_modal.js';
 import { LobbyModal } from '../frontend/ui/lobby_modal.js';
 import { PauseModal } from '../frontend/ui/pause_modal.js';
+import { EditorModal } from '../frontend/ui/editor_modal.js';
 
 export class Game {
   constructor() {
@@ -58,10 +59,24 @@ export class Game {
 
     this.initUIListeners();
 
+    // コースエディタモーダル
+    this.editorModal = new EditorModal(this.appContainer, (customCourseId) => {
+      this.lobbyModal.hide();
+      this.startRace({
+        mode: 'solo',
+        courseId: customCourseId,
+        vehicleKey: 'standard_red',
+        isHost: true
+      });
+    });
+
     // ロビーモーダル起動
     this.lobbyModal = new LobbyModal(this.appContainer, this.p2p, (gameConfig) => {
       this.startRace(gameConfig);
     }, this.inputManager);
+    this.lobbyModal.onOpenEditor = () => {
+      this.editorModal.show();
+    };
 
     this.setupNetworkEvents();
 
@@ -86,16 +101,6 @@ export class Game {
     if (btnForceLandscape) {
       btnForceLandscape.onclick = () => {
         this.enableForcedLandscape();
-      };
-    }
-
-    // HUDの画面向き左右反転トグルボタン
-    const btnToggleRotate = document.getElementById('btn-toggle-rotate');
-    if (btnToggleRotate) {
-      btnToggleRotate.onclick = () => {
-        document.body.classList.toggle('rotate-reverse');
-        if (this.renderer) this.renderer.onResize();
-        window.dispatchEvent(new Event('resize'));
       };
     }
 
@@ -409,6 +414,12 @@ export class Game {
     // 4. 木・岩などコース環境オブジェクトとの衝突判定
     this.checkObstacleCollisions();
 
+    // 4-2. ダッシュボード（加速板）判定
+    this.checkDashPanels();
+
+    // 4-3. スター発動中の七色（レインボー）発光エフェクト
+    this.updateInvincibleRainbowEffects();
+
     // 5. ワールド内アイテム更新と当たり判定 & 相殺判定
     this.updateWorldItems(dt);
 
@@ -498,6 +509,57 @@ export class Game {
             this.showItemNotification(`${obs.type === 'tree' ? '木' : '岩'}に激突！`);
           }
         }
+      }
+    }
+  }
+
+  checkDashPanels() {
+    if (!this.courseTrack || !this.courseTrack.dashPanels || this.courseTrack.dashPanels.length === 0) return;
+    const allKarts = [this.localPlayerKart, ...Array.from(this.otherPlayers.values()).map(p => p.physics)];
+
+    for (const kart of allKarts) {
+      if (!kart || kart.isRespawning) continue;
+
+      for (const panel of this.courseTrack.dashPanels) {
+        const dist = kart.mesh.position.distanceTo(panel.position);
+        if (dist < (panel.radius || 6.0)) {
+          // ダッシュボードを踏んだ！ 瞬間ダッシュ + 2秒間ブースト
+          kart.applyBoost(1.55, 2.0);
+          kart.speed = Math.max(kart.speed, kart.maxSpeed * 1.35);
+
+          if (kart === this.localPlayerKart) {
+            if (!this._lastDashTime || performance.now() - this._lastDashTime > 1500) {
+              this._lastDashTime = performance.now();
+              this.showItemNotification('⚡ ダッシュボード通過！急加速！', 1500);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  updateInvincibleRainbowEffects() {
+    const allKarts = [this.localPlayerKart, ...Array.from(this.otherPlayers.values()).map(p => p.physics)];
+    const time = performance.now() * 0.008;
+
+    for (const kart of allKarts) {
+      if (!kart || !kart.mesh) continue;
+      const uData = kart.mesh.userData;
+      if (!uData || !uData.bodyMesh) continue;
+
+      if (kart.invincibleTimer > 0) {
+        // 七色に高速グラデーション変化
+        const hue = (time * 0.7) % 1.0;
+        const color = new THREE.Color().setHSL(hue, 1.0, 0.55);
+
+        uData.bodyMesh.material.color = color;
+        if (uData.headMesh) uData.headMesh.material.color = color;
+        if (uData.wingMesh) uData.wingMesh.material.color = color;
+      } else if (uData.defaultColor !== undefined) {
+        // 通常色に戻す
+        uData.bodyMesh.material.color.setHex(uData.defaultColor);
+        if (uData.headMesh) uData.headMesh.material.color.setHex(uData.defaultColor);
+        if (uData.wingMesh) uData.wingMesh.material.color.setHex(uData.defaultAccent || uData.defaultColor);
       }
     }
   }

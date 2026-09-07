@@ -143,7 +143,12 @@ export const Vehicles = {
     group.userData = {
       wheels,
       config,
-      typeKey: vehicleTypeKey
+      typeKey: vehicleTypeKey,
+      bodyMesh: body,
+      headMesh: head,
+      wingMesh: wing,
+      defaultColor: config.color,
+      defaultAccent: config.accentColor
     };
 
     return group;

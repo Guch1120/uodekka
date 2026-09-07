@@ -303,8 +303,8 @@ export const Items = {
     group.position.y = kart.position.y + 0.5;
     gameState.scene.add(group);
 
-    // 緑甲羅の弾速を倍速（約105）に向上して爽快な狙撃を可能にする
-    let velocity = forward.clone().multiplyScalar(colorType === 'green' ? 105 : 46);
+    // 赤甲羅の弾速を倍速（96）、緑甲羅（105）
+    let velocity = forward.clone().multiplyScalar(colorType === 'green' ? 105 : 96);
     let target = null;
     let bouncesLeft = 4;
 
@@ -328,12 +328,12 @@ export const Items = {
           return;
         }
 
-        group.rotation.y += dt * 10.0;
+        group.rotation.y += dt * 12.0;
 
         if (colorType === 'red' && target && !target.isFinished) {
           const dir = new THREE.Vector3().subVectors(target.position, group.position).normalize();
           dir.y = 0;
-          velocity.lerp(dir.multiplyScalar(48), dt * 4.5);
+          velocity.lerp(dir.multiplyScalar(96), dt * 6.5);
         } else if (colorType === 'green' && gameState.courseTrack) {
           const t = gameState.localPlayerKart.findNearestTrackT(gameState.courseTrack.curve, group.position);
           const trackCenter = gameState.courseTrack.curve.getPointAt(t);
@@ -388,7 +388,8 @@ export const Items = {
     group.position.y = kart.position.y + 3.0;
     gameState.scene.add(group);
 
-    let velocity = forward.clone().multiplyScalar(58);
+    // 青甲羅の速度を倍速（120）に高速化
+    let velocity = forward.clone().multiplyScalar(120);
     let lifetime = 12.0;
 
     return {
@@ -405,19 +406,19 @@ export const Items = {
           return;
         }
 
-        group.rotation.y += dt * 14.0;
+        group.rotation.y += dt * 18.0;
 
         const leaderKart = gameState.calculateRankings()[0];
         if (leaderKart) {
           const dir = new THREE.Vector3().subVectors(leaderKart.position, group.position).normalize();
           dir.y = 0;
-          velocity.lerp(dir.multiplyScalar(58), dt * 6.0);
+          velocity.lerp(dir.multiplyScalar(120), dt * 8.0);
 
           const dist2D = new THREE.Vector2(group.position.x - leaderKart.position.x, group.position.z - leaderKart.position.z).length();
           if (dist2D < 4.5) {
-            group.position.y = THREE.MathUtils.lerp(group.position.y, leaderKart.position.y + 0.3, dt * 12);
+            group.position.y = THREE.MathUtils.lerp(group.position.y, leaderKart.position.y + 0.3, dt * 14);
           } else {
-            group.position.y = THREE.MathUtils.lerp(group.position.y, leaderKart.position.y + 3.2, dt * 5);
+            group.position.y = THREE.MathUtils.lerp(group.position.y, leaderKart.position.y + 3.2, dt * 6);
           }
         }
 
@@ -647,21 +648,39 @@ export const Items = {
   },
 
   triggerLightning(userKart, gameState) {
-    const allKarts = [gameState.localPlayerKart, ...Array.from(gameState.otherPlayers.values()).map(p => p.physics)];
+    // 現在の順位一覧を取得
+    const ranking = gameState.calculateRankings ? gameState.calculateRankings() : [];
+    const userRankIndex = ranking.findIndex(k => k === userKart);
 
     if (userKart.isLocalPlayer) {
-      gameState.showItemNotification('⚡ サンダー発動！ライバル達を直撃！');
+      gameState.showItemNotification('⚡ サンダー発動！前方のライバル達を直撃！');
     }
 
-    allKarts.forEach(target => {
+    ranking.forEach((target, rankIdx) => {
       if (!target || target === userKart) return;
+
+      // 使用者より前の順位のカートのみを対象にする (rankIdx < userRankIndex)
+      // もし順位が取れなかった場合は全体対象のフォールバック
+      if (userRankIndex !== -1 && rankIdx >= userRankIndex) {
+        return; // 使用者より後ろのプレイヤーは被弾しない
+      }
 
       if (target.invincibleTimer > 0) {
         if (target.isLocalPlayer) gameState.showItemNotification('スターでサンダーを無効化！');
         return;
       }
 
+      // 1. スピン
       target.spinOut();
+
+      // 2. スモール化：上位（1位）ほど長く、下位から順に解除される
+      // 1位: 6.0秒、2位: 4.5秒、3位: 3.0秒 ...
+      const duration = Math.max(2.5, 6.0 - rankIdx * 1.5);
+      if (typeof target.applySmall === 'function') {
+        target.applySmall(duration);
+      }
+
+      // 3. アイテムロスト
       if (target.holdingItem) {
         if (target.holdingItem.id.includes('mushroom')) {
           const dropped = Items.spawnDroppedMushroom(target.position, gameState);
@@ -671,7 +690,7 @@ export const Items = {
       }
 
       if (target.isLocalPlayer) {
-        gameState.showItemNotification('⚡ サンダー被弾！アイテムをロスト！');
+        gameState.showItemNotification(`⚡ サンダー被弾！小さくなって速度低下 (${Math.round(duration)}秒)！`);
       }
     });
   }

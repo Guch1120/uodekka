@@ -13,7 +13,44 @@ export const Courses = {
   },
 
   getCourse(id) {
-    return this.list[id] || this.list.course1;
+    if (this.list[id]) return this.list[id];
+    // カスタムコース（コースエディタ作成コース）
+    if (id.startsWith('custom_')) {
+      try {
+        const saved = localStorage.getItem('kart_custom_courses');
+        if (saved) {
+          const dict = JSON.parse(saved);
+          if (dict[id]) {
+            const raw = dict[id];
+            return {
+              id: raw.id,
+              name: raw.name || 'カスタムコース',
+              theme: raw.theme || 'grassland',
+              skyColor: raw.skyColor || 0x87ceeb,
+              ambientColor: raw.ambientColor || 0xffffff,
+              trackWidth: raw.trackWidth || 32,
+              totalLaps: raw.totalLaps || 3,
+              points: raw.points.map(p => new THREE.Vector3(p.x, p.y, p.z)),
+              itemBoxLocations: raw.itemBoxLocations || [0.2, 0.5, 0.8],
+              dashPanels: raw.dashPanels || [0.35, 0.65],
+              createEnvironment: (scene) => {
+                const grp = new THREE.Group();
+                const groundGeo = new THREE.PlaneGeometry(1200, 1200);
+                groundGeo.rotateX(-Math.PI / 2);
+                const groundMat = new THREE.MeshStandardMaterial({ color: 0x55aa44, roughness: 0.9 });
+                const ground = new THREE.Mesh(groundGeo, groundMat);
+                ground.receiveShadow = true;
+                grp.add(ground);
+                return grp;
+              }
+            };
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load custom course', e);
+      }
+    }
+    return this.list.course1;
   },
 
   /**
@@ -99,15 +136,64 @@ export const Courses = {
     // スタート＆フィニッシュゲート
     const startLine = this.buildStartGate(points[0], points[1], trackWidth);
 
+    // ダッシュボード（加速板・矢印床）
+    const dashPanelGroup = new THREE.Group();
+    const dashPanels = [];
+    const dashLocations = courseConfig.dashPanels || [0.3, 0.7];
+
+    dashLocations.forEach(t => {
+      const p = curve.getPointAt(t);
+      const tangent = curve.getTangentAt(t).normalize();
+      const normal = new THREE.Vector3().crossVectors(tangent, up).normalize();
+
+      // 幅いっぱいに2〜3枚のダッシュパネルを配置
+      [-trackWidth * 0.25, trackWidth * 0.25].forEach(offset => {
+        const panelGroup = new THREE.Group();
+        const panelGeo = new THREE.BoxGeometry(trackWidth * 0.35, 0.12, 5.0);
+        const panelMat = new THREE.MeshStandardMaterial({
+          color: 0xf59e0b,
+          emissive: 0xd97706,
+          emissiveIntensity: 0.8,
+          roughness: 0.2,
+          metalness: 0.5
+        });
+        const panelMesh = new THREE.Mesh(panelGeo, panelMat);
+        panelGroup.add(panelMesh);
+
+        // 矢印マーク
+        const arrowGeo = new THREE.ConeGeometry(trackWidth * 0.12, 2.5, 3);
+        arrowGeo.rotateX(Math.PI / 2);
+        const arrowMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const arrowMesh = new THREE.Mesh(arrowGeo, arrowMat);
+        arrowMesh.position.y = 0.08;
+        panelGroup.add(arrowMesh);
+
+        panelGroup.position.copy(p).addScaledVector(normal, offset);
+        panelGroup.position.y += 0.08;
+
+        const forward = tangent.clone();
+        panelGroup.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), forward);
+
+        dashPanelGroup.add(panelGroup);
+        dashPanels.push({
+          position: panelGroup.position,
+          t: t,
+          radius: trackWidth * 0.25
+        });
+      });
+    });
+
     const fullTrackGroup = new THREE.Group();
     fullTrackGroup.add(trackMesh);
     fullTrackGroup.add(curbGroup);
     fullTrackGroup.add(startLine);
+    fullTrackGroup.add(dashPanelGroup);
 
     return {
       group: fullTrackGroup,
       curve: curve,
-      points: points
+      points: points,
+      dashPanels: dashPanels
     };
   },
 

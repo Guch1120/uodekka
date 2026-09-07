@@ -24,6 +24,7 @@ export class LobbyModal {
             <button id="tab-create" class="tab-btn active">部屋をつくる (ホスト)</button>
             <button id="tab-join" class="tab-btn">部屋に入る (ゲスト)</button>
             <button id="tab-solo" class="tab-btn solo-btn">ひとりで遊ぶ (CPU対戦)</button>
+            <button id="tab-editor" class="tab-btn" style="border-color: #f59e0b; color: #f59e0b;">🛠️ コースを作る</button>
           </div>
 
           <!-- ホスト画面 -->
@@ -122,6 +123,7 @@ export class LobbyModal {
     const tabCreate = modal.querySelector('#tab-create');
     const tabJoin = modal.querySelector('#tab-join');
     const tabSolo = modal.querySelector('#tab-solo');
+    const tabEditor = modal.querySelector('#tab-editor');
     const secHost = modal.querySelector('#section-host');
     const secJoin = modal.querySelector('#section-join');
     const secSolo = modal.querySelector('#section-solo');
@@ -151,6 +153,12 @@ export class LobbyModal {
       secSolo.classList.remove('hidden');
       secHost.classList.add('hidden');
       secJoin.classList.add('hidden');
+    };
+
+    tabEditor.onclick = () => {
+      if (this.onOpenEditor) {
+        this.onOpenEditor();
+      }
     };
 
     // ホスト: 部屋作成
@@ -290,7 +298,31 @@ export class LobbyModal {
     }
   }
 
+  populateCourseSelects() {
+    let customCourses = {};
+    try {
+      customCourses = JSON.parse(localStorage.getItem('kart_custom_courses') || '{}');
+    } catch (e) {}
+
+    const defaultOptions = `
+      <option value="course1">コース1: ピーチ・サーキット (高速オーバル)</option>
+      <option value="course2">コース2: サンセット・キャニオン (荒野・起伏)</option>
+      <option value="course3">コース3: コズミック・ネオン (宇宙ハイウェイ)</option>
+    `;
+
+    let customOptions = '';
+    Object.values(customCourses).forEach(c => {
+      customOptions += `<option value="${c.id}">🛠️ ${c.name || 'カスタムコース'}</option>`;
+    });
+
+    const hostSelect = this.modalEl.querySelector('#select-host-course');
+    const soloSelect = this.modalEl.querySelector('#select-solo-course');
+    if (hostSelect) hostSelect.innerHTML = defaultOptions + customOptions;
+    if (soloSelect) soloSelect.innerHTML = defaultOptions + customOptions;
+  }
+
   show() {
+    this.populateCourseSelects();
     this.modalEl.classList.remove('hidden');
   }
 

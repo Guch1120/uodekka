@@ -25,6 +25,7 @@ export const Course2 = {
   ],
 
   itemBoxLocations: [0.2, 0.5, 0.8],
+  dashPanels: [0.35, 0.72],
 
   createEnvironment(scene) {
     const group = new THREE.Group();

@@ -31,6 +31,13 @@ export class KartPhysics {
     this.boostMultiplier = 1.0;
     this.invincibleTimer = 0;
 
+    // サンダーによるスモール化状態
+    this.isSmall = false;
+    this.smallTimer = 0;
+
+    // ドリフト火花レベル (0: なし, 1: 青ミニターボ, 2: 橙スーパーミニターボ)
+    this.driftSparkLevel = 0;
+
     // レース進行状態 & アンチグリッチ
     this.currentLap = 1;
     this.totalLaps = 3;
@@ -114,16 +121,37 @@ export class KartPhysics {
       this.invincibleTimer -= dt;
     }
 
+    // サンダーによるスモール化減衰とスケール復帰
+    if (this.smallTimer > 0) {
+      this.smallTimer -= dt;
+      if (this.smallTimer <= 0) {
+        this.isSmall = false;
+        this.mesh.scale.set(1.0, 1.0, 1.0);
+        if (this.isLocalPlayer && gameState) {
+          gameState.showItemNotification('元のサイズに戻った！');
+        }
+      } else {
+        this.mesh.scale.set(0.55, 0.55, 0.55);
+      }
+    } else {
+      this.isSmall = false;
+      this.mesh.scale.set(1.0, 1.0, 1.0);
+    }
+
     // 3. アイテム後方保持
     this.updateItemHolding(inputState, gameState);
 
     // 4. 加速・ブレーキ・慣性減速
     const accelInput = inputState.accelerating;
     const brakeInput = inputState.braking;
-    const currentMaxSpeed = this.maxSpeed * this.boostMultiplier;
+    
+    // スモール化時は最高速度と加速度が45%低下
+    const smallSpeedFactor = this.isSmall ? 0.55 : 1.0;
+    const currentMaxSpeed = this.maxSpeed * this.boostMultiplier * smallSpeedFactor;
+    const currentAccel = this.acceleration * smallSpeedFactor;
 
     if (accelInput > 0) {
-      this.speed += this.acceleration * accelInput * dt;
+      this.speed += currentAccel * accelInput * dt;
     } else if (brakeInput > 0) {
       this.speed -= this.brakeForce * brakeInput * dt;
     } else {
@@ -169,7 +197,7 @@ export class KartPhysics {
       this.isWrongWay = (dot < -0.35 && Math.abs(this.speed) > 5.0);
     }
 
-    // 6. ドリフト制御
+    // 6. ドリフト制御 (ミニターボ / スーパーミニターボ)
     if (inputState.drift && Math.abs(inputState.steering) > 0.2 && Math.abs(this.speed) > 12) {
       if (!this.isDrifting) {
         this.isDrifting = true;
@@ -177,14 +205,31 @@ export class KartPhysics {
         this.driftTime = 0;
       }
       this.driftTime += dt;
+
+      // ドリフト継続時間に応じたスパークレベル
+      if (this.driftTime > 1.6) {
+        this.driftSparkLevel = 2; // オレンジ（スーパーミニターボ）
+      } else if (this.driftTime > 0.7) {
+        this.driftSparkLevel = 1; // 青（ミニターボ）
+      } else {
+        this.driftSparkLevel = 0;
+      }
     } else {
       if (this.isDrifting) {
-        if (this.driftTime > 1.8) {
-          this.applyBoost(1.45, 1.8);
-        } else if (this.driftTime > 0.8) {
-          this.applyBoost(1.25, 1.0);
+        // ドリフト終了時にスパークに応じた急加速
+        if (this.driftSparkLevel === 2) {
+          this.applyBoost(1.5, 1.8);
+          if (this.isLocalPlayer && gameState) {
+            gameState.showItemNotification('🔥 スーパーミニターボ発動！', 1500);
+          }
+        } else if (this.driftSparkLevel === 1) {
+          this.applyBoost(1.3, 1.0);
+          if (this.isLocalPlayer && gameState) {
+            gameState.showItemNotification('⚡ ミニターボ発動！', 1200);
+          }
         }
         this.isDrifting = false;
+        this.driftSparkLevel = 0;
       }
     }
 
@@ -324,5 +369,12 @@ export class KartPhysics {
     this.isSpinning = true;
     this.spinTimer = 1.2;
     this.speed = this.speed * 0.2;
+  }
+
+  applySmall(duration) {
+    if (this.invincibleTimer > 0 || this.isRespawning) return;
+    this.isSmall = true;
+    this.smallTimer = Math.max(this.smallTimer, duration);
+    this.mesh.scale.set(0.55, 0.55, 0.55);
   }
 }
