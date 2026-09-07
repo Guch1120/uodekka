@@ -33,6 +33,11 @@ export const Courses = {
               points: raw.points.map(p => new THREE.Vector3(p.x, p.y, p.z)),
               itemBoxLocations: raw.itemBoxLocations || [0.2, 0.5, 0.8],
               dashPanels: raw.dashPanels || [0.35, 0.65],
+              tireWallSegments: raw.tireWallSegments || [
+                { start: 0.05, end: 0.35, side: 'both' },
+                { start: 0.45, end: 0.72, side: 'both' },
+                { start: 0.80, end: 0.95, side: 'both' }
+              ],
               createEnvironment: (scene) => {
                 const grp = new THREE.Group();
                 const groundGeo = new THREE.PlaneGeometry(1200, 1200);
@@ -183,9 +188,15 @@ export const Courses = {
       });
     });
 
+    // タイヤウォール（内側・外側の防護壁＆意図的な切れ目によるコースアウトエリア）
+    const tireWallData = this.buildTireWalls(curve, divisions, trackWidth, courseConfig.tireWallSegments);
+    const tireWallGroup = tireWallData.group;
+    const tireWallObstacles = tireWallData.obstacles;
+
     const fullTrackGroup = new THREE.Group();
     fullTrackGroup.add(trackMesh);
     fullTrackGroup.add(curbGroup);
+    fullTrackGroup.add(tireWallGroup);
     fullTrackGroup.add(startLine);
     fullTrackGroup.add(dashPanelGroup);
 
@@ -193,8 +204,120 @@ export const Courses = {
       group: fullTrackGroup,
       curve: curve,
       points: points,
-      dashPanels: dashPanels
+      dashPanels: dashPanels,
+      tireWallObstacles: tireWallObstacles
     };
+  },
+
+  /**
+   * タイヤウォールの生成
+   * 指定されたセグメント区間にのみタイヤの山（赤白交互）を配置し、未指定区間は意図的なコースアウト切れ目とする
+   */
+  buildTireWalls(curve, divisions, trackWidth, segments) {
+    const tireGroup = new THREE.Group();
+    const obstacles = [];
+    const up = new THREE.Vector3(0, 1, 0);
+
+    // デフォルトセグメント (未指定時は3箇所の切れ目を設けた配置)
+    const wallSegments = segments && segments.length > 0 ? segments : [
+      { start: 0.05, end: 0.38, side: 'both' },
+      { start: 0.45, end: 0.72, side: 'both' },
+      { start: 0.80, end: 0.96, side: 'both' }
+    ];
+
+    // タイヤ用共通ジオメトリ
+    // 直径約 1.8m、高さ約 1.4m の2段重ねタイヤ
+    const tireGeo = new THREE.CylinderGeometry(0.9, 0.9, 0.65, 10);
+    const blackMat = new THREE.MeshStandardMaterial({
+      color: 0x18181b,
+      roughness: 0.85,
+      metalness: 0.1
+    });
+    const redMat = new THREE.MeshStandardMaterial({
+      color: 0xef4444,
+      roughness: 0.6,
+      metalness: 0.2
+    });
+    const whiteMat = new THREE.MeshStandardMaterial({
+      color: 0xf8fafc,
+      roughness: 0.6,
+      metalness: 0.2
+    });
+
+    const isInsideSegment = (t, side) => {
+      for (const seg of wallSegments) {
+        if (seg.side !== 'both' && seg.side !== side) continue;
+        if (seg.start <= seg.end) {
+          if (t >= seg.start && t <= seg.end) return true;
+        } else {
+          // 0境界をまたぐ場合
+          if (t >= seg.start || t <= seg.end) return true;
+        }
+      }
+      return false;
+    };
+
+    // サンプル密度: コース全体で約120〜160個のタイヤスタック間隔
+    const totalSamples = Math.max(120, divisions);
+    const step = 1 / totalSamples;
+
+    // 内側と外側のオフセット距離
+    const sides = [
+      { key: 'inner', offset: -trackWidth / 2 - 1.2 },
+      { key: 'outer', offset: trackWidth / 2 + 1.2 }
+    ];
+
+    let stackCounter = 0;
+
+    for (let i = 0; i < totalSamples; i++) {
+      const t = i * step;
+      const pt = curve.getPointAt(t);
+      const tangent = curve.getTangentAt(t).normalize();
+      const normal = new THREE.Vector3().crossVectors(tangent, up).normalize();
+
+      sides.forEach(side => {
+        if (!isInsideSegment(t, side.key)) {
+          // この区間は切れ目（コースアウト可能エリア）
+          return;
+        }
+
+        const wallPos = pt.clone().addScaledVector(normal, side.offset);
+        wallPos.y += 0.35; // 地面から少し浮かせて設置
+
+        const stack = new THREE.Group();
+        stack.position.copy(wallPos);
+
+        // 赤白交互のアクセントバンド
+        stackCounter++;
+        const bandMat = (stackCounter % 2 === 0) ? redMat : whiteMat;
+
+        // 下段タイヤ（ブラックゴム）
+        const tire1 = new THREE.Mesh(tireGeo, blackMat);
+        tire1.position.y = 0.32;
+        tire1.castShadow = true;
+        tire1.receiveShadow = true;
+        stack.add(tire1);
+
+        // 上段タイヤ（赤または白の防護マーキング）
+        const tire2 = new THREE.Mesh(tireGeo, bandMat);
+        tire2.position.y = 0.95;
+        tire2.castShadow = true;
+        tire2.receiveShadow = true;
+        stack.add(tire2);
+
+        tireGroup.add(stack);
+
+        // 衝突判定用オブスタクル情報
+        // カートとの接触で跳ね返す（半径 1.6m）
+        obstacles.push({
+          position: new THREE.Vector3(wallPos.x, wallPos.y, wallPos.z),
+          radius: 1.6,
+          type: 'tire_wall'
+        });
+      });
+    }
+
+    return { group: tireGroup, obstacles: obstacles };
   },
 
   buildCurbs(points, divisions, trackWidth) {

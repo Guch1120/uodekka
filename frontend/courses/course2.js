@@ -26,6 +26,13 @@ export const Course2 = {
 
   itemBoxLocations: [0.2, 0.5, 0.8],
   dashPanels: [0.35, 0.72],
+  tireWallSegments: [
+    { start: 0.05, end: 0.30, side: 'both' }, // 登り勾配区間
+    // 0.30〜0.40 は切れ目 (崖っぷち・キャニオン落下の危険ゾーン)
+    { start: 0.40, end: 0.65, side: 'both' }, // 中盤
+    // 0.65〜0.75 は切れ目 (急カーブ下りの難所コースアウトゾーン)
+    { start: 0.75, end: 0.95, side: 'both' }  // 終盤ストレート
+  ],
 
   createEnvironment(scene) {
     const group = new THREE.Group();

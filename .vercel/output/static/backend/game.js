@@ -253,8 +253,13 @@ export class Game {
       const envGroup = this.currentCourseConfig.createEnvironment(this.scene);
       this.scene.add(envGroup);
       if (envGroup.userData && envGroup.userData.obstacles) {
-        this.courseObstacles = envGroup.userData.obstacles;
+        this.courseObstacles = [...envGroup.userData.obstacles];
       }
+    }
+
+    // タイヤウォール衝突判定オブジェクトを追加
+    if (this.courseTrack.tireWallObstacles && this.courseTrack.tireWallObstacles.length > 0) {
+      this.courseObstacles.push(...this.courseTrack.tireWallObstacles);
     }
 
     this.spawnItemBoxes();
@@ -506,7 +511,8 @@ export class Game {
           kart.speed = -kart.speed * 0.35;
 
           if (kart === this.localPlayerKart && Math.abs(kart.speed) > 4.0) {
-            this.showItemNotification(`${obs.type === 'tree' ? '木' : '岩'}に激突！`);
+            const name = obs.type === 'tire_wall' ? 'タイヤウォール' : (obs.type === 'tree' ? '木' : '岩');
+            this.showItemNotification(`${name}に激突！`);
           }
         }
       }

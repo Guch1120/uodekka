@@ -30,12 +30,17 @@ export class EditorModal {
         { x: -80, y: 0, z: 40 }
       ],
       itemBoxLocations: [0.2, 0.5, 0.8],
-      dashPanels: [0.35, 0.65]
+      dashPanels: [0.35, 0.65],
+      tireWallSegments: [
+        { start: 0.05, end: 0.38, side: 'both' },
+        { start: 0.45, end: 0.72, side: 'both' },
+        { start: 0.80, end: 0.96, side: 'both' }
+      ]
     };
 
     this.selectedPointIdx = -1;
     this.draggingPointIdx = -1;
-    this.currentTool = 'move'; // 'move', 'add_point', 'dash_panel', 'item_box'
+    this.currentTool = 'move'; // 'move', 'add_point', 'dash_panel', 'item_box', 'wall'
     this.zoom = 0.8;
     this.panX = 0;
     this.panY = 0;
@@ -69,6 +74,7 @@ export class EditorModal {
           <div class="tool-group">
             <button id="tool-dash" class="editor-tool-btn" title="ダッシュボード（加速床）の追加">⚡ ダッシュ板配置</button>
             <button id="tool-item" class="editor-tool-btn" title="アイテムボックス地点の追加">🎁 アイテム箱配置</button>
+            <button id="tool-wall" class="editor-tool-btn" title="コース上の区間をクリックしてタイヤ壁/切れ目(コースアウト)を切替">🛡️ タイヤ壁/切替</button>
           </div>
           <div class="tool-group info-group">
             <label>コース名: <input type="text" id="editor-course-name" value="マイ・カスタムサーキット" class="editor-text-input"></label>
@@ -135,7 +141,8 @@ export class EditorModal {
       add: modal.querySelector('#tool-add'),
       del: modal.querySelector('#tool-del'),
       dash: modal.querySelector('#tool-dash'),
-      item: modal.querySelector('#tool-item')
+      item: modal.querySelector('#tool-item'),
+      wall: modal.querySelector('#tool-wall')
     };
 
     const setTool = (toolName) => {
@@ -150,6 +157,7 @@ export class EditorModal {
     toolBtns.add.onclick = () => setTool('add');
     toolBtns.dash.onclick = () => setTool('dash');
     toolBtns.item.onclick = () => setTool('item');
+    toolBtns.wall.onclick = () => setTool('wall');
 
     toolBtns.del.onclick = () => {
       if (this.selectedPointIdx >= 0 && this.courseData.points.length > 4) {
@@ -241,6 +249,13 @@ export class EditorModal {
       if (this.currentTool === 'item') {
         const t = this.findNearestSplineT(world.x, world.z);
         this.courseData.itemBoxLocations.push(t);
+        this.render();
+        return;
+      }
+
+      if (this.currentTool === 'wall') {
+        const t = this.findNearestSplineT(world.x, world.z);
+        this.toggleTireWallSegment(t);
         this.render();
         return;
       }
@@ -363,8 +378,52 @@ export class EditorModal {
     ];
     this.courseData.itemBoxLocations = [0.2, 0.5, 0.8];
     this.courseData.dashPanels = [0.35, 0.65];
+    this.courseData.tireWallSegments = [
+      { start: 0.05, end: 0.38, side: 'both' },
+      { start: 0.45, end: 0.72, side: 'both' },
+      { start: 0.80, end: 0.96, side: 'both' }
+    ];
     this.selectedPointIdx = -1;
     this.render();
+  }
+
+  /**
+   * クリックしたスプライン位置 t にタイヤ壁があるか判定し、壁の追加/削除（切れ目作成）をトグルする
+   */
+  toggleTireWallSegment(clickT) {
+    if (!this.courseData.tireWallSegments) {
+      this.courseData.tireWallSegments = [];
+    }
+
+    const segments = this.courseData.tireWallSegments;
+    let foundIdx = -1;
+
+    for (let i = 0; i < segments.length; i++) {
+      const seg = segments[i];
+      if (seg.start <= seg.end) {
+        if (clickT >= seg.start && clickT <= seg.end) {
+          foundIdx = i;
+          break;
+        }
+      } else {
+        if (clickT >= seg.start || clickT <= seg.end) {
+          foundIdx = i;
+          break;
+        }
+      }
+    }
+
+    if (foundIdx >= 0) {
+      // 既存の壁区間内をクリックした場合：そのセグメントを解除（切れ目・コースアウト区間を作成）
+      segments.splice(foundIdx, 1);
+    } else {
+      // 切れ目区画をクリックした場合：その周辺（前後 0.08、計約 16% 幅）に新たなタイヤ壁セグメントを新設
+      let s = Math.round((clickT - 0.07) * 100) / 100;
+      let e = Math.round((clickT + 0.07) * 100) / 100;
+      if (s < 0) s += 1.0;
+      if (e > 1) e -= 1.0;
+      segments.push({ start: s, end: e, side: 'both' });
+    }
   }
 
   findNearestSplineT(x, z) {
@@ -505,6 +564,65 @@ export class EditorModal {
     ctx.setLineDash([8, 8]);
     ctx.stroke();
     ctx.setLineDash([]);
+
+    // 1.5. タイヤウォール（防護壁）およびコースアウト切れ目の描画
+    const wallSegments = this.courseData.tireWallSegments || [
+      { start: 0.05, end: 0.38, side: 'both' },
+      { start: 0.45, end: 0.72, side: 'both' },
+      { start: 0.80, end: 0.96, side: 'both' }
+    ];
+
+    const isInsideWall = (t) => {
+      for (const seg of wallSegments) {
+        if (seg.start <= seg.end) {
+          if (t >= seg.start && t <= seg.end) return true;
+        } else {
+          if (t >= seg.start || t <= seg.end) return true;
+        }
+      }
+      return false;
+    };
+
+    // 内側・外側の境界線上を細かくサンプリングしてタイヤ壁（赤白ブロック）を描画
+    const wallSteps = 120;
+    const upVec = new THREE.Vector3(0, 1, 0);
+
+    [-1, 1].forEach(sideMultiplier => {
+      for (let i = 0; i < wallSteps; i++) {
+        const t1 = i / wallSteps;
+        const t2 = (i + 1) / wallSteps;
+
+        const p1 = curve.getPointAt(t1);
+        const tan1 = curve.getTangentAt(t1).normalize();
+        const norm1 = new THREE.Vector3().crossVectors(tan1, upVec).normalize();
+        const edge1 = p1.clone().addScaledVector(norm1, sideMultiplier * (this.courseData.trackWidth / 2));
+
+        const p2 = curve.getPointAt(t2);
+        const tan2 = curve.getTangentAt(t2).normalize();
+        const norm2 = new THREE.Vector3().crossVectors(tan2, upVec).normalize();
+        const edge2 = p2.clone().addScaledVector(norm2, sideMultiplier * (this.courseData.trackWidth / 2));
+
+        const hasWall = isInsideWall((t1 + t2) / 2);
+
+        ctx.beginPath();
+        ctx.moveTo(toScreenX(edge1.x), toScreenY(edge1.z));
+        ctx.lineTo(toScreenX(edge2.x), toScreenY(edge2.z));
+
+        if (hasWall) {
+          // タイヤウォール区間: 赤白交互の防護壁ボーダー (太さ 5px)
+          ctx.lineWidth = 5;
+          ctx.strokeStyle = (i % 2 === 0) ? '#ef4444' : '#f8fafc';
+          ctx.stroke();
+        } else {
+          // 切れ目区間（コースアウト注意ゾーン）: 黄色と黒の注意破線
+          ctx.lineWidth = 2.5;
+          ctx.strokeStyle = 'rgba(234, 179, 8, 0.55)';
+          ctx.setLineDash([4, 4]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+      }
+    });
 
     // 2. スタートライン
     const startPt = curve.getPointAt(0);

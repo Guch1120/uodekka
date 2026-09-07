@@ -26,6 +26,13 @@ export const Course1 = {
 
   itemBoxLocations: [0.15, 0.45, 0.75],
   dashPanels: [0.32, 0.68],
+  tireWallSegments: [
+    { start: 0.04, end: 0.36, side: 'both' }, // 第1コーナー付近は壁で守る
+    // 0.36〜0.44 は切れ目 (アウト側へ飛び出すとコースアウト)
+    { start: 0.44, end: 0.70, side: 'both' }, // バックストレッチ付近
+    // 0.70〜0.78 は切れ目 (急カーブ手前の危険な飛び出しゾーン)
+    { start: 0.78, end: 0.96, side: 'both' }  // 最終コーナーとホームストレート
+  ],
 
   createEnvironment(scene) {
     const group = new THREE.Group();
