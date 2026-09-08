@@ -178,12 +178,12 @@ export class HUD {
     this.lapTotalEl.textContent = totLaps;
     this.speedEl.textContent = Math.round(Math.abs(playerState.speed || 0) * 3);
 
-    if (playerState.holdingItem) {
-      this.itemSlotEl.classList.remove('empty');
-      this.itemIconEl.innerHTML = Icons.getSvg(playerState.holdingItem.icon);
-    } else {
-      this.itemSlotEl.classList.add('empty');
-      this.itemIconEl.innerHTML = '';
+    // アイコンが変わったときだけ DOM を更新する。
+    const itemIcon = playerState.holdingItem?.icon || null;
+    if (itemIcon !== this.lastItemIcon) {
+      this.lastItemIcon = itemIcon;
+      this.itemSlotEl.classList.toggle('empty', !itemIcon);
+      this.itemIconEl.innerHTML = itemIcon ? Icons.getSvg(itemIcon) : '';
     }
 
     if (playerState.isRespawning) {

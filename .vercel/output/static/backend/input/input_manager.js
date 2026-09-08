@@ -24,6 +24,9 @@ export class InputManager {
     const savedInvert = localStorage.getItem('kart_invert_steer');
     this.invertSteering = savedInvert !== null ? savedInvert === 'true' : true;
 
+    this.keyboardKeys = {};
+    this.resetCallbacks = [];
+    this.keyboardSteering = false;
     this.gyroGamma = 0;
     this.gyroActive = false;
 
@@ -104,7 +107,7 @@ export class InputManager {
 
   bindGyroEvents() {
     window.addEventListener('deviceorientation', (e) => {
-      if (this.controlMode !== 'gyro') return;
+      if (this.controlMode !== 'gyro' || !this.canDrive() || this.keyboardSteering) return;
 
       const orientationAngle = (screen.orientation && screen.orientation.angle !== undefined)
         ? screen.orientation.angle
@@ -150,16 +153,44 @@ export class InputManager {
     });
   }
 
-  bindKeyboardEvents() {
-    const keys = {};
-    window.addEventListener('keydown', (e) => {
-      keys[e.code] = true;
-      this.updateKeyboardState(keys);
-    });
+  canDrive() {
+    return !this.isEditingLayout && !this.controlsRoot.classList.contains('hidden') &&
+      !document.querySelector('.modal-backdrop:not(.hidden)');
+  }
 
+  resetState() {
+    // キー解放を受け取れない中断でも、入力と発射予約を持ち越さない。
+    this.keyboardKeys = {};
+    this.keyboardSteering = false;
+    Object.assign(this.state, {
+      steering: 0, accelerating: 0, braking: 0, drift: false,
+      itemHeld: false, useItemTrigger: false, isForwardThrow: false,
+      itemPressStartTime: 0
+    });
+    this.controlsRoot.querySelectorAll('.pressed').forEach(el => el.classList.remove('pressed'));
+    this.resetCallbacks.forEach(reset => reset());
+  }
+
+  bindKeyboardEvents() {
+    const gameKeys = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+      'KeyA', 'KeyD', 'KeyW', 'KeyS', 'ShiftLeft', 'ShiftRight', 'Space', 'KeyE', 'KeyQ', 'Enter']);
+    window.addEventListener('keydown', (e) => {
+      if (!gameKeys.has(e.code) || !this.canDrive() ||
+          e.target.closest?.('input, textarea, select, button, [contenteditable="true"]') ||
+          e.ctrlKey || e.metaKey || e.altKey) return;
+      e.preventDefault();
+      this.keyboardKeys[e.code] = true;
+      this.updateKeyboardState(this.keyboardKeys);
+    });
     window.addEventListener('keyup', (e) => {
-      keys[e.code] = false;
-      this.updateKeyboardState(keys);
+      if (!this.keyboardKeys[e.code]) return;
+      delete this.keyboardKeys[e.code];
+      if (!this.canDrive()) { this.resetState(); return; }
+      this.updateKeyboardState(this.keyboardKeys);
+    });
+    window.addEventListener('blur', () => this.resetState());
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.resetState();
     });
   }
 
@@ -167,11 +198,13 @@ export class InputManager {
     let steer = 0;
     if (keys['ArrowLeft'] || keys['KeyA']) steer -= 1;
     if (keys['ArrowRight'] || keys['KeyD']) steer += 1;
-    if (this.invertSteering && steer !== 0) steer = -steer;
+    // キーボードはセンサー反転設定に関係なく、矢印の方向へ旋回する。
 
-    if (steer !== 0 || this.controlMode !== 'gyro') {
+    if (steer !== 0 || this.keyboardSteering || this.controlMode !== 'gyro') {
       this.state.steering = steer;
     }
+
+    this.keyboardSteering = steer !== 0;
 
     this.state.accelerating = (keys['ArrowUp'] || keys['KeyW']) ? 1 : 0;
     this.state.braking = (keys['ArrowDown'] || keys['KeyS']) ? 1 : 0;
@@ -264,21 +297,26 @@ export class InputManager {
     const stickKnob = document.getElementById('stick-knob');
 
     const bindPress = (el, onDown, onUp) => {
-      const handleDown = (e) => {
-        if (this.isEditingLayout) return;
+      let activePointer = null;
+      el.addEventListener('pointerdown', (e) => {
+        if (!this.canDrive() || activePointer !== null || e.button !== 0) return;
         e.preventDefault();
+        activePointer = e.pointerId;
+        el.setPointerCapture(e.pointerId);
         onDown();
-      };
-      const handleUp = (e) => {
-        if (this.isEditingLayout) return;
+      });
+      el.addEventListener('pointerup', (e) => {
+        if (e.pointerId !== activePointer) return;
+        activePointer = null;
         e.preventDefault();
         onUp();
+      });
+      const cancel = (e) => {
+        if (e.pointerId === activePointer) this.resetState();
       };
-
-      el.addEventListener('touchstart', handleDown, { passive: false });
-      el.addEventListener('touchend', handleUp, { passive: false });
-      el.addEventListener('mousedown', handleDown);
-      window.addEventListener('mouseup', handleUp);
+      el.addEventListener('pointercancel', cancel);
+      el.addEventListener('lostpointercapture', cancel);
+      this.resetCallbacks.push(() => { activePointer = null; });
     };
 
     // アクセル
@@ -356,7 +394,7 @@ export class InputManager {
       stickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
       // 右に倒したら dx > 0 なので steer > 0（右旋回）
       let steer = dx / maxRadius;
-      if (this.invertSteering) steer = -steer;
+      if (!this.invertSteering) steer = -steer;
       this.state.steering = steer;
     };
 
@@ -368,8 +406,11 @@ export class InputManager {
       }
     };
 
+    this.resetCallbacks.push(handleStickEnd);
+    window.addEventListener('touchcancel', () => this.resetState());
+
     stickBase.addEventListener('touchstart', (e) => {
-      if (this.isEditingLayout) return;
+      if (!this.canDrive()) return;
       e.preventDefault();
       const touch = e.changedTouches[0];
       stickTouchId = touch.identifier;
@@ -397,12 +438,15 @@ export class InputManager {
       }
     });
 
+    const accelTouches = new Set();
+    this.resetCallbacks.push(() => accelTouches.clear());
     window.addEventListener('touchstart', (e) => {
-      if (this.isEditingLayout) return;
+      if (!this.canDrive()) return;
       const touch = e.changedTouches[0];
       if (touch.clientX > window.innerWidth * 0.55 && touch.clientY > window.innerHeight * 0.3) {
         const target = document.elementFromPoint(touch.clientX, touch.clientY);
-        if (target && !target.closest('.touch-btn') && !target.closest('#game-hud')) {
+        if (target?.tagName === 'CANVAS' && target.parentElement === this.container) {
+          accelTouches.add(touch.identifier);
           this.state.accelerating = 1;
         }
       }
@@ -410,9 +454,9 @@ export class InputManager {
 
     window.addEventListener('touchend', (e) => {
       if (this.isEditingLayout) return;
-      const touch = e.changedTouches[0];
-      if (touch.clientX > window.innerWidth * 0.55 && touch.clientY > window.innerHeight * 0.3) {
-        if (!btnAccel.classList.contains('pressed')) {
+      for (const touch of e.changedTouches) accelTouches.delete(touch.identifier);
+      if (accelTouches.size === 0) {
+        if (!btnAccel.classList.contains('pressed') && !this.keyboardKeys.KeyW && !this.keyboardKeys.ArrowUp) {
           this.state.accelerating = 0;
         }
       }
@@ -420,6 +464,7 @@ export class InputManager {
   }
 
   startLayoutCustomization() {
+    this.resetState();
     this.isEditingLayout = true;
     this.controlsRoot.classList.add('customizing-layout');
     this.updateStickVisibility();
@@ -514,6 +559,7 @@ export class InputManager {
   }
 
   hideControls() {
+    this.resetState();
     if (this.controlsRoot) {
       this.controlsRoot.classList.add('hidden');
     }

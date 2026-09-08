@@ -86,6 +86,7 @@ export class Game {
 
   initUIListeners() {
     document.getElementById('btn-open-settings').onclick = () => {
+      this.inputManager.resetState();
       this.settingsModal.show();
     };
 
@@ -115,6 +116,7 @@ export class Game {
   }
 
   openPauseMenu() {
+    this.inputManager.resetState();
     const isMulti = this.currentGameConfig && (this.currentGameConfig.mode === 'multi_host' || this.currentGameConfig.mode === 'multi_guest');
     if (!isMulti) {
       this.isPaused = true;
@@ -226,11 +228,12 @@ export class Game {
     };
   }
 
-  showItemNotification(text) {
-    this.hud.showNotification(text);
+  showItemNotification(text, durationMs = 2000) {
+    this.hud.showNotification(text, durationMs);
   }
 
   startRace(config) {
+    this.inputManager.resetState();
     while (this.scene.children.length > 2) {
       const obj = this.scene.children[this.scene.children.length - 1];
       this.scene.remove(obj);
@@ -384,8 +387,9 @@ export class Game {
     const input = this.inputManager.state;
 
     // アイテム発射トリガー
-    if (input.useItemTrigger && this.localPlayerKart.holdingItem) {
-      input.useItemTrigger = false;
+    const useItem = input.useItemTrigger;
+    input.useItemTrigger = false;
+    if (useItem && this.localPlayerKart.holdingItem) {
       const throwDir = input.isForwardThrow ? 'forward' : 'backward';
       input.isForwardThrow = false;
       const item = this.localPlayerKart.holdingItem;
@@ -456,6 +460,7 @@ export class Game {
       currentLap: this.localPlayerKart.currentLap,
       totalLaps: this.localPlayerKart.totalLaps,
       speed: this.localPlayerKart.speed,
+      boostTimer: this.localPlayerKart.boostTimer,
       holdingItem: this.localPlayerKart.holdingItem,
       isRespawning: this.localPlayerKart.isRespawning,
       respawnTimer: this.localPlayerKart.respawnTimer,
