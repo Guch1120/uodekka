@@ -16,34 +16,41 @@
   </script>
 
   <!-- PeerJS (サーバーレス WebRTC P2P通信ライブラリ) -->
-  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <script defer src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 </head>
 <body>
-  <!-- 縦持ち時の横画面案内オーバーレイ -->
-  <div id="orientation-prompt" class="orientation-prompt">
-    <div class="rotate-phone-icon">
-      <svg viewBox="0 0 100 100" fill="none" stroke="#f1c40f" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="25" y="15" width="50" height="70" rx="8"/>
-        <line x1="45" y1="78" x2="55" y2="78" stroke-width="4"/>
-        <path d="M78 35 A 35 35 0 0 1 78 65" stroke-dasharray="6,6"/>
-        <polygon points="75,60 82,70 70,70" fill="#f1c40f"/>
-      </svg>
-    </div>
-    <h3>画面を横向きにしてください</h3>
-    <p>このゲームは横画面専用です。端末を横向きにするか、回転ロック有効時は下のボタンを押して横画面モードを有効化してください。</p>
-    <button id="btn-force-landscape" class="primary-btn" style="margin-top: 16px; font-size: 16px; padding: 12px 24px;">
-      📱 横画面でゲームを開始
-    </button>
-  </div>
+  <!-- 画像と余白を含め、画面全体をタッチしてロビーへ進む -->
+  <button id="title-screen" class="title-screen" type="button" aria-label="画面をタッチしてゲームをはじめる">
+    <img src="frontend/images/title-screen.png" alt="UO:De Car" width="3360" height="1560" fetchpriority="high" draggable="false">
+    <span id="title-screen-status" class="title-screen-status" role="status"></span>
+  </button>
 
-  <div id="app"></div>
+  <div id="app" inert aria-hidden="true"></div>
 
   <!-- ゲームエントリースクリプト -->
   <script type="module">
-    import { Game } from './backend/game.js';
+    const titleScreen = document.getElementById('title-screen');
+    const status = document.getElementById('title-screen-status');
+    const app = document.getElementById('app');
 
-    window.addEventListener('DOMContentLoaded', () => {
-      window.gameInstance = new Game();
+    titleScreen.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      if (titleScreen.disabled) return;
+
+      titleScreen.disabled = true;
+      status.textContent = '読み込み中…';
+
+      try {
+        // タッチ完了後に初期化し、開始操作がゲーム入力に混ざるのを防ぐ。
+        const { Game } = await import('./backend/game.js');
+        window.gameInstance = new Game();
+        app.inert = false;
+        app.removeAttribute('aria-hidden');
+        titleScreen.remove();
+      } catch (error) {
+        console.error('ゲームの起動に失敗しました:', error);
+        status.textContent = 'ゲームを読み込めませんでした。通信環境を確認して再読み込みしてください。';
+      }
     });
   </script>
 </body>

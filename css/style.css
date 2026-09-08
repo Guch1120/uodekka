@@ -637,61 +637,61 @@ canvas {
   margin-bottom: 4px;
 }
 
-/* ================= 横持ち（ランドスケープ）誘導オーバーレイ ================= */
-.orientation-prompt {
-  display: none;
+/* ================= 起動時のタイトル画面 ================= */
+.title-screen {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(15, 23, 42, 0.95);
-  backdrop-filter: blur(10px);
+  inset: 0;
   z-index: 9999;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: #000;
   color: #fff;
-  text-align: center;
-  padding: 24px;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.orientation-prompt .rotate-phone-icon {
-  width: 72px;
-  height: 72px;
-  margin-bottom: 20px;
-  animation: rotatePhone 2s infinite ease-in-out;
+.title-screen img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
 }
 
-@keyframes rotatePhone {
-  0% { transform: rotate(0deg); }
-  35% { transform: rotate(-90deg); }
-  70% { transform: rotate(-90deg); }
-  100% { transform: rotate(0deg); }
+.title-screen:focus-visible {
+  outline: 3px solid #00c8f8;
+  outline-offset: -3px;
 }
 
-.orientation-prompt h3 {
-  font-size: 22px;
-  margin-bottom: 10px;
-  color: #f1c40f;
+.title-screen:disabled {
+  cursor: wait;
 }
 
-.orientation-prompt p {
+.title-screen-status {
+  position: absolute;
+  right: 16px;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  left: 16px;
+  width: fit-content;
+  max-width: calc(100% - 32px);
+  margin: 0 auto;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.85);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 14px;
-  color: #cbd5e1;
-  max-width: 320px;
   line-height: 1.6;
+  text-align: center;
+  pointer-events: none;
 }
 
-/* 縦画面のときはオーバーレイを表示（強制モード時は非表示） */
-@media (orientation: portrait) {
-  .orientation-prompt {
-    display: flex;
-  }
-}
-
-.orientation-prompt.dismissed {
-  display: none !important;
+.title-screen-status:empty {
+  display: none;
 }
 
 /* CSSによる横持ち強制モード（端末の縦画面ロック有効時のみ適用） */
