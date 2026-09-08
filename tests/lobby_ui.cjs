@@ -1,0 +1,45 @@
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE || '/opt/browser-tests/node_modules/playwright');
+const assert=require('node:assert/strict');
+(async()=>{
+const browser=await chromium.launch({executablePath:process.env.CHROME_PATH || undefined,headless:true,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+const page=await browser.newPage({viewport:{width:1280,height:800}});
+const errors=[];page.on('pageerror',e=>errors.push(e.message));
+await page.goto(process.env.GAME_URL || 'http://localhost:8099');
+await page.click('#title-screen');
+await page.waitForFunction(()=>!!window.gameInstance);
+await page.fill('#player-name','テストドライバー');
+const name=await page.locator('.garage-home .vehicle-name').textContent();
+await page.click('#vehicle-next');
+assert.notEqual(await page.locator('.garage-home .vehicle-name').textContent(),name);
+await page.screenshot({path:'/tmp/uodekka-home.png'});
+await page.click('#tab-create');
+await page.fill('#input-room-id','Weekend-Race');
+assert.match(await page.inputValue('#invite-url'),/room=weekend-race/);
+assert(await page.locator('[data-screen=home]').isVisible());
+await page.screenshot({path:'/tmp/uodekka-dialog.png'});
+await page.click('#room-dialog-close');
+await page.click('#tab-join');assert(await page.locator('#room-dialog').isVisible());
+await page.click('#room-dialog-close');
+await page.click('#tab-solo');
+assert(await page.locator('#btn-start-solo').isDisabled());
+await page.click('#course-confirm');
+const confirmed=await page.evaluate(()=>gameInstance.lobbyModal.confirmedCourse);
+await page.click('#course-next');
+assert.equal(await page.evaluate(()=>gameInstance.lobbyModal.confirmedCourse),confirmed);
+assert.match(await page.locator('#course-confirmation').textContent(),/閲覧中/);
+await page.click('#course-random');
+assert.equal(await page.evaluate(()=>gameInstance.lobbyModal.confirmedCourse),await page.evaluate(()=>{const l=gameInstance.lobbyModal;return l.courseIds[l.courseIndex]}));
+await page.screenshot({path:'/tmp/uodekka-solo.png'});
+await page.click('#btn-start-solo');
+await page.waitForFunction(()=>gameInstance.isRunning);
+assert.equal(await page.evaluate(()=>gameInstance.currentGameConfig.playerName),'テストドライバー');
+await page.evaluate(()=>gameInstance.quitRace());
+for(const size of [{width:390,height:844},{width:844,height:390}]){
+ await page.setViewportSize(size);
+ assert(await page.evaluate(()=>document.querySelector('.garage').scrollWidth<=innerWidth));
+ await page.screenshot({path:'/tmp/uodekka-'+size.width+'.png'});
+}
+assert.deepEqual(errors,[]);
+console.log('PASS: profile, car selection, dialogs, invite URL, course confirmation persistence, random confirmation, race config, portrait/landscape, no page errors');
+await browser.close();
+})().catch(e=>{console.error(e);process.exit(1)});

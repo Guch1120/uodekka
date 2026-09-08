@@ -3,11 +3,6 @@ import { Courses } from '../courses/index.js';
 import { P2PManager } from '../../backend/network/p2p_manager.js';
 import { GaragePreview, courseArt } from './lobby_preview.js';
 
-const details = {
-  standard_red: ['BALANCED', 'バランス型', '扱いやすさと速さを両立。最初の一台に。'],
-  speed_blue: ['HIGH SPEED', '高速型', '最高速と重さを武器に、ストレートを駆け抜ける。'],
-  handling_green: ['AGILITY', '軽量型', '鋭い加速と軽快なハンドリングでコーナーを攻略。']
-};
 const arrow = (id, direction, label) => `<button id="${id}" class="garage-arrow" aria-label="${label}">${direction === 'prev' ? '◀' : '▶'}</button>`;
 const stats = () => `<section class="garage-specs"><div class="garage-eyebrow">YOUR MACHINE</div><h2 class="vehicle-name"></h2><p class="vehicle-description"></p><div class="garage-stat-list">${[['topSpeed', 'スピード', 50], ['acceleration', '加速', 35], ['weight', '重さ', 1.5]].map(([key, label, max]) => `<label class="garage-stat"><span>${label}</span><meter data-stat="${key}" min="0" max="${max}" aria-label="${label}"></meter><span data-stat-value="${key}" class="garage-stat-value"></span></label>`).join('')}</div></section>`;
 
@@ -73,7 +68,7 @@ export class LobbyModal {
         </main>
         <footer class="garage-footer"><span>UO:De Car / RACING CLUB</span><span id="garage-status" role="status" aria-live="polite">好きな車体で、好きな走りを。</span><span>LET'S RACE ↗</span></footer>
       </div>
-      <dialog id="room-dialog" class="garage-dialog" aria-labelledby="room-dialog-title"><form id="room-form"><div class="garage-dialog-heading"><span class="garage-eyebrow" id="room-dialog-kicker"></span><button type="button" id="room-dialog-close" class="garage-close" aria-label="閉じる">×</button></div><h2 id="room-dialog-title"></h2><p id="room-dialog-description"></p><label for="input-room-id">ルームID</label><input id="input-room-id" maxlength="32" pattern="[a-zA-Z0-9][a-zA-Z0-9-]{2,31}" required placeholder="例：weekend-race" autocapitalize="none" spellcheck="false" autocomplete="off"><small>半角英数字・ハイフン、3〜32文字</small><button type="button" id="dialog-copy" class="garage-copy-link">招待URLをコピー ↗</button><p id="room-dialog-status" role="status" aria-live="polite"></p><button type="submit" id="room-submit" class="garage-button garage-button-start"></button></form></dialog>
+      <dialog id="room-dialog" class="garage-dialog" aria-labelledby="room-dialog-title"><form id="room-form"><div class="garage-dialog-heading"><span class="garage-eyebrow" id="room-dialog-kicker"></span><button type="button" id="room-dialog-close" class="garage-close" aria-label="閉じる">×</button></div><h2 id="room-dialog-title"></h2><p id="room-dialog-description"></p><label for="input-room-id">ルームID</label><input id="input-room-id" maxlength="32" pattern="[a-zA-Z0-9][a-zA-Z0-9-]{2,31}" required placeholder="例：weekend-race" autocapitalize="none" spellcheck="false" autocomplete="off"><small>半角英数字・ハイフン、3〜32文字</small><label class="garage-invite-label" for="invite-url">招待URL</label><input id="invite-url" readonly aria-label="招待URL" placeholder="ルームIDを入力すると表示されます"><button type="button" id="dialog-copy" class="garage-copy-link">招待URLをコピー ↗</button><p id="room-dialog-status" role="status" aria-live="polite"></p><button type="submit" id="room-submit" class="garage-button garage-button-start"></button></form></dialog>
       <div id="race-countdown" class="garage-countdown" role="alert" hidden><div><span class="garage-eyebrow">GET READY</span><h2>まもなくゲームが開始されます</h2><p id="countdown-course"></p><strong>3 · 2 · 1</strong></div></div>`;
     this.container.appendChild(this.modalEl);
     this.el('#player-name').value = localStorage.getItem('kart_player_name') || '';
@@ -133,6 +128,7 @@ export class LobbyModal {
       if (this.busy) { this.connectionAttempt++; this.p2pManager.leaveRoom(); this.busy = false; }
       this.el('.garage-shell').inert = false;
     });
+    this.el('#input-room-id').addEventListener('input', () => this.updateInvite());
     this.el('#room-form').addEventListener('submit', event => { event.preventDefault(); this.connectRoom(); });
   }
 
@@ -151,8 +147,8 @@ export class LobbyModal {
   updateVehicle() {
     const vehicle = Vehicles.types[this.vehicleKey];
     this.modalEl.querySelectorAll('.vehicle-name').forEach(el => { el.textContent = vehicle.name; });
-    this.modalEl.querySelectorAll('.vehicle-description').forEach(el => { el.textContent = details[this.vehicleKey][2]; });
-    this.el('#vehicle-category').textContent = details[this.vehicleKey][1];
+    this.modalEl.querySelectorAll('.vehicle-description').forEach(el => { el.textContent = vehicle.description || ''; });
+    this.el('#vehicle-category').textContent = vehicle.category || 'カスタム';
     this.el('#vehicle-counter').textContent = `0${this.vehicleIndex + 1} / 0${this.vehicleKeys.length}`;
     this.el('#vehicle-dots').innerHTML = this.vehicleKeys.map((_, i) => `<i class="${i === this.vehicleIndex ? 'active' : ''}"></i>`).join('');
     this.modalEl.querySelectorAll('[data-stat]').forEach(el => { el.value = vehicle[el.dataset.stat]; });
@@ -174,17 +170,25 @@ export class LobbyModal {
 
   changeCourse(step) {
     this.courseIndex = (this.courseIndex + step + this.courseIds.length) % this.courseIds.length;
-    this.confirmedCourse = null;
     this.updateCourse();
   }
 
   updateCourse() {
     const course = Courses.getCourse(this.courseIds[this.courseIndex]);
-    this.el('#solo-map').innerHTML = courseArt(course);
+    const map = this.el('#solo-map');
+    map.innerHTML = courseArt(course);
+    if (course.previewImage) {
+      const image = document.createElement('img');
+      image.className = 'garage-preview-image';
+      image.alt = `${course.name}の俯瞰図`;
+      image.onerror = () => { map.innerHTML = courseArt(course); };
+      image.src = course.previewImage;
+      map.replaceChildren(image);
+    }
     this.el('#solo-course-name').textContent = course.name;
     this.el('#solo-course-laps').textContent = `${course.totalLaps} LAPS`;
     this.el('#course-counter').textContent = `${String(this.courseIndex + 1).padStart(2, '0')} / ${String(this.courseIds.length).padStart(2, '0')}`;
-    this.el('#course-confirmation').textContent = this.confirmedCourse ? `✓ ${course.name}で決定` : 'コースを選んで確定してください。';
+    this.el('#course-confirmation').textContent = this.confirmedCourse ? `✓ 確定コース：${Courses.getCourse(this.confirmedCourse).name}${this.confirmedCourse !== this.courseIds[this.courseIndex] ? '（閲覧中のコースは未確定）' : ''}` : 'コースを選んで確定してください。';
     this.el('#btn-start-solo').disabled = !this.confirmedCourse;
   }
 
@@ -218,6 +222,7 @@ export class LobbyModal {
     this.el('#room-submit').disabled = false;
     this.el('#room-dialog-status').textContent = '';
     this.el('#input-room-id').value = room;
+    this.updateInvite();
     this.el('.garage-shell').inert = true;
     this.el('#room-dialog').showModal();
     this.el('#input-room-id').focus();
@@ -278,13 +283,27 @@ export class LobbyModal {
     this.el('#room-role-note').textContent = p2p.isHost ? 'あなたがホストです。コースを決定してレースを開始。' : 'コース決定・ゲーム開始はホストが操作します。';
   }
 
+  inviteUrl(value) {
+    const id = P2PManager.normalizeRoomId(value);
+    const url = new URL(window.location.href);
+    url.search = ''; url.hash = ''; url.searchParams.set('room', id);
+    return url.href;
+  }
+
+  updateInvite() {
+    try {
+      this.el('#invite-url').value = this.inviteUrl(this.el('#input-room-id').value);
+      this.el('#dialog-copy').disabled = false;
+    } catch {
+      this.el('#invite-url').value = '';
+      this.el('#dialog-copy').disabled = true;
+    }
+  }
+
   async copyInvite(value, inDialog = false) {
     const status = inDialog ? this.el('#room-dialog-status') : this.el('#garage-status');
     try {
-      const id = P2PManager.normalizeRoomId(value);
-      const url = new URL(window.location.href);
-      url.search = ''; url.hash = ''; url.searchParams.set('room', id);
-      await navigator.clipboard.writeText(url.href);
+      await navigator.clipboard.writeText(this.inviteUrl(value));
       status.textContent = '招待URLをコピーしました。';
     } catch (error) {
       status.textContent = error.message.includes('ルームID') ? error.message : 'コピーできませんでした。ルームIDを直接伝えてください。';
@@ -314,7 +333,7 @@ export class LobbyModal {
   launch(config) {
     this.inputManager?.resetState();
     this.hide();
-    this.onStartGame(config);
+    this.onStartGame({ ...config, playerName: this.playerName });
   }
 
   returnHome() {

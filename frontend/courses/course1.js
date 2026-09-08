@@ -4,6 +4,7 @@ import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 
 export const Course1 = {
   id: 'course1',
+  previewImage: null, // 未指定時は実際の形状から俯瞰図を生成
   name: 'ピーチ・サーキット',
   theme: 'grassland',
   skyColor: 0x87ceeb,

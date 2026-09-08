@@ -4,6 +4,7 @@ import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 
 export const Course3 = {
   id: 'course3',
+  previewImage: null, // 未指定時は実際の形状から俯瞰図を生成
   name: 'コズミック・ネオン',
   theme: 'space',
   skyColor: 0x050518,

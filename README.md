@@ -86,3 +86,9 @@
 マルチではホストが3〜32文字の半角英数字・ハイフンのルームIDを設定し、ゲストは同じIDまたは招待URLから参加します。メンバー名と選択コースは全員に同期され、コース決定・開始はホスト専用です。マルチは全員が持つ標準3コースから選ばれます。カスタムコースはソロ画面とコースエディタで利用できます。ルームは最大8人で、ホストの退出時はゲストもホームへ戻ります。
 
 通信プロトコルのテスト: `node tests/p2p_lobby.mjs`。公開は GitHub main への push をトリガーとする自動デプロイです。現在の配信対象 `.vercel/output/static` にも変更した配信ファイルを同期してから commit・push してください。Production URL: https://takufcbarcamessi10-8840.vercel.app/
+
+### 開始前UIの拡張
+
+車体データは `frontend/vehicles/vehicles.js` に集約しています。`image` に画像URLを設定すると3Dプレビューを差し替えられます（未指定・読み込み失敗時は3D表示）。`category` と `description` も同じデータから表示します。性能はゲーム本体と共通の `topSpeed / acceleration / weight` を参照します。
+
+標準コースの `previewImage` に画像URLを設定すると俯瞰図を差し替えられます。未指定・読み込み失敗時はコース座標から生成します。閲覧コースを変更しても確定済みコースは保持され、画面には実際にレースで使用する確定コース名を表示します。開始コールバックには `playerName / vehicleKey / courseId / mode / isHost` を渡します。

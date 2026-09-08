@@ -7,6 +7,9 @@ export const Vehicles = {
     standard_red: {
       id: 'standard_red',
       name: 'レッド・ストリーム',
+      image: null, // 画像URLでガレージの3D表示を差し替え
+      category: 'バランス型',
+      description: '扱いやすさと速さを両立。最初の一台に。',
       color: 0xe74c3c,
       accentColor: 0xffffff,
       topSpeed: 42.0,        // 最高速度 (km/h換算 ~126km/h)
@@ -21,6 +24,9 @@ export const Vehicles = {
     speed_blue: {
       id: 'speed_blue',
       name: 'ブルー・ファルコン',
+      image: null, // 画像URLでガレージの3D表示を差し替え
+      category: '高速型',
+      description: '最高速と重さを武器に、ストレートを駆け抜ける。',
       color: 0x3498db,
       accentColor: 0xf1c40f,
       topSpeed: 47.0,
@@ -35,6 +41,9 @@ export const Vehicles = {
     handling_green: {
       id: 'handling_green',
       name: 'グリーン・ツイスター',
+      image: null, // 画像URLでガレージの3D表示を差し替え
+      category: '軽量型',
+      description: '鋭い加速と軽快なハンドリングでコーナーを攻略。',
       color: 0x2ecc71,
       accentColor: 0x27ae60,
       topSpeed: 38.0,

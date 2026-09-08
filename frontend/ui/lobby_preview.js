@@ -14,6 +14,15 @@ export class GaragePreview {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.domElement.setAttribute('role', 'img');
     container.appendChild(this.renderer.domElement);
+    this.image = document.createElement('img');
+    this.image.className = 'garage-preview-image';
+    this.image.hidden = true;
+    this.image.onerror = () => {
+      this.image.hidden = true;
+      this.renderer.domElement.hidden = false;
+      this.render();
+    };
+    container.appendChild(this.image);
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0x7c8c9f, 2.7));
     const light = new THREE.DirectionalLight(0xffffff, 3.2);
     light.position.set(-3, 6, -4);
@@ -36,6 +45,12 @@ export class GaragePreview {
       geometries.forEach(g => g.dispose());
       materials.forEach(m => m.dispose());
     }
+    const vehicle = Vehicles.types[key];
+    this.image.hidden = !vehicle.image;
+    this.renderer.domElement.hidden = !!vehicle.image;
+    this.image.alt = `${vehicle.name}の車体プレビュー`;
+    if (vehicle.image) this.image.src = vehicle.image;
+    else this.image.removeAttribute('src');
     this.kart = Vehicles.createKartMesh(key);
     this.scene.add(this.kart);
     this.renderer.domElement.setAttribute('aria-label', `${Vehicles.types[key].name}の車体プレビュー`);
