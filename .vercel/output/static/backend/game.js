@@ -74,6 +74,7 @@ export class Game {
     this.lobbyModal = new LobbyModal(this.appContainer, this.p2p, (gameConfig) => {
       this.startRace(gameConfig);
     }, this.inputManager);
+    this.lobbyModal.onSessionEnded = () => { if (this.isRunning) this.quitRace(); };
     this.lobbyModal.onOpenEditor = () => {
       this.editorModal.show();
     };
@@ -145,13 +146,7 @@ export class Game {
     if (this.inputManager) this.inputManager.hideControls();
 
     // P2P接続中なら切断
-    if (this.p2p && this.p2p.peer) {
-      try {
-        this.p2p.peer.destroy();
-      } catch (e) {
-        console.warn(e);
-      }
-    }
+    this.p2p.leaveRoom();
     // ロビー画面を再表示
     this.lobbyModal.show();
   }
@@ -200,7 +195,13 @@ export class Game {
   }
 
   setupNetworkEvents() {
+    this.p2p.onPlayerLeft = (peerId) => {
+      const player = this.otherPlayers.get(peerId);
+      if (player) this.scene.remove(player.mesh);
+      this.otherPlayers.delete(peerId);
+    };
     this.p2p.onPeerStateReceived = (peerId, state) => {
+      if (!this.isRunning) return;
       let peerKart = this.otherPlayers.get(peerId);
       if (!peerKart) {
         const mesh = Vehicles.createKartMesh(state.vehicleKey || 'speed_blue');
@@ -275,7 +276,8 @@ export class Game {
     const normal = new THREE.Vector3().crossVectors(forward, up).normalize();
 
     const localKartMesh = Vehicles.createKartMesh(config.vehicleKey);
-    localKartMesh.position.copy(p0).addScaledVector(normal, 4.0);
+    const gridIndex = config.mode === 'solo' ? 0 : Math.max(0, this.p2p.members.findIndex(member => member.id === this.p2p.myPeerId));
+    localKartMesh.position.copy(p0).addScaledVector(normal, gridIndex % 2 === 0 ? 4.0 : -4.0).addScaledVector(forward, -Math.floor(gridIndex / 2) * 5);
     localKartMesh.position.y += 0.4;
 
     const startYaw = Math.atan2(-forward.x, -forward.z);
@@ -471,6 +473,7 @@ export class Game {
     // 9. P2Pマルチプレイ位置送信
     if (this.p2p.roomId) {
       this.p2p.sendKartState({
+        vehicleKey: this.currentGameConfig.vehicleKey,
         x: this.localPlayerKart.mesh.position.x,
         y: this.localPlayerKart.mesh.position.y,
         z: this.localPlayerKart.mesh.position.z,

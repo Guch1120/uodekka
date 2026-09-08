@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
  await page.goto(process.env.GAME_URL || 'http://localhost:8099');
  await page.click('#title-screen');
  await page.waitForFunction(()=>!!window.gameInstance,{timeout:60000});
- await page.click('#tab-solo'); await page.click('#btn-start-solo');
+ await page.click('#tab-solo'); await page.click('#course-confirm'); await page.click('#btn-start-solo');
  await page.waitForFunction(()=>window.gameInstance.isRunning);
  const getState=()=>page.evaluate(()=>({...gameInstance.inputManager.state}));
  await page.keyboard.down('ArrowRight'); assert.equal((await getState()).steering,1);
