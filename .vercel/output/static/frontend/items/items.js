@@ -163,8 +163,7 @@ export const Items = {
       // 最下位層 (11〜12位)
       pool = [
         'star', 'star', 'star',
-        'triple_mushroom', 'triple_mushroom',
-        'golden_mushroom',
+        'triple_mushroom', 'triple_mushroom', 'triple_mushroom',
         'blue_shell', 'blue_shell'
       ];
       if (!this.lightningHeld) {
