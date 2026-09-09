@@ -167,17 +167,15 @@ export class HUD {
   }
 
   update(playerState, trackPoints = []) {
-    if (!playerState) return;
-
-    this.positionEl.textContent = playerState.position || 1;
-    const suffixEl = this.element.querySelector('.pos-suffix');
     const pos = playerState.position || 1;
+    this.positionEl.textContent = pos;
+    this.positionEl.classList.toggle('two-digits', pos >= 10);
+    const suffixEl = this.element.querySelector('.pos-suffix');
     suffixEl.textContent = pos === 1 ? 'st' : (pos === 2 ? 'nd' : (pos === 3 ? 'rd' : 'th'));
 
     const posBadge = this.element.querySelector('.position-badge');
     if (posBadge) {
-      posBadge.classList.remove('pos-1', 'pos-2', 'pos-3', 'pos-4');
-      posBadge.classList.add(`pos-${Math.min(pos, 4)}`);
+      posBadge.className = `hud-badge position-badge pos-${pos}`;
     }
 
     const curLap = playerState.currentLap || 1;

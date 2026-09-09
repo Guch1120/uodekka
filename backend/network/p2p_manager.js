@@ -201,8 +201,8 @@ export class P2PManager {
     });
     conn.on('open', () => {
       if (generation !== this.generation) { conn.close(); return; }
-      if (this.phase !== 'lobby' || this.members.length >= 8) {
-        conn.send({ type: 'ROOM_ERROR', message: this.phase !== 'lobby' ? 'レースはすでに開始しています。' : 'ルームは満員です（最大8人）。' });
+      if (this.phase !== 'lobby' || this.members.length >= 12) {
+        conn.send({ type: 'ROOM_ERROR', message: this.phase !== 'lobby' ? 'レースはすでに開始しています。' : 'ルームは満員です（最大12人）。' });
         setTimeout(() => conn.close(), 250); return;
       }
       this.connections.push(conn);
@@ -321,10 +321,10 @@ export class P2PManager {
     return true;
   }
 
-  broadcastStartRace() {
+  broadcastStartRace(aiRacers = []) {
     if (!this.isHost || this.phase !== 'lobby' || !COURSES.has(this.courseId)) return false;
     this.phase = 'starting';
-    const data = { type: 'START_RACE', courseId: this.courseId, delayMs: 2200 };
+    const data = { type: 'START_RACE', courseId: this.courseId, delayMs: 2200, aiRacers };
     this.publishRoom();
     this.broadcast(data);
     this.onGameStart?.(data);
@@ -339,6 +339,11 @@ export class P2PManager {
   sendKartState(state) {
     if (!this.roomId) return;
     this.broadcast({ type: 'KART_STATE', senderId: this.myPeerId, time: performance.now(), state });
+  }
+
+  sendCpuStates(states) {
+    if (!this.isHost || !this.roomId) return;
+    this.broadcast({ type: 'CPU_STATES', time: performance.now(), states });
   }
 
   handleDataFromGuest(senderPeerId, data) {
@@ -358,16 +363,18 @@ export class P2PManager {
   handleDataFromHost(data) {
     if (this.isHost || !data || typeof data !== 'object') return;
     if (data.type === 'ROOM_STATE' && data.roomId === this.roomId && Array.isArray(data.members)) {
-      this.members = data.members.slice(0, 8).map(m => ({ id: String(m.id), ...profile(m), isHost: m.id === this.hostConnection?.peer }));
+      this.members = data.members.slice(0, 12).map(m => ({ id: String(m.id), ...profile(m), isHost: m.id === this.hostConnection?.peer }));
       this.courseId = COURSES.has(data.courseId) ? data.courseId : null;
       this.phase = data.phase;
       this.onRoomState?.({ ...data, members: this.members, courseId: this.courseId });
     } else if (data.type === 'START_RACE' && COURSES.has(data.courseId) && !this.receivedStart) {
       this.receivedStart = true;
       this.phase = 'starting';
-      this.onGameStart?.({ ...data, delayMs: 2200 });
+      this.onGameStart?.({ ...data, delayMs: 2200, aiRacers: data.aiRacers || [] });
     } else if (data.type === 'KART_STATE' && data.state && data.senderId !== this.myPeerId) {
       this.onPeerStateReceived?.(data.senderId, data.state);
+    } else if (data.type === 'CPU_STATES' && Array.isArray(data.states)) {
+      this.onCpuStatesReceived?.(data.states);
     } else if (data.type === 'ITEM_USE') this.onItemEvent?.(data);
   }
 

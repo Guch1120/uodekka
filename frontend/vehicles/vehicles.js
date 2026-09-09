@@ -57,8 +57,10 @@ export const Vehicles = {
     }
   },
 
-  createKartMesh(vehicleTypeKey = 'standard_red') {
+  createKartMesh(vehicleTypeKey = 'standard_red', customColor = null, customAccent = null) {
     const config = this.types[vehicleTypeKey] || this.types.standard_red;
+    const mainColor = customColor !== null ? customColor : config.color;
+    const accColor = customAccent !== null ? customAccent : config.accentColor;
     const group = new THREE.Group();
 
     // 1. シャーシ
@@ -72,7 +74,7 @@ export const Vehicles = {
     // 2. メインボディ
     const bodyGeo = new THREE.BoxGeometry(1.2, 0.45, 1.8);
     const bodyMat = new THREE.MeshStandardMaterial({
-      color: config.color,
+      color: mainColor,
       roughness: 0.3,
       metalness: 0.6
     });
@@ -84,7 +86,7 @@ export const Vehicles = {
     // ノーズコーン (-Z前方)
     const noseGeo = new THREE.ConeGeometry(0.6, 0.9, 4);
     noseGeo.rotateX(-Math.PI / 2);
-    const noseMat = new THREE.MeshStandardMaterial({ color: config.accentColor, roughness: 0.3 });
+    const noseMat = new THREE.MeshStandardMaterial({ color: accColor, roughness: 0.3 });
     const nose = new THREE.Mesh(noseGeo, noseMat);
     nose.position.set(0, 0.55, -1.2);
     nose.castShadow = true;
@@ -99,7 +101,7 @@ export const Vehicles = {
 
     // ヘルメット
     const headGeo = new THREE.SphereGeometry(0.35, 16, 16);
-    const headMat = new THREE.MeshStandardMaterial({ color: config.color, roughness: 0.2 });
+    const headMat = new THREE.MeshStandardMaterial({ color: mainColor, roughness: 0.2 });
     const head = new THREE.Mesh(headGeo, headMat);
     head.position.set(0, 1.25, 0.2);
     head.castShadow = true;
@@ -114,7 +116,7 @@ export const Vehicles = {
 
     // 4. リアウイング (+Z後方)
     const wingGeo = new THREE.BoxGeometry(1.5, 0.1, 0.4);
-    const wingMat = new THREE.MeshStandardMaterial({ color: config.accentColor, roughness: 0.3 });
+    const wingMat = new THREE.MeshStandardMaterial({ color: accColor, roughness: 0.3 });
     const wing = new THREE.Mesh(wingGeo, wingMat);
     wing.position.set(0, 1.0, 1.2);
     wing.castShadow = true;
@@ -156,8 +158,8 @@ export const Vehicles = {
       bodyMesh: body,
       headMesh: head,
       wingMesh: wing,
-      defaultColor: config.color,
-      defaultAccent: config.accentColor
+      defaultColor: mainColor,
+      defaultAccent: accColor
     };
 
     return group;

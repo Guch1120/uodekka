@@ -3,6 +3,7 @@ import { Vehicles } from '../vehicles/vehicles.js';
 import { Courses } from '../courses/index.js';
 import { P2PManager } from '../../backend/network/p2p_manager.js';
 import { GaragePreview, courseArt } from './lobby_preview.js';
+import { CPU_ROSTER } from '../../backend/ai/cpu_driver.js';
 
 const arrow = (id, direction, label) => `<button id="${id}" class="garage-arrow" aria-label="${label}">${direction === 'prev' ? '◀' : '▶'}</button>`;
 const stats = () => `<section class="garage-specs"><div class="garage-eyebrow">YOUR MACHINE</div><h2 class="vehicle-name"></h2><p class="vehicle-description"></p><div class="garage-stat-list">${[['topSpeed', 'スピード', 50], ['acceleration', '加速', 35], ['weight', '重さ', 1.5]].map(([key, label, max]) => `<label class="garage-stat"><span>${label}</span><meter data-stat="${key}" min="0" max="${max}" aria-label="${label}"></meter><span data-stat-value="${key}" class="garage-stat-value"></span></label>`).join('')}</div></section>`;
@@ -57,9 +58,9 @@ export class LobbyModal {
             </div>
           </section>
           <section class="garage-screen garage-setup" data-screen="solo" hidden>
-            <div class="garage-course-panel"><div class="garage-section-heading"><div><span class="garage-eyebrow">SOLO / SELECT YOUR COURSE</span><h1>次の舞台を選ぼう。</h1></div><span class="garage-chip">CPU 3台と対戦</span></div>
+            <div class="garage-course-panel"><div class="garage-section-heading"><div><span class="garage-eyebrow">SOLO / SELECT YOUR COURSE</span><h1>次の舞台を選ぼう。</h1></div><span class="garage-chip">CPU 11台と対戦（合計12人）</span></div>
               <div class="garage-map-card"><div class="garage-map" id="solo-map"></div>${arrow('course-prev', 'prev', '前のコース')}${arrow('course-next', 'next', '次のコース')}<span id="course-counter" class="garage-counter"></span></div>
-              <div class="garage-course-caption"><div><span class="garage-eyebrow">CIRCUIT</span><h2 id="solo-course-name" aria-live="polite"></h2></div><span id="solo-course-laps" class="garage-chip"></span></div>
+              <div class="garage-course-caption"><div><span class="garage-eyebrow">CIRCUIT</span><h2 id="solo-course-name" aria-live="polite"></h2></div><div class="garage-course-badges"><span id="solo-course-laps" class="garage-chip"></span><span id="solo-ai-level" class="garage-chip garage-chip-ai">🧠 CPU学習 Lv.1</span><button type="button" id="btn-reset-ai" class="garage-ai-reset-btn" title="このコースの学習データを初期化">↺ 学習リセット</button></div></div>
             </div>
             <div class="garage-setup-side"><div class="garage-course-actions"><button id="course-confirm" class="garage-button garage-button-green">✓ コース決定</button><button id="course-random" class="garage-button garage-button-light">⤨ ランダム決定</button></div><p id="course-confirmation" class="garage-note" aria-live="polite">コースを選んで確定してください。</p>${stats()}<button id="btn-start-solo" class="garage-button garage-button-start" disabled>ゲームスタート <span>→</span></button></div>
           </section>
@@ -142,7 +143,23 @@ export class LobbyModal {
       const ids = Object.keys(Courses.list);
       this.p2pManager.selectCourse(ids[this.randomIndex(ids.length, ids.indexOf(this.p2pManager.courseId))]);
     });
-    on('#btn-host-start', () => { if (this.p2pManager.isHost && !this.starting) this.p2pManager.broadcastStartRace(); });
+    on('#btn-host-start', () => {
+      if (this.p2pManager.isHost && !this.starting) {
+        const memberCount = this.p2pManager.members.length;
+        const neededCpu = Math.max(0, 12 - memberCount);
+        const aiRacers = CPU_ROSTER.slice(0, neededCpu).map((bot, idx) => ({
+          ...bot,
+          gridIndex: memberCount + idx
+        }));
+        this.p2pManager.broadcastStartRace(aiRacers);
+      }
+    });
+    on('#btn-reset-ai', () => {
+      const courseId = this.courseIds[this.courseIndex];
+      localStorage.removeItem(`kart_ai_knowledge_${courseId}`);
+      this.updateCourse();
+      this.setStatus('CPU学習データをリセットしました。');
+    });
     on('#room-diagnostics', () => this.copyDiagnostics('room'));
     on('#dialog-diagnostics', () => this.copyDiagnostics('dialog'));
     on('#room-copy', () => this.copyInvite(this.p2pManager.roomId));
@@ -212,6 +229,22 @@ export class LobbyModal {
     }
     this.el('#solo-course-name').textContent = course.name;
     this.el('#solo-course-laps').textContent = `${course.totalLaps} LAPS`;
+
+    const courseId = this.courseIds[this.courseIndex];
+    let aiLaps = 0;
+    try {
+      const raw = localStorage.getItem(`kart_ai_knowledge_${courseId}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        aiLaps = parsed.totalLapsLearned || 0;
+      }
+    } catch {}
+    const aiLevel = Math.min(10, Math.floor(aiLaps / 2) + 1);
+    const aiEl = this.el('#solo-ai-level');
+    if (aiEl) {
+      aiEl.textContent = `🧠 CPU学習 Lv.${aiLevel} (${aiLaps}周学習済)`;
+    }
+
     this.el('#course-counter').textContent = `${String(this.courseIndex + 1).padStart(2, '0')} / ${String(this.courseIds.length).padStart(2, '0')}`;
     this.el('#course-confirmation').textContent = this.confirmedCourse ? `✓ 確定コース：${Courses.getCourse(this.confirmedCourse).name}${this.confirmedCourse !== this.courseIds[this.courseIndex] ? '（閲覧中のコースは未確定）' : ''}` : 'コースを選んで確定してください。';
     this.el('#btn-start-solo').disabled = !this.confirmedCourse;
@@ -289,7 +322,7 @@ export class LobbyModal {
   updateRoom() {
     const p2p = this.p2pManager;
     this.el('#display-room-id').textContent = p2p.roomId || '';
-    this.el('#member-count').textContent = `${p2p.members.length} / 8 人`;
+    this.el('#member-count').textContent = `${p2p.members.length} / 12 人（不足${Math.max(0, 12 - p2p.members.length)}枠はCPU参戦）`;
     const list = this.el('#players-list');
     list.replaceChildren();
     [...p2p.members].sort((a, b) => Number(b.isHost) - Number(a.isHost)).forEach((member, i) => {
@@ -367,7 +400,13 @@ export class LobbyModal {
     this.startTimer = setTimeout(() => {
       if (!this.p2pManager.roomId) return;
       this.el('#race-countdown').hidden = true;
-      this.launch({ mode: this.p2pManager.isHost ? 'multi_host' : 'multi_guest', courseId: data.courseId, vehicleKey: this.vehicleKey, isHost: this.p2pManager.isHost });
+      this.launch({
+        mode: this.p2pManager.isHost ? 'multi_host' : 'multi_guest',
+        courseId: data.courseId,
+        vehicleKey: this.vehicleKey,
+        isHost: this.p2pManager.isHost,
+        aiRacers: data.aiRacers || []
+      });
     }, data.delayMs);
   }
 

@@ -120,25 +120,27 @@ export const Items = {
     }
   },
 
-  getRandomItem(position = 1, totalPlayers = 4) {
+  getRandomItem(position = 1, totalPlayers = 12) {
     let pool = [];
+    const ratio = (position - 1) / Math.max(1, totalPlayers - 1); // 0.0 (1st) to 1.0 (12th)
 
     if (position === 1) {
       pool = [
         'banana', 'banana', 'banana',
         'triple_banana', 'triple_banana',
         'green_shell', 'green_shell',
-        'red_shell',
         'bobomb'
       ];
-    } else if (position === 2) {
+    } else if (ratio < 0.28) {
+      // 上位 (2〜3位)
       pool = [
         'red_shell', 'red_shell',
         'green_shell', 'green_shell',
         'triple_banana', 'banana',
         'mushroom', 'bobomb'
       ];
-    } else if (position === 3) {
+    } else if (ratio < 0.58) {
+      // 中位 (4〜7位)
       pool = [
         'red_shell', 'red_shell',
         'triple_mushroom', 'triple_mushroom',
@@ -146,14 +148,24 @@ export const Items = {
         'bobomb',
         'star'
       ];
-      if (!this.lightningHeld) pool.push('lightning');
-    } else {
+      if (!this.lightningHeld && Math.random() < 0.2) pool.push('blue_shell');
+    } else if (ratio < 0.85) {
+      // 下位 (8〜10位)
       pool = [
-        'star', 'star', 'star',
-        'triple_mushroom', 'triple_mushroom', 'triple_mushroom',
-        'blue_shell', 'blue_shell',
+        'star', 'star',
+        'triple_mushroom', 'triple_mushroom',
+        'blue_shell',
         'bobomb',
         'mushroom'
+      ];
+      if (!this.lightningHeld) pool.push('lightning');
+    } else {
+      // 最下位層 (11〜12位)
+      pool = [
+        'star', 'star', 'star',
+        'triple_mushroom', 'triple_mushroom',
+        'golden_mushroom',
+        'blue_shell', 'blue_shell'
       ];
       if (!this.lightningHeld) {
         pool.push('lightning', 'lightning');

@@ -35,6 +35,10 @@
 .garage-showroom { background: #edf3f5; border-radius: 20px; overflow: hidden; box-shadow: 0 15px 36px #0002; }
 .garage-showroom-top { padding: 22px 24px 0; display: flex; align-items: center; justify-content: space-between; }
 .garage-chip { display: inline-flex; align-items: center; white-space: nowrap; border-radius: 6px; padding: 7px 10px; background: #dce6e9; color: #3c5868; font-size: 11px; font-weight: 700; letter-spacing: .5px; }
+.garage-course-badges { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.garage-chip-ai { background: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe; font-weight: 800; }
+.garage-ai-reset-btn { background: transparent; border: 1px solid #cbd5e1; border-radius: 6px; padding: 5px 8px; font-size: 10px; color: #64748b; cursor: pointer; transition: all .15s ease; }
+.garage-ai-reset-btn:hover { background: #fee2e2; color: #dc2626; border-color: #fca5a5; }
 .garage-counter { font-variant-numeric: tabular-nums; font-size: 12px; letter-spacing: 2px; color: #728592; }
 .garage-vehicle-stage { position: relative; height: clamp(200px, 36vh, 380px); background: radial-gradient(ellipse at 50% 70%, #fff, #ffffff00 70%); }
 #garage-vehicle-preview { position: absolute; inset: 0 35px; }

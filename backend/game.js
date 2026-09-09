@@ -15,6 +15,8 @@ import { SettingsModal } from '../frontend/ui/settings_modal.js';
 import { LobbyModal } from '../frontend/ui/lobby_modal.js';
 import { PauseModal } from '../frontend/ui/pause_modal.js';
 import { EditorModal } from '../frontend/ui/editor_modal.js';
+import { CourseKnowledgeBase } from './ai/learning_ai.js';
+import { CPUDriver, CPU_ROSTER } from './ai/cpu_driver.js';
 
 export class Game {
   constructor() {
@@ -54,6 +56,8 @@ export class Game {
     this.otherPlayers = new Map();
     this.activeWorldItems = [];
     this.itemBoxes = [];
+    this.knowledgeBase = null;
+    this._lastPlayerLap = 1;
 
     this.clock = new THREE.Clock();
 
@@ -239,6 +243,28 @@ export class Game {
         Items.triggerLightning({ id: itemEvent.ownerId, isLocalPlayer: false }, this);
       }
     };
+
+    this.p2p.onCpuStatesReceived = (states) => {
+      if (!this.isRunning || !Array.isArray(states)) return;
+      states.forEach(state => {
+        let aiKart = this.otherPlayers.get(state.id);
+        if (!aiKart) {
+          const vKey = state.vehicleKey || 'standard_red';
+          const mesh = Vehicles.createKartMesh(vKey, state.color, state.accent);
+          this.scene.add(mesh);
+          const physics = new KartPhysics(mesh, Vehicles.types[vKey] || Vehicles.types.standard_red, false);
+          aiKart = { id: state.id, name: state.name, mesh, physics, isAI: false, isHostControlled: false, colorHex: state.colorHex };
+          this.otherPlayers.set(state.id, aiKart);
+        }
+        if (!aiKart.isHostControlled) {
+          aiKart.mesh.position.set(state.x, state.y, state.z);
+          aiKart.mesh.quaternion.set(state.qx, state.qy, state.qz, state.qw);
+          aiKart.physics.currentLap = state.lap;
+          aiKart.physics.progress = state.progress;
+          aiKart.physics.speed = state.speed;
+        }
+      });
+    };
   }
 
   showItemNotification(text, durationMs = 2000) {
@@ -280,33 +306,117 @@ export class Game {
 
     this.spawnItemBoxes();
 
-    const curve = this.courseTrack.curve;
-    const startT = 0.02;
-    const p0 = curve.getPointAt(startT);
-    const forward = curve.getTangentAt(startT).normalize();
+  getGridTransform(curve, gridIndex) {
+    const startT = 0.05;
+    const row = Math.floor(gridIndex / 2); // 0 to 5
+    const col = gridIndex % 2; // 0 = left (+3.4m), 1 = right (-3.4m)
+    const rowProgress = (startT - row * 0.0055 + 1.0) % 1.0;
+
+    const p = curve.getPointAt(rowProgress);
+    const forward = curve.getTangentAt(rowProgress).normalize();
     const up = new THREE.Vector3(0, 1, 0);
     const normal = new THREE.Vector3().crossVectors(forward, up).normalize();
 
+    const lateralOffset = (col === 0) ? 3.4 : -3.4;
+    const pos = p.clone().addScaledVector(normal, lateralOffset);
+    pos.y += 0.4;
+    const yaw = Math.atan2(-forward.x, -forward.z);
+
+    return { pos, yaw, progress: rowProgress };
+  }
+
+  startRace(config) {
+    this.inputManager.resetState();
+    while (this.scene.children.length > 2) {
+      const obj = this.scene.children[this.scene.children.length - 1];
+      this.scene.remove(obj);
+    }
+    this.otherPlayers.clear();
+    this.activeWorldItems = [];
+    this.itemBoxes = [];
+    this.courseObstacles = [];
+    this._finishedNotified = false;
+    Items.lightningHeld = false;
+    this.hud.resetLaps();
+
+    this.currentCourseConfig = Courses.getCourse(config.courseId);
+    this.renderer.setSkyAndTheme(this.currentCourseConfig.skyColor, this.currentCourseConfig.ambientColor);
+
+    this.courseTrack = Courses.buildTrack(this.currentCourseConfig);
+    this.scene.add(this.courseTrack.group);
+
+    if (this.currentCourseConfig.createEnvironment) {
+      const envGroup = this.currentCourseConfig.createEnvironment(this.scene);
+      this.scene.add(envGroup);
+      if (envGroup.userData && envGroup.userData.obstacles) {
+        this.courseObstacles = [...envGroup.userData.obstacles];
+      }
+    }
+
+    // タイヤウォール衝突判定オブジェクトを追加
+    if (this.courseTrack.tireWallObstacles && this.courseTrack.tireWallObstacles.length > 0) {
+      this.courseObstacles.push(...this.courseTrack.tireWallObstacles);
+    }
+
+    this.spawnItemBoxes();
+
+    // プレイヤー走行学習用知識ベースの初期化
+    this.knowledgeBase = new CourseKnowledgeBase(config.courseId, this.courseTrack.curve, this.currentCourseConfig.trackWidth);
+    this._lastPlayerLap = 1;
+
+    const curve = this.courseTrack.curve;
     const localKartMesh = Vehicles.createKartMesh(config.vehicleKey);
     const gridIndex = config.mode === 'solo' ? 0 : Math.max(0, this.p2p.members.findIndex(member => member.id === this.p2p.myPeerId));
-    localKartMesh.position.copy(p0).addScaledVector(normal, gridIndex % 2 === 0 ? 4.0 : -4.0).addScaledVector(forward, -Math.floor(gridIndex / 2) * 5);
-    localKartMesh.position.y += 0.4;
+    const gridInfo = this.getGridTransform(curve, gridIndex);
 
-    const startYaw = Math.atan2(-forward.x, -forward.z);
-    localKartMesh.rotation.set(0, startYaw, 0, 'YXZ');
+    localKartMesh.position.copy(gridInfo.pos);
+    localKartMesh.rotation.set(0, gridInfo.yaw, 0, 'YXZ');
     this.scene.add(localKartMesh);
 
     const vehicleConfig = Vehicles.types[config.vehicleKey] || Vehicles.types.standard_red;
     this.localPlayerKart = new KartPhysics(localKartMesh, vehicleConfig, true);
-    this.localPlayerKart.alignToTrack(curve, startT);
+    this.localPlayerKart.alignToTrack(curve, gridInfo.progress);
     this.localPlayerKart.totalLaps = this.currentCourseConfig.totalLaps;
-    this.localPlayerKart.progress = startT;
-    this.localPlayerKart.lastSafeT = startT;
+    this.localPlayerKart.progress = gridInfo.progress;
+    this.localPlayerKart.lastSafeT = gridInfo.progress;
 
     this.followCamera.setTarget(localKartMesh);
 
+    // 12人レースの編成
     if (config.mode === 'solo') {
-      this.spawnAICarts(config.vehicleKey);
+      // ソロ：プレイヤー1人 ＋ CPU 11台 ＝ 合計12台
+      this.spawnAICarts(config.vehicleKey, 11, 1);
+    } else if (config.mode === 'multi_host') {
+      // マルチホスト：参加者M人 ＋ 不足(12 - M)台のCPU ＝ 合計12台
+      const memberCount = this.p2p.members.length;
+      const neededCpu = Math.max(0, 12 - memberCount);
+      if (neededCpu > 0) {
+        this.spawnAICarts(config.vehicleKey, neededCpu, memberCount);
+      }
+    } else if (config.mode === 'multi_guest') {
+      // マルチゲスト：ホストから送られたCPUカートリストを配置
+      if (config.aiRacers && config.aiRacers.length > 0) {
+        config.aiRacers.forEach(bot => {
+          const grid = this.getGridTransform(curve, bot.gridIndex);
+          const mesh = Vehicles.createKartMesh(bot.vehicleKey, bot.color, bot.accent);
+          mesh.position.copy(grid.pos);
+          mesh.rotation.set(0, grid.yaw, 0, 'YXZ');
+          this.scene.add(mesh);
+          const physics = new KartPhysics(mesh, Vehicles.types[bot.vehicleKey] || Vehicles.types.standard_red, false);
+          physics.alignToTrack(curve, grid.progress);
+          physics.totalLaps = this.currentCourseConfig.totalLaps;
+          physics.progress = grid.progress;
+          this.otherPlayers.set(bot.id, {
+            id: bot.id,
+            name: bot.name,
+            mesh,
+            physics,
+            isAI: false,
+            isHostControlled: false,
+            colorHex: '#' + (bot.color || 0xe74c3c).toString(16).padStart(6, '0')
+          });
+        });
+      }
     }
 
     this.currentGameConfig = config;
@@ -317,7 +427,8 @@ export class Game {
     if (this.hud) this.hud.show();
     if (this.inputManager) this.inputManager.showControls();
 
-    this.showItemNotification('レーススタート！ GO!', 2500);
+    const aiLevel = this.knowledgeBase ? this.knowledgeBase.learningLevel : 1;
+    this.showItemNotification(`レーススタート！ 12人対戦 GO! (CPU学習Lv.${aiLevel})`, 3000);
   }
 
   spawnItemBoxes() {
@@ -346,43 +457,37 @@ export class Game {
     });
   }
 
-  spawnAICarts(playerVehicleKey) {
-    const aiKeys = ['speed_blue', 'handling_green', 'standard_red'].filter(k => k !== playerVehicleKey);
+  spawnAICarts(playerVehicleKey, count = 11, startGridIndex = 1) {
     const curve = this.courseTrack.curve;
-    const up = new THREE.Vector3(0, 1, 0);
 
-    const gridT = [0.035, 0.030, 0.025];
-    const gridOffsets = [-4.0, 4.0, -4.0];
+    for (let i = 0; i < count; i++) {
+      const gridIndex = startGridIndex + i;
+      const bot = CPU_ROSTER[i % CPU_ROSTER.length];
+      const vKey = bot.vehicleKey;
+      const mesh = Vehicles.createKartMesh(vKey, bot.color, bot.accent);
 
-    for (let i = 0; i < 3; i++) {
-      const vKey = aiKeys[i % aiKeys.length];
-      const mesh = Vehicles.createKartMesh(vKey);
-
-      const t = gridT[i];
-      const p = curve.getPointAt(t);
-      const forward = curve.getTangentAt(t).normalize();
-      const normal = new THREE.Vector3().crossVectors(forward, up).normalize();
-
-      mesh.position.copy(p).addScaledVector(normal, gridOffsets[i]);
-      mesh.position.y += 0.4;
-
-      const yaw = Math.atan2(-forward.x, -forward.z);
-      mesh.rotation.set(0, yaw, 0, 'YXZ');
+      const grid = this.getGridTransform(curve, gridIndex);
+      mesh.position.copy(grid.pos);
+      mesh.rotation.set(0, grid.yaw, 0, 'YXZ');
       this.scene.add(mesh);
 
       const physics = new KartPhysics(mesh, Vehicles.types[vKey], false);
-      physics.alignToTrack(curve, t);
+      physics.alignToTrack(curve, grid.progress);
       physics.totalLaps = this.currentCourseConfig.totalLaps;
-      physics.progress = t;
-      physics.lastSafeT = t;
+      physics.progress = grid.progress;
+      physics.lastSafeT = grid.progress;
 
-      this.otherPlayers.set(`ai_${i}`, {
-        id: `ai_${i}`,
+      this.otherPlayers.set(bot.id, {
+        id: bot.id,
+        name: bot.name,
         mesh,
         physics,
         isAI: true,
-        aiOffset: gridOffsets[i] * 0.7,
-        speedMultiplier: 0.88 + (i * 0.04)
+        isHostControlled: true,
+        personality: bot,
+        aiOffset: bot.offsetBias,
+        speedMultiplier: bot.speedScale,
+        colorHex: '#' + bot.color.toString(16).padStart(6, '0')
       });
     }
   }
@@ -420,6 +525,17 @@ export class Game {
 
     // 1. 自機物理更新
     this.localPlayerKart.update(dt, input, this.courseTrack.curve, this.currentCourseConfig.trackWidth, this);
+
+    // プレイヤーの走行データサンプリングとリアルタイム学習
+    if (this.knowledgeBase && this.localPlayerKart) {
+      this.knowledgeBase.recordPlayerSample(this.localPlayerKart, this.courseTrack.curve);
+      if (this.localPlayerKart.currentLap > this._lastPlayerLap) {
+        this._lastPlayerLap = this.localPlayerKart.currentLap;
+        this.knowledgeBase.commitLap();
+        const level = this.knowledgeBase.learningLevel;
+        this.showItemNotification(`🧠 プレイヤーの走りを学習！ (CPU学習Lv.${level})`, 2200);
+      }
+    }
 
     // 2. カメラ追従
     this.followCamera.update(
@@ -459,7 +575,8 @@ export class Game {
     const allKartPositions = [{
       x: this.localPlayerKart.mesh.position.x,
       z: this.localPlayerKart.mesh.position.z,
-      isLocal: true
+      isLocal: true,
+      color: '#38bdf8'
     }];
 
     this.otherPlayers.forEach(p => {
@@ -467,7 +584,7 @@ export class Game {
         x: p.mesh.position.x,
         z: p.mesh.position.z,
         isLocal: false,
-        color: '#e74c3c'
+        color: p.colorHex || '#e74c3c'
       });
     });
 
@@ -484,7 +601,7 @@ export class Game {
       allKartPositions
     }, this.courseTrack.points);
 
-    // 9. P2Pマルチプレイ位置送信
+    // 9. P2Pマルチプレイ位置送信（自機 + ホスト主導のCPU位置）
     if (this.p2p.roomId) {
       this.p2p.sendKartState({
         vehicleKey: this.currentGameConfig.vehicleKey,
@@ -499,10 +616,42 @@ export class Game {
         lap: this.localPlayerKart.currentLap,
         progress: this.localPlayerKart.progress
       });
+
+      if (this.p2p.isHost) {
+        const cpuStates = [];
+        this.otherPlayers.forEach(p => {
+          if (p.isAI) {
+            cpuStates.push({
+              id: p.id,
+              name: p.name,
+              vehicleKey: p.personality?.vehicleKey || 'standard_red',
+              color: p.personality?.color,
+              accent: p.personality?.accent,
+              colorHex: p.colorHex,
+              x: p.mesh.position.x,
+              y: p.mesh.position.y,
+              z: p.mesh.position.z,
+              qx: p.mesh.quaternion.x,
+              qy: p.mesh.quaternion.y,
+              qz: p.mesh.quaternion.z,
+              qw: p.mesh.quaternion.w,
+              speed: p.physics.speed,
+              lap: p.physics.currentLap,
+              progress: p.physics.progress
+            });
+          }
+        });
+        if (cpuStates.length > 0) {
+          this.p2p.sendCpuStates(cpuStates);
+        }
+      }
     }
 
     if (this.localPlayerKart.isFinished && !this._finishedNotified) {
       this._finishedNotified = true;
+      if (this.knowledgeBase) {
+        this.knowledgeBase.commitLap();
+      }
       this.showItemNotification(`GOAL!! あなたの順位は 第${myRank}位 です！`, 5000);
     }
   }
@@ -693,42 +842,11 @@ export class Game {
   }
 
   updateAIPlayer(aiKart, dt) {
-    const curve = this.courseTrack.curve;
-    const physics = aiKart.physics;
-    const mesh = aiKart.mesh;
-
-    const lookAheadT = (physics.progress + 0.04) % 1.0;
-    const targetPt = curve.getPointAt(lookAheadT);
-
-    const tangent = curve.getTangentAt(lookAheadT).normalize();
-    const up = new THREE.Vector3(0, 1, 0);
-    const normal = new THREE.Vector3().crossVectors(tangent, up).normalize();
-    targetPt.addScaledVector(normal, aiKart.aiOffset || 0);
-
-    const dirToTarget = new THREE.Vector3().subVectors(targetPt, mesh.position);
-    dirToTarget.y = 0;
-    dirToTarget.normalize();
-
-    const kartForward = new THREE.Vector3(0, 0, -1).applyQuaternion(mesh.quaternion);
-    kartForward.y = 0;
-    kartForward.normalize();
-
-    const cross = new THREE.Vector3().crossVectors(kartForward, dirToTarget);
-    const steer = Math.max(-1, Math.min(1, -cross.y * 3.0));
-
-    const aiInput = {
-      steering: steer,
-      accelerating: 0.95 * (aiKart.speedMultiplier || 1.0),
-      braking: 0,
-      drift: false,
-      itemHeld: false,
-      useItemTrigger: false
-    };
-
-    physics.update(dt, aiInput, curve, this.currentCourseConfig.trackWidth, this);
+    CPUDriver.stepAI(aiKart, dt, this.courseTrack, this.currentCourseConfig, this.knowledgeBase, this);
   }
 
   updateItemBoxes(dt) {
+    const allKarts = [this.localPlayerKart, ...Array.from(this.otherPlayers.values()).map(p => p.physics)];
     this.itemBoxes.forEach(box => {
       if (!box.active) {
         box.respawnTimer -= dt;
@@ -740,17 +858,23 @@ export class Game {
         box.mesh.rotation.x += dt * 1.5;
         box.mesh.rotation.y += dt * 2.5;
 
-        if (box.pos.distanceTo(this.localPlayerKart.mesh.position) < 2.5) {
-          box.active = false;
-          box.mesh.visible = false;
-          box.respawnTimer = 4.0;
+        for (const kart of allKarts) {
+          if (!kart || kart.isRespawning) continue;
+          if (box.pos.distanceTo(kart.mesh.position) < 2.5) {
+            box.active = false;
+            box.mesh.visible = false;
+            box.respawnTimer = 4.0;
 
-          if (!this.localPlayerKart.holdingItem) {
-            const ranking = this.calculateRankings();
-            const myRank = ranking.findIndex(k => k === this.localPlayerKart) + 1;
-            const item = Items.getRandomItem(myRank, 4);
-            this.localPlayerKart.holdingItem = item;
-            this.showItemNotification(`アイテム獲得: ${item.name}!`);
+            if (!kart.holdingItem) {
+              const ranking = this.calculateRankings();
+              const rank = ranking.findIndex(k => k === kart) + 1;
+              const item = Items.getRandomItem(rank, 12);
+              kart.holdingItem = item;
+              if (kart === this.localPlayerKart) {
+                this.showItemNotification(`アイテム獲得: ${item.name}!`);
+              }
+            }
+            break;
           }
         }
       }

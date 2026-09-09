@@ -128,12 +128,47 @@ canvas {
   box-shadow: 0 0 16px rgba(59, 130, 246, 0.4), 0 6px 20px rgba(0, 0, 0, 0.6);
 }
 
+.position-badge.pos-5,
+.position-badge.pos-6 {
+  background: linear-gradient(135deg, #059669, #047857);
+  border-color: #a7f3d0;
+  box-shadow: 0 0 16px rgba(5, 150, 105, 0.4), 0 6px 20px rgba(0, 0, 0, 0.6);
+}
+
+.position-badge.pos-7,
+.position-badge.pos-8 {
+  background: linear-gradient(135deg, #6366f1, #4338ca);
+  border-color: #c7d2fe;
+  box-shadow: 0 0 16px rgba(99, 102, 241, 0.4), 0 6px 20px rgba(0, 0, 0, 0.6);
+}
+
+.position-badge.pos-9,
+.position-badge.pos-10 {
+  background: linear-gradient(135deg, #475569, #334155);
+  border-color: #cbd5e1;
+  box-shadow: 0 0 16px rgba(71, 85, 105, 0.4), 0 6px 20px rgba(0, 0, 0, 0.6);
+}
+
+.position-badge.pos-11,
+.position-badge.pos-12 {
+  background: linear-gradient(135deg, #334155, #1e293b);
+  border-color: #94a3b8;
+  box-shadow: 0 0 16px rgba(30, 41, 59, 0.5), 0 6px 20px rgba(0, 0, 0, 0.6);
+}
+
 #hud-pos-num {
   font-size: 50px;
   font-weight: 900;
   line-height: 1;
   color: #ffffff;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  transition: font-size 0.15s ease;
+}
+
+#hud-pos-num.two-digits {
+  font-size: 40px;
+  letter-spacing: -2px;
+  margin-left: -6px;
 }
 
 .pos-suffix {
@@ -144,6 +179,12 @@ canvas {
   right: 11px;
   color: #ffffff;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+
+.position-badge:has(.two-digits) .pos-suffix {
+  top: 17px;
+  right: 6px;
+  font-size: 14px;
 }
 
 .lap-badge {
