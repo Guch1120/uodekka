@@ -5,16 +5,16 @@ import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 
 export const CPU_ROSTER = [
   { id: 'ai_0', name: 'ハヤテ', vehicleKey: 'speed_blue', color: 0x1e88e5, accent: 0xfbc531, style: 'speeder', offsetBias: 0.0, speedScale: 1.02, itemAggression: 0.8 },
-  { id: 'ai_1', name: 'ツバサ', vehicleKey: 'handling_green', color: 0x27ae60, accent: 0x4cd137, style: 'drifter', offsetBias: -1.4, speedScale: 0.99, itemAggression: 0.7 },
+  { id: 'ai_1', name: 'ツバサ', vehicleKey: 'handling_green', color: 0x27ae60, accent: 0x4cd137, style: 'drifter', offsetBias: -0.6, speedScale: 0.99, itemAggression: 0.7 },
   { id: 'ai_2', name: 'アオイ', vehicleKey: 'standard_red', color: 0xe74c3c, accent: 0xffffff, style: 'line_master', offsetBias: 0.0, speedScale: 1.01, itemAggression: 0.75 },
-  { id: 'ai_3', name: 'タクミ', vehicleKey: 'handling_green', color: 0x8e44ad, accent: 0x9c88ff, style: 'apex_cutter', offsetBias: 1.6, speedScale: 1.00, itemAggression: 0.7 },
-  { id: 'ai_4', name: 'レン', vehicleKey: 'speed_blue', color: 0xe67e22, accent: 0xf39c12, style: 'aggressive', offsetBias: -0.9, speedScale: 1.03, itemAggression: 0.95 },
-  { id: 'ai_5', name: 'ソラ', vehicleKey: 'standard_red', color: 0x16a085, accent: 0x48dbfb, style: 'balanced', offsetBias: 0.7, speedScale: 0.98, itemAggression: 0.7 },
-  { id: 'ai_6', name: 'ユウキ', vehicleKey: 'handling_green', color: 0xf1c40f, accent: 0xffda79, style: 'tactician', offsetBias: -1.7, speedScale: 0.98, itemAggression: 0.85 },
-  { id: 'ai_7', name: 'カイト', vehicleKey: 'speed_blue', color: 0x2c3e50, accent: 0x718093, style: 'wide_sweeper', offsetBias: 1.4, speedScale: 1.01, itemAggression: 0.8 },
-  { id: 'ai_8', name: 'ヒカリ', vehicleKey: 'standard_red', color: 0xe84393, accent: 0xff9ff3, style: 'smooth', offsetBias: -0.6, speedScale: 0.97, itemAggression: 0.65 },
-  { id: 'ai_9', name: 'リク', vehicleKey: 'speed_blue', color: 0x00cec9, accent: 0x81ecec, style: 'drafter', offsetBias: 0.9, speedScale: 1.02, itemAggression: 0.8 },
-  { id: 'ai_10', name: 'メイ', vehicleKey: 'handling_green', color: 0x2ed573, accent: 0x7bed9f, style: 'defender', offsetBias: -1.1, speedScale: 0.97, itemAggression: 0.9 }
+  { id: 'ai_3', name: 'タクミ', vehicleKey: 'handling_green', color: 0x8e44ad, accent: 0x9c88ff, style: 'apex_cutter', offsetBias: 0.7, speedScale: 1.00, itemAggression: 0.7 },
+  { id: 'ai_4', name: 'レン', vehicleKey: 'speed_blue', color: 0xe67e22, accent: 0xf39c12, style: 'aggressive', offsetBias: -0.5, speedScale: 1.03, itemAggression: 0.95 },
+  { id: 'ai_5', name: 'ソラ', vehicleKey: 'standard_red', color: 0x16a085, accent: 0x48dbfb, style: 'balanced', offsetBias: 0.4, speedScale: 0.98, itemAggression: 0.7 },
+  { id: 'ai_6', name: 'ユウキ', vehicleKey: 'handling_green', color: 0xf1c40f, accent: 0xffda79, style: 'tactician', offsetBias: -0.7, speedScale: 0.98, itemAggression: 0.85 },
+  { id: 'ai_7', name: 'カイト', vehicleKey: 'speed_blue', color: 0x2c3e50, accent: 0x718093, style: 'wide_sweeper', offsetBias: 0.6, speedScale: 1.01, itemAggression: 0.8 },
+  { id: 'ai_8', name: 'ヒカリ', vehicleKey: 'standard_red', color: 0xe84393, accent: 0xff9ff3, style: 'smooth', offsetBias: -0.3, speedScale: 0.97, itemAggression: 0.65 },
+  { id: 'ai_9', name: 'リク', vehicleKey: 'speed_blue', color: 0x00cec9, accent: 0x81ecec, style: 'drafter', offsetBias: 0.5, speedScale: 1.02, itemAggression: 0.8 },
+  { id: 'ai_10', name: 'メイ', vehicleKey: 'handling_green', color: 0x2ed573, accent: 0x7bed9f, style: 'defender', offsetBias: -0.4, speedScale: 0.97, itemAggression: 0.9 }
 ];
 
 export class CPUDriver {
@@ -26,10 +26,8 @@ export class CPUDriver {
     const mesh = aiKart.mesh;
     const personality = aiKart.personality || CPU_ROSTER[0];
 
-    // 1. 目標進行度（Lookahead）の算出
-    // 速度が高いほど先を見る動的注視距離（0.025〜0.05）
-    const lookAheadDist = 0.025 + Math.min(0.025, (physics.speed / 45.0) * 0.02);
-    const lookAheadT = (physics.progress + lookAheadDist) % 1.0;
+    // 1. 目標進行度（Lookahead）の算出: 安定した 0.04
+    const lookAheadT = (physics.progress + 0.04) % 1.0;
 
     // 2. 学習知識ベースからの目標走行線（横オフセット）および推奨速度
     let targetOffset = 0;
@@ -46,8 +44,8 @@ export class CPUDriver {
       targetSpeed = 38.0 * (aiKart.speedMultiplier || 1.0);
     }
 
-    // コース幅の制限（コースアウト防止）
-    const maxOffset = (courseConfig.trackWidth || 24) * 0.44;
+    // コースアスファルト内（安全マージン）への確実なクランプ
+    const maxOffset = (courseConfig.trackWidth || 24) * 0.32;
     targetOffset = Math.max(-maxOffset, Math.min(maxOffset, targetOffset));
 
     // 目標3D座標の計算
@@ -67,7 +65,7 @@ export class CPUDriver {
     kartForward.normalize();
 
     const cross = new THREE.Vector3().crossVectors(kartForward, dirToTarget);
-    let steer = Math.max(-1, Math.min(1, -cross.y * 3.4));
+    let steer = Math.max(-1, Math.min(1, -cross.y * 3.0));
 
     // 4. 動的障害物回避（前方のバナナやボム兵を検知して避ける）
     if (gameState && gameState.activeWorldItems && gameState.activeWorldItems.length > 0) {
@@ -80,9 +78,8 @@ export class CPUDriver {
           const fwdDist = toItem.dot(kartForward);
           if (fwdDist > 1.0) {
             const sideDist = toItem.dot(new THREE.Vector3().crossVectors(up, kartForward).normalize());
-            if (Math.abs(sideDist) < 2.8) {
-              // 障害物の反対側へ緊急ステア
-              steer += (sideDist >= 0 ? 0.6 : -0.6);
+            if (Math.abs(sideDist) < 2.5) {
+              steer += (sideDist >= 0 ? 0.5 : -0.5);
               steer = Math.max(-1, Math.min(1, steer));
               break;
             }
@@ -92,20 +89,17 @@ export class CPUDriver {
     }
 
     // 5. 加速／ブレーキ／ドリフト決定
-    let accel = 1.0;
+    let accel = 0.95 * (personality.speedScale || 1.0);
     let brake = 0;
     let drift = false;
 
-    // コーナー手前での事前減速（突っ込みすぎ・壁衝突の防止）
-    if (physics.speed > targetSpeed + 3.0) {
-      brake = 0.55;
-      accel = 0;
-    } else {
-      accel = Math.min(1.0, 0.96 * (personality.speedScale || 1.0));
+    // コーナー手前で突っ込みすぎの場合のみアクセルを緩める
+    if (physics.speed > targetSpeed + 8.0 && targetSpeed < 32.0) {
+      accel = 0.4;
     }
 
-    // ドリフト発動（急カーブまたは学習したドリフト推奨区間で高速走行時）
-    if ((shouldDrift || Math.abs(steer) > 0.58) && physics.speed > 15.0) {
+    // ドリフト発動（急カーブかつ学習ドリフト推奨区間）
+    if (shouldDrift && Math.abs(steer) > 0.6 && physics.speed > 18.0) {
       drift = true;
     }
 
