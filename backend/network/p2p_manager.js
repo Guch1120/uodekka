@@ -238,6 +238,7 @@ export class P2PManager {
           throw error;
         }
         this.report('retrying', this.networkConfig.relayConfigured ? '中継経路を優先して再接続します（2/2）…' : '通信経路を再確認します（2/2）…');
+        if (operation.signal.aborted || this.operation !== operation) throw cancelled();
         await new Promise((resolve, reject) => {
           const abort = () => { clearTimeout(timer); reject(cancelled()); };
           const timer = setTimeout(() => { operation.signal.removeEventListener('abort', abort); resolve(); }, this.timeouts.retry);
@@ -272,7 +273,7 @@ export class P2PManager {
         if (!settled && this.connectionStage === 'connecting') arm(Math.max(this.timeouts.progress, this.timeouts.connecting - (Date.now() - began)));
       });
       conn.on('open', () => {
-        if (generation !== this.generation) { conn.close(); return; }
+        if (generation !== this.generation || (settled && !joined)) { conn.close(); return; }
         this.hostConnection = conn; this.roomId = roomId;
         if (joined) return;
         this.report('room-sync', '通信がつながりました。ルーム情報を受信しています…');
@@ -281,7 +282,7 @@ export class P2PManager {
         request(); requestTimer = setInterval(request, this.timeouts.request);
       });
       conn.on('data', data => {
-        if (generation !== this.generation || !data || typeof data !== 'object') return;
+        if (generation !== this.generation || (settled && !joined) || !data || typeof data !== 'object') return;
         if (data.type === 'ROOM_ERROR') { fail(failure('room-rejected', String(data.message).slice(0, 140))); return; }
         if (data.type === 'ROOM_STATE' && data.roomId === roomId && Array.isArray(data.members) && data.members.some(m => m.id === this.myPeerId)) {
           // Initialize identity even if the first message races the local open callback.
