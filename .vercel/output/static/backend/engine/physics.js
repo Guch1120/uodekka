@@ -259,7 +259,7 @@ export class KartPhysics {
           }
         }
 
-        const outOfBoundsLimit = this.isGliding ? (halfWidth + 45.0) : (this.isAirborne ? halfWidth + 30.0 : halfWidth + 16.0);
+        const outOfBoundsLimit = this.isGliding ? (halfWidth + 60.0) : (this.isAirborne ? halfWidth + 30.0 : halfWidth + 16.0);
         if (distFromCenter > outOfBoundsLimit || this.mesh.position.y < -25.0) {
           this.triggerDeusExMachinaRescue(courseSpline, gameState);
           return;
