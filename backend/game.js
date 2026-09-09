@@ -271,41 +271,6 @@ export class Game {
     this.hud.showNotification(text, durationMs);
   }
 
-  startRace(config) {
-    this.inputManager.resetState();
-    while (this.scene.children.length > 2) {
-      const obj = this.scene.children[this.scene.children.length - 1];
-      this.scene.remove(obj);
-    }
-    this.otherPlayers.clear();
-    this.activeWorldItems = [];
-    this.itemBoxes = [];
-    this.courseObstacles = [];
-    this._finishedNotified = false;
-    Items.lightningHeld = false;
-    this.hud.resetLaps();
-
-    this.currentCourseConfig = Courses.getCourse(config.courseId);
-    this.renderer.setSkyAndTheme(this.currentCourseConfig.skyColor, this.currentCourseConfig.ambientColor);
-
-    this.courseTrack = Courses.buildTrack(this.currentCourseConfig);
-    this.scene.add(this.courseTrack.group);
-
-    if (this.currentCourseConfig.createEnvironment) {
-      const envGroup = this.currentCourseConfig.createEnvironment(this.scene);
-      this.scene.add(envGroup);
-      if (envGroup.userData && envGroup.userData.obstacles) {
-        this.courseObstacles = [...envGroup.userData.obstacles];
-      }
-    }
-
-    // タイヤウォール衝突判定オブジェクトを追加
-    if (this.courseTrack.tireWallObstacles && this.courseTrack.tireWallObstacles.length > 0) {
-      this.courseObstacles.push(...this.courseTrack.tireWallObstacles);
-    }
-
-    this.spawnItemBoxes();
-
   getGridTransform(curve, gridIndex) {
     const startT = 0.05;
     const row = Math.floor(gridIndex / 2); // 0 to 5
