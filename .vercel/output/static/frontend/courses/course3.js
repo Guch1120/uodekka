@@ -27,6 +27,10 @@ export const Course3 = {
 
   itemBoxLocations: [0.18, 0.48, 0.78],
   dashPanels: [0.28, 0.62],
+  jumpRamps: [
+    { t: 0.30, type: 'standard', boost: true, widthScale: 0.65, height: 2.0 },
+    { t: 0.64, type: 'glider', boost: true, widthScale: 0.75, height: 2.5 }
+  ],
   tireWallSegments: [
     { start: 0.04, end: 0.28, side: 'both' }, // 宇宙発進ループ
     // 0.28〜0.42 は切れ目 (宇宙空間への落下・宇宙空間コースアウトゾーン)

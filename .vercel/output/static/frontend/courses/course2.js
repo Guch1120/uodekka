@@ -27,6 +27,10 @@ export const Course2 = {
 
   itemBoxLocations: [0.2, 0.5, 0.8],
   dashPanels: [0.35, 0.72],
+  jumpRamps: [
+    { t: 0.37, type: 'standard', boost: true, widthScale: 0.65, height: 2.0 },
+    { t: 0.74, type: 'glider', boost: true, widthScale: 0.75, height: 2.5 }
+  ],
   tireWallSegments: [
     { start: 0.05, end: 0.30, side: 'both' }, // 登り勾配区間
     // 0.30〜0.40 は切れ目 (崖っぷち・キャニオン落下の危険ゾーン)

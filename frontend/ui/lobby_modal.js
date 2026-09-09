@@ -3,6 +3,7 @@ import { Courses } from '../courses/index.js';
 import { normalizeRoomId } from '../../backend/network/room_id.js';
 import { GaragePreview, courseArt } from './lobby_preview.js';
 import { CPU_ROSTER } from '../../backend/ai/cpu_driver.js';
+import { UpdateModal } from './update_modal.js';
 
 const arrow = (id, direction, label) => `<button id="${id}" class="garage-arrow" aria-label="${label}">${direction === 'prev' ? '◀' : '▶'}</button>`;
 const stats = () => `<section class="garage-specs"><div class="garage-eyebrow">YOUR MACHINE</div><h2 class="vehicle-name"></h2><p class="vehicle-description"></p><div class="garage-stat-list">${[['topSpeed', 'スピード', 50], ['acceleration', '加速', 35], ['weight', '重さ', 1.5]].map(([key, label, max]) => `<label class="garage-stat"><span>${label}</span><meter data-stat="${key}" min="0" max="${max}" aria-label="${label}"></meter><span data-stat-value="${key}" class="garage-stat-value"></span></label>`).join('')}</div></section>`;
@@ -37,7 +38,10 @@ export class LobbyModal {
         <header class="garage-header">
           <div class="garage-brand"><span class="garage-brand-mark">U<span>•</span>D</span><div>UO:De Car<small>READY. SET. DRIVE.</small></div></div>
           <div class="garage-location"><span class="garage-live-dot"></span><span id="garage-location">ホーム / GARAGE</span></div>
-          <button id="garage-back" class="garage-subtle" hidden>← ホームへ</button>
+          <div class="garage-header-actions">
+            <button type="button" id="btn-show-updates" class="garage-subtle update-notice-btn">📢 更新情報</button>
+            <button id="garage-back" class="garage-subtle" hidden>← ホームへ</button>
+          </div>
         </header>
         <main>
           <section class="garage-screen garage-home" data-screen="home">
@@ -105,6 +109,10 @@ export class LobbyModal {
     this.el('#player-name').addEventListener('input', () => localStorage.setItem('kart_player_name', this.playerName));
     on('#vehicle-prev', () => this.changeVehicle(-1));
     on('#vehicle-next', () => this.changeVehicle(1));
+    on('#btn-show-updates', () => {
+      const modal = new UpdateModal(this.modalEl);
+      modal.show();
+    });
     on('#tab-solo', () => { this.saveProfile(); this.refreshCourses(); this.confirmedCourse = null; this.showScreen('solo'); this.updateCourse(); });
     on('#tab-create', () => this.openDialog('host'));
     on('#tab-join', () => this.openDialog('guest'));
@@ -246,6 +254,11 @@ export class LobbyModal {
   }
 
   showScreen(screen) {
+    if (this.screen === 'home' && screen !== 'home') {
+      if (UpdateModal.checkAndShow(this.modalEl, () => this.showScreen(screen))) {
+        return;
+      }
+    }
     this.screen = screen;
     this.modalEl.querySelectorAll('[data-screen]').forEach(el => { el.hidden = el.dataset.screen !== screen; });
     this.el('#garage-back').hidden = screen === 'home';
@@ -254,6 +267,11 @@ export class LobbyModal {
   }
 
   openDialog(mode, room = '') {
+    if (this.screen === 'home') {
+      if (UpdateModal.checkAndShow(this.modalEl, () => this.openDialog(mode, room))) {
+        return;
+      }
+    }
     this.saveProfile();
     this.dialogMode = mode;
     const host = mode === 'host';

@@ -5,12 +5,14 @@ import { courseCurve } from './course_curve.js';
 import { Course1 } from './course1.js';
 import { Course2 } from './course2.js';
 import { Course3 } from './course3.js';
+import { Course4 } from './course4.js';
 
 export const Courses = {
   list: {
     course1: Course1,
     course2: Course2,
-    course3: Course3
+    course3: Course3,
+    course4: Course4
   },
 
   getCourse(id) {
@@ -190,6 +192,125 @@ export const Courses = {
       });
     });
 
+    // ジャンプ台（通常ジャンプ ＆ 滑空グライダージャンプ）
+    const jumpRampGroup = new THREE.Group();
+    const jumpRamps = [];
+    const rampConfigs = courseConfig.jumpRamps || [];
+
+    rampConfigs.forEach(rampDef => {
+      const t = rampDef.t;
+      const type = rampDef.type || 'standard';
+      const p = curve.getPointAt(t);
+      const tangent = curve.getTangentAt(t).normalize();
+      const normal = new THREE.Vector3().crossVectors(tangent, up).normalize();
+      const forward = tangent.clone();
+
+      const rampW = trackWidth * (rampDef.widthScale || 0.7);
+      const rampL = 7.0;
+      const rampH = rampDef.height || (type === 'glider' ? 2.5 : 1.9);
+
+      const rampObj = new THREE.Group();
+
+      // スロープ（ウェッジ）形状
+      const wedgeShape = new THREE.Shape();
+      wedgeShape.moveTo(-rampL / 2, 0);
+      wedgeShape.lineTo(rampL / 2, rampH);
+      wedgeShape.lineTo(rampL / 2, 0);
+      wedgeShape.closePath();
+
+      const extrudeSettings = { steps: 1, depth: rampW, bevelEnabled: false };
+      const wedgeGeo = new THREE.ExtrudeGeometry(wedgeShape, extrudeSettings);
+      wedgeGeo.translate(0, 0, -rampW / 2);
+      wedgeGeo.rotateY(-Math.PI / 2);
+
+      const isGlider = type === 'glider';
+      const rampMat = new THREE.MeshStandardMaterial({
+        color: isGlider ? 0x00b4d8 : 0xf39c12,
+        emissive: isGlider ? 0x0077b6 : 0xd35400,
+        emissiveIntensity: 0.6,
+        roughness: 0.25,
+        metalness: 0.4
+      });
+      const rampMesh = new THREE.Mesh(wedgeGeo, rampMat);
+      rampObj.add(rampMesh);
+
+      // 装飾（矢印・リング）
+      if (isGlider) {
+        // グライダーシンボル（2枚の翼型シェブロン）
+        for (let s = -1; s <= 1; s += 2) {
+          const chevronGeo = new THREE.ConeGeometry(rampW * 0.14, 3.2, 3);
+          chevronGeo.rotateX(Math.PI / 2);
+          const chevronMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+          const chevronMesh = new THREE.Mesh(chevronGeo, chevronMat);
+          chevronMesh.position.set(s * rampW * 0.25, rampH * 0.55, 0);
+          rampObj.add(chevronMesh);
+        }
+        // 青い上昇気流リング
+        const ringGeo = new THREE.TorusGeometry(rampW * 0.32, 0.12, 8, 16);
+        const ringMat = new THREE.MeshBasicMaterial({ color: 0x90e0ef });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.position.set(0, rampH + 0.6, -rampL * 0.25);
+        rampObj.add(ring);
+      } else {
+        // 通常ジャンプ台：大きな白矢印
+        const arrowGeo = new THREE.ConeGeometry(rampW * 0.2, 3.8, 3);
+        arrowGeo.rotateX(Math.PI / 2);
+        const arrowMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const arrowMesh = new THREE.Mesh(arrowGeo, arrowMat);
+        arrowMesh.position.set(0, rampH * 0.55, 0);
+        rampObj.add(arrowMesh);
+      }
+
+      rampObj.position.copy(p);
+      rampObj.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), forward);
+
+      jumpRampGroup.add(rampObj);
+      jumpRamps.push({
+        position: rampObj.position.clone(),
+        forward: forward.clone(),
+        t: t,
+        type: type,
+        radius: trackWidth * 0.38,
+        height: rampH
+      });
+
+      // 加速板とジャンプ台は基本セット：ジャンプ台の手前直前に加速板を追加
+      const dashT = (t - 0.016 + 1) % 1;
+      const dashP = curve.getPointAt(dashT);
+      const dashForward = curve.getTangentAt(dashT).normalize();
+      [-trackWidth * 0.25, trackWidth * 0.25].forEach(offset => {
+        const panelGroup = new THREE.Group();
+        const panelGeo = new THREE.BoxGeometry(trackWidth * 0.35, 0.12, 5.0);
+        const panelMat = new THREE.MeshStandardMaterial({
+          color: isGlider ? 0x00f5d4 : 0xf59e0b,
+          emissive: isGlider ? 0x00bbf9 : 0xd97706,
+          emissiveIntensity: 0.9,
+          roughness: 0.2,
+          metalness: 0.5
+        });
+        const panelMesh = new THREE.Mesh(panelGeo, panelMat);
+        panelGroup.add(panelMesh);
+
+        const arrowGeo = new THREE.ConeGeometry(trackWidth * 0.12, 2.5, 3);
+        arrowGeo.rotateX(Math.PI / 2);
+        const arrowMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const arrowMesh = new THREE.Mesh(arrowGeo, arrowMat);
+        arrowMesh.position.y = 0.08;
+        panelGroup.add(arrowMesh);
+
+        panelGroup.position.copy(dashP).addScaledVector(normal, offset);
+        panelGroup.position.y += 0.08;
+        panelGroup.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), dashForward);
+
+        dashPanelGroup.add(panelGroup);
+        dashPanels.push({
+          position: panelGroup.position,
+          t: dashT,
+          radius: trackWidth * 0.25
+        });
+      });
+    });
+
     // タイヤウォール（内側・外側の防護壁＆意図的な切れ目によるコースアウトエリア）
     const tireWallData = this.buildTireWalls(curve, divisions, trackWidth, courseConfig.tireWallSegments);
     const tireWallGroup = tireWallData.group;
@@ -201,12 +322,14 @@ export const Courses = {
     fullTrackGroup.add(tireWallGroup);
     fullTrackGroup.add(startLine);
     fullTrackGroup.add(dashPanelGroup);
+    fullTrackGroup.add(jumpRampGroup);
 
     return {
       group: fullTrackGroup,
       curve: curve,
       points: points,
       dashPanels: dashPanels,
+      jumpRamps: jumpRamps,
       tireWallObstacles: tireWallObstacles
     };
   },

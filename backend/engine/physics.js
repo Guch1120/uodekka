@@ -54,12 +54,56 @@ export class KartPhysics {
     this.respawnTargetPos = new THREE.Vector3();
     this.respawnTargetQuat = new THREE.Quaternion();
 
+    // ジャンプ＆グライダー滑空状態
+    this.isAirborne = false;
+    this.isGliding = false;
+    this.verticalSpeed = 0;
+    this.airTime = 0;
+    this.gliderPitch = 0; // -1.0 (機首下げダイブ) 〜 +1.0 (機首上げ揚力)
+    this.gliderRoll = 0;  // -1.0 (左バンク) 〜 +1.0 (右バンク)
+
     // アイテム関連
     this.holdingItem = null;
     this.trailingItemMesh = null;
 
     this.position = this.mesh.position;
     this.rotation = this.mesh.quaternion;
+  }
+
+  triggerJump(jumpForce = 13.0, boostMult = 1.45, boostDuration = 1.8) {
+    this.isAirborne = true;
+    this.isGliding = false;
+    this.verticalSpeed = jumpForce;
+    this.airTime = 0;
+    this.applyBoost(boostMult, boostDuration);
+    this.speed = Math.max(this.speed, this.maxSpeed * 1.25);
+    if (this.mesh.userData && this.mesh.userData.gliderMesh) {
+      this.mesh.userData.gliderMesh.visible = false;
+    }
+  }
+
+  triggerGlider(launchSpeed = 15.0, boostMult = 1.55, boostDuration = 3.5) {
+    this.isAirborne = true;
+    this.isGliding = true;
+    this.verticalSpeed = launchSpeed;
+    this.airTime = 0;
+    this.gliderPitch = 0;
+    this.gliderRoll = 0;
+    this.applyBoost(boostMult, boostDuration);
+    this.speed = Math.max(this.speed, this.maxSpeed * 1.35);
+    if (this.mesh.userData && this.mesh.userData.gliderMesh) {
+      this.mesh.userData.gliderMesh.visible = true;
+    }
+  }
+
+  getRoadY(curve, t, pos) {
+    const center = curve.getPointAt(t);
+    const tangent = curve.getTangentAt(t).normalize();
+    const horizontalSq = tangent.x * tangent.x + tangent.z * tangent.z;
+    if (horizontalSq < 0.0001) return center.y + 0.35;
+    const grade = tangent.y / horizontalSq;
+    return center.y + 0.35 +
+      ((pos.x - center.x) * tangent.x + (pos.z - center.z) * tangent.z) * grade;
   }
 
   update(dt, inputState, courseSpline, trackWidth = 32, gameState = null) {
@@ -188,15 +232,15 @@ export class KartPhysics {
         this.lastSafeT = nearestT;
         this.updateLegitimateProgress(nearestT);
       } else {
-        if (this.invincibleTimer <= 0) {
+        if (!this.isAirborne && this.invincibleTimer <= 0) {
           const dirtSpeedLimit = this.maxSpeed * this.offroadFriction;
           if (this.speed > dirtSpeedLimit) {
             this.speed = THREE.MathUtils.lerp(this.speed, dirtSpeedLimit, dt * 4.0);
           }
         }
 
-        const outOfBoundsLimit = halfWidth + 16.0;
-        if (distFromCenter > outOfBoundsLimit || this.mesh.position.y < -15.0) {
+        const outOfBoundsLimit = this.isGliding ? (halfWidth + 45.0) : (this.isAirborne ? halfWidth + 30.0 : halfWidth + 16.0);
+        if (distFromCenter > outOfBoundsLimit || this.mesh.position.y < -25.0) {
           this.triggerDeusExMachinaRescue(courseSpline, gameState);
           return;
         }
@@ -264,11 +308,47 @@ export class KartPhysics {
       }
     }
 
-    // 8. 前進
+    // 8. 前進移動
     const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.mesh.quaternion);
     this.mesh.position.addScaledVector(forward, this.speed * dt);
 
-    // 高さ追従
+    // 9. 空中挙動制御（通常ジャンプ & グライダー滑空）
+    if (this.isAirborne) {
+      if (this.isGliding) {
+        // グライダー滑空制御
+        const pitchIn = inputState.pitch || 0;
+        if (pitchIn > 0.1) {
+          // 前入力: 機首上げ（落下に抗う揚力、滞空時間延長）
+          const targetVy = -1.2;
+          this.verticalSpeed = THREE.MathUtils.lerp(this.verticalSpeed, targetVy, dt * 3.5);
+          this.gliderPitch = THREE.MathUtils.lerp(this.gliderPitch, 1.0, dt * 5.0);
+        } else if (pitchIn < -0.1) {
+          // 後ろ入力: 機首下げ（急降下ダイブ）
+          const targetVy = -18.0;
+          this.verticalSpeed = THREE.MathUtils.lerp(this.verticalSpeed, targetVy, dt * 4.5);
+          this.gliderPitch = THREE.MathUtils.lerp(this.gliderPitch, -1.0, dt * 5.0);
+          this.speed = Math.min(this.maxSpeed * 1.45, this.speed + 15.0 * dt);
+        } else {
+          // ニュートラル: 標準滑空
+          const targetVy = -4.5;
+          this.verticalSpeed = THREE.MathUtils.lerp(this.verticalSpeed, targetVy, dt * 2.5);
+          this.gliderPitch = THREE.MathUtils.lerp(this.gliderPitch, 0.0, dt * 3.5);
+        }
+
+        // 左右入力による横滑空スライド
+        const rightVec = new THREE.Vector3(1, 0, 0).applyQuaternion(this.mesh.quaternion);
+        this.mesh.position.addScaledVector(rightVec, -inputState.steering * 12.0 * dt);
+        this.gliderRoll = THREE.MathUtils.lerp(this.gliderRoll, -inputState.steering * 0.45, dt * 7.0);
+      } else {
+        // 通常ジャンプ: 重力加速度による放物線
+        this.verticalSpeed -= 32.0 * dt;
+      }
+
+      this.mesh.position.y += this.verticalSpeed * dt;
+      this.airTime += dt;
+    }
+
+    // 高さ追従 & 着地判定
     if (courseSpline) {
       nearestT = this.findNearestTrackT(courseSpline, this.mesh.position);
       this.alignToTrack(courseSpline, nearestT);
@@ -287,9 +367,43 @@ export class KartPhysics {
     forward.normalize();
     const right = new THREE.Vector3().crossVectors(forward, normal).normalize();
     const basis = new THREE.Matrix4().makeBasis(right, normal, forward.clone().negate());
-    this.mesh.quaternion.setFromRotationMatrix(basis);
-    this.mesh.position.y = center.y + 0.35 +
+
+    const roadY = center.y + 0.35 +
       ((this.mesh.position.x - center.x) * tangent.x + (this.mesh.position.z - center.z) * tangent.z) * grade;
+
+    if (this.isAirborne) {
+      // 空中滞空時：Y座標は上空を飛行し、路面以下になったら着地
+      if (this.airTime > 0.15 && this.mesh.position.y <= roadY) {
+        // 着地！
+        this.mesh.position.y = roadY;
+        this.isAirborne = false;
+        this.isGliding = false;
+        this.verticalSpeed = 0;
+        this.airTime = 0;
+        this.gliderPitch = 0;
+        this.gliderRoll = 0;
+        if (this.mesh.userData && this.mesh.userData.gliderMesh) {
+          this.mesh.userData.gliderMesh.visible = false;
+        }
+        this.mesh.quaternion.setFromRotationMatrix(basis);
+      } else {
+        // 空中での姿勢制御（ピッチ＆ロール傾斜）
+        this.mesh.quaternion.setFromRotationMatrix(basis);
+        const pitchAngle = this.isGliding
+          ? (-this.gliderPitch * 0.38)
+          : (-Math.atan2(this.verticalSpeed, Math.max(12, this.speed)) * 0.35);
+        const rollAngle = this.isGliding ? this.gliderRoll : 0;
+
+        this.mesh.rotateX(pitchAngle);
+        if (rollAngle !== 0) {
+          this.mesh.rotateZ(rollAngle);
+        }
+      }
+    } else {
+      // 通常走行時：路面に密着
+      this.mesh.quaternion.setFromRotationMatrix(basis);
+      this.mesh.position.y = roadY;
+    }
   }
 
   updateItemHolding(inputState, gameState) {
@@ -327,6 +441,15 @@ export class KartPhysics {
     this.isRespawning = true;
     this.respawnTimer = 2.0;
     this.speed = 0;
+    this.isAirborne = false;
+    this.isGliding = false;
+    this.verticalSpeed = 0;
+    this.airTime = 0;
+    this.gliderPitch = 0;
+    this.gliderRoll = 0;
+    if (this.mesh.userData && this.mesh.userData.gliderMesh) {
+      this.mesh.userData.gliderMesh.visible = false;
+    }
     this.removeTrailingMesh(gameState);
 
     const restoreT = this.lastSafeT || 0.01;

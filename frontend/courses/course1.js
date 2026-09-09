@@ -27,6 +27,10 @@ export const Course1 = {
 
   itemBoxLocations: [0.15, 0.45, 0.75],
   dashPanels: [0.32, 0.68],
+  jumpRamps: [
+    { t: 0.34, type: 'standard', boost: true, widthScale: 0.65, height: 2.0 },
+    { t: 0.69, type: 'glider', boost: true, widthScale: 0.75, height: 2.5 }
+  ],
   tireWallSegments: [
     { start: 0.04, end: 0.36, side: 'both' }, // 第1コーナー付近は壁で守る
     // 0.36〜0.44 は切れ目 (アウト側へ飛び出すとコースアウト)

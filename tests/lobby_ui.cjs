@@ -5,6 +5,7 @@ const browser=await chromium.launch({executablePath:process.env.CHROME_PATH || u
 const page=await browser.newPage({viewport:{width:1280,height:800}});
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
 await page.goto(process.env.GAME_URL || 'http://localhost:8099');
+await page.evaluate(() => localStorage.setItem('kart_last_read_update_version', '2026.09.10'));
 await page.click('#title-screen');
 await page.waitForFunction(()=>!!window.gameInstance);
 await page.fill('#player-name','テストドライバー');
@@ -21,6 +22,7 @@ await page.click('#room-dialog-close');
 await page.click('#tab-join');assert(await page.locator('#room-dialog').isVisible());
 await page.click('#room-dialog-close');
 await page.click('#tab-solo');
+await page.waitForSelector('[data-screen="solo"]:not([hidden])', { timeout: 5000 });
 assert(await page.locator('#btn-start-solo').isDisabled());
 await page.click('#course-confirm');
 const confirmed=await page.evaluate(()=>gameInstance.lobbyModal.confirmedCourse);

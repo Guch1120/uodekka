@@ -151,6 +151,12 @@ export const Vehicles = {
       wheels.push(wheel);
     });
 
+    // 6. グライダー（滑空用デルタ翼）
+    const gliderMesh = this.createGliderMesh(accColor);
+    gliderMesh.position.set(0, 1.65, 0.1);
+    gliderMesh.visible = false; // 通常時は格納
+    group.add(gliderMesh);
+
     group.userData = {
       wheels,
       config,
@@ -158,10 +164,60 @@ export const Vehicles = {
       bodyMesh: body,
       headMesh: head,
       wingMesh: wing,
+      gliderMesh: gliderMesh,
       defaultColor: mainColor,
       defaultAccent: accColor
     };
 
     return group;
+  },
+
+  createGliderMesh(accentColor = 0x3498db) {
+    const gliderGroup = new THREE.Group();
+
+    // デルタ翼（カイト・ハンググライダー型）
+    const wingShape = new THREE.Shape();
+    wingShape.moveTo(0, -0.8);
+    wingShape.lineTo(-1.8, 1.1);
+    wingShape.lineTo(0, 0.6);
+    wingShape.lineTo(1.8, 1.1);
+    wingShape.closePath();
+
+    const wingGeo = new THREE.ShapeGeometry(wingShape);
+    wingGeo.rotateX(Math.PI / 2);
+
+    const wingMat = new THREE.MeshStandardMaterial({
+      color: accentColor,
+      roughness: 0.3,
+      metalness: 0.2,
+      side: THREE.DoubleSide
+    });
+    const wingMesh = new THREE.Mesh(wingGeo, wingMat);
+    wingMesh.castShadow = true;
+    gliderGroup.add(wingMesh);
+
+    // センターストライプ
+    const stripeGeo = new THREE.PlaneGeometry(0.22, 1.6);
+    stripeGeo.rotateX(Math.PI / 2);
+    const stripeMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+    const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+    stripe.position.set(0, 0.01, 0.1);
+    gliderGroup.add(stripe);
+
+    // カーボンフレーム・支柱
+    const poleGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.7, 8);
+    const poleMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.8, roughness: 0.2 });
+    const pole = new THREE.Mesh(poleGeo, poleMat);
+    pole.position.set(0, -0.35, 0.2);
+    gliderGroup.add(pole);
+
+    const stayGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.8, 6);
+    stayGeo.rotateX(Math.PI / 6);
+    const stay = new THREE.Mesh(stayGeo, poleMat);
+    stay.position.set(0, -0.35, -0.1);
+    gliderGroup.add(stay);
+
+    return gliderGroup;
   }
 };
+

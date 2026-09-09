@@ -15,6 +15,7 @@ import { SettingsModal } from '../frontend/ui/settings_modal.js';
 import { LobbyModal } from '../frontend/ui/lobby_modal.js';
 import { PauseModal } from '../frontend/ui/pause_modal.js';
 import { EditorModal } from '../frontend/ui/editor_modal.js';
+import { ResultModal } from '../frontend/ui/result_modal.js';
 import { CourseKnowledgeBase } from './ai/learning_ai.js';
 import { CPUDriver, CPU_ROSTER } from './ai/cpu_driver.js';
 
@@ -148,14 +149,29 @@ export class Game {
 
   restartRace() {
     this.isPaused = false;
+    if (this.activeResultModal) {
+      this.activeResultModal.destroy();
+      this.activeResultModal = null;
+    }
     if (this.currentGameConfig) {
       this.startRace(this.currentGameConfig);
+    }
+  }
+
+  selectOtherCourse() {
+    this.quitRace();
+    if (this.lobbyModal) {
+      this.lobbyModal.showScreen('solo');
     }
   }
 
   quitRace() {
     this.isPaused = false;
     this.isRunning = false;
+    if (this.activeResultModal) {
+      this.activeResultModal.destroy();
+      this.activeResultModal = null;
+    }
 
     // HUDおよび操作UIを非表示
     if (this.hud) this.hud.hide();
@@ -292,6 +308,15 @@ export class Game {
 
   startRace(config) {
     this.inputManager.resetState();
+    if (this.activeResultModal) {
+      this.activeResultModal.destroy();
+      this.activeResultModal = null;
+    }
+    this.raceStartTime = performance.now();
+    this.lastLapStartTime = this.raceStartTime;
+    this.lapTimes = [];
+    this.jumpRamps = [];
+
     while (this.scene.children.length > 2) {
       const obj = this.scene.children[this.scene.children.length - 1];
       this.scene.remove(obj);
@@ -309,6 +334,9 @@ export class Game {
 
     this.courseTrack = Courses.buildTrack(this.currentCourseConfig);
     this.scene.add(this.courseTrack.group);
+    if (this.courseTrack.jumpRamps) {
+      this.jumpRamps = [...this.courseTrack.jumpRamps];
+    }
 
     if (this.currentCourseConfig.createEnvironment) {
       const envGroup = this.currentCourseConfig.createEnvironment(this.scene);
@@ -503,6 +531,11 @@ export class Game {
     if (this.knowledgeBase && this.localPlayerKart) {
       this.knowledgeBase.recordPlayerSample(this.localPlayerKart, this.courseTrack.curve);
       if (this.localPlayerKart.currentLap > this._lastPlayerLap) {
+        // ラップタイム計測
+        const lapTime = performance.now() - this.lastLapStartTime;
+        this.lapTimes.push(lapTime);
+        this.lastLapStartTime = performance.now();
+
         this._lastPlayerLap = this.localPlayerKart.currentLap;
         this.knowledgeBase.commitLap();
         const level = this.knowledgeBase.learningLevel;
@@ -530,6 +563,9 @@ export class Game {
 
     // 4-2. ダッシュボード（加速板）判定
     this.checkDashPanels();
+
+    // 4-2-2. ジャンプ台（通常・滑空）判定
+    this.checkJumpRamps();
 
     // 4-3. スター発動中の七色（レインボー）発光エフェクト
     this.updateInvincibleRainbowEffects();
@@ -629,7 +665,62 @@ export class Game {
       if (this.knowledgeBase) {
         this.knowledgeBase.commitLap();
       }
-      this.showItemNotification(`GOAL!! あなたの順位は 第${myRank}位 です！`, 5000);
+
+      // 最終ラップタイムとトータルタイムの計算
+      if (this.lapTimes.length < this.localPlayerKart.totalLaps) {
+        const finalLapTime = performance.now() - this.lastLapStartTime;
+        this.lapTimes.push(finalLapTime);
+      }
+      const totalTime = performance.now() - this.raceStartTime;
+
+      // 12人の着順一覧を生成
+      const racersList = ranking.map((kart, idx) => {
+        const isLocal = kart === this.localPlayerKart;
+        let name = isLocal ? (localStorage.getItem('kart_player_name') || 'あなた') : 'CPU';
+        let colorHex = isLocal ? '#38bdf8' : '#e74c3c';
+        let rTime = 0;
+        if (isLocal) {
+          rTime = totalTime;
+        } else {
+          for (const [id, p] of this.otherPlayers.entries()) {
+            if (p.physics === kart) {
+              name = p.name || 'CPU';
+              colorHex = p.colorHex || '#e74c3c';
+              break;
+            }
+          }
+          if (kart.finishTime && this.raceStartTime) {
+            rTime = kart.finishTime - this.raceStartTime;
+          } else {
+            rTime = totalTime + (idx + 1 - myRank) * 2200;
+          }
+        }
+        return {
+          rank: idx + 1,
+          name: name,
+          isLocal: isLocal,
+          colorHex: colorHex,
+          totalTime: Math.max(8000, rTime)
+        };
+      });
+
+      this.showItemNotification(`GOAL!! あなたの順位は 第${myRank}位 です！`, 3500);
+
+      setTimeout(() => {
+        if (!this.isRunning || this.activeResultModal) return;
+        this.activeResultModal = new ResultModal(this.appContainer, {
+          rank: myRank,
+          totalTime: totalTime,
+          lapTimes: [...this.lapTimes],
+          courseName: this.currentCourseConfig.name,
+          racers: racersList
+        }, {
+          onHome: () => this.quitRace(),
+          onChangeCourse: () => this.selectOtherCourse(),
+          onRetry: () => this.restartRace()
+        });
+        this.activeResultModal.show();
+      }, 1200);
     }
   }
 
@@ -785,6 +876,38 @@ export class Game {
             if (!this._lastDashTime || performance.now() - this._lastDashTime > 1500) {
               this._lastDashTime = performance.now();
               this.showItemNotification('⚡ ダッシュボード通過！急加速！', 1500);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  checkJumpRamps() {
+    if (!this.jumpRamps || this.jumpRamps.length === 0) return;
+    const allKarts = [this.localPlayerKart, ...Array.from(this.otherPlayers.values()).map(p => p.physics)];
+
+    for (const kart of allKarts) {
+      if (!kart || kart.isRespawning) continue;
+      // 既に跳躍直後なら連続発動を防ぐ
+      if (kart.isAirborne && kart.airTime < 0.3) continue;
+
+      for (const ramp of this.jumpRamps) {
+        if (Math.abs(kart.mesh.position.y - ramp.position.y) > 6.0) continue;
+        const dx = kart.mesh.position.x - ramp.position.x;
+        const dz = kart.mesh.position.z - ramp.position.z;
+        const distSq = dx * dx + dz * dz;
+        const triggerRadius = (ramp.radius || 15.0);
+        if (distSq < triggerRadius * triggerRadius) {
+          if (ramp.type === 'glider') {
+            kart.triggerGlider(16.0, 1.6, 3.5);
+            if (kart === this.localPlayerKart) {
+              this.showItemNotification('🪂 グライダー展開！大空を滑空！', 2000);
+            }
+          } else {
+            kart.triggerJump(14.0, 1.5, 2.0);
+            if (kart === this.localPlayerKart) {
+              this.showItemNotification('🚀 大ジャンプ！', 1500);
             }
           }
         }

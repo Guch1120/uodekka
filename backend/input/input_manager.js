@@ -36,6 +36,20 @@ export class InputManager {
       enumerable: true
     });
 
+    this._stickY = 0;
+    Object.defineProperty(this.state, 'pitch', {
+      get: () => {
+        if (!this.canDrive()) return 0;
+        if (this.keyboardKeys && (this.keyboardKeys['KeyW'] || this.keyboardKeys['ArrowUp'])) return 1.0;
+        if (this.keyboardKeys && (this.keyboardKeys['KeyS'] || this.keyboardKeys['ArrowDown'])) return -1.0;
+        if (this._stickY && Math.abs(this._stickY) > 0.2) return Math.sign(this._stickY) * Math.min(1.0, Math.abs(this._stickY));
+        if (this.state.braking > 0) return -1.0;
+        return 0;
+      },
+      configurable: true,
+      enumerable: true
+    });
+
     const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
     this.controlMode = localStorage.getItem('kart_control_mode') || (isTouch ? 'gyro' : 'stick'); // PCは既定でstick
     this.gyroSensitivity = parseFloat(localStorage.getItem('kart_gyro_sens') || '0.7');
@@ -199,6 +213,7 @@ export class InputManager {
     // キー解放を受け取れない中断でも、入力と発射予約を持ち越さない。
     this.keyboardKeys = {};
     this.keyboardSteering = false;
+    this._stickY = 0;
     Object.assign(this.state, {
       steering: 0, accelerating: 0, braking: 0, drift: false,
       itemHeld: false, useItemTrigger: false, isForwardThrow: false,
@@ -463,11 +478,14 @@ export class InputManager {
       let steer = dx / maxRadius;
       if (!this.invertSteering) steer = -steer;
       this.state.steering = steer;
+      // 前に倒したら dy < 0 なので _stickY > 0 (前入力)
+      this._stickY = -dy / maxRadius;
     };
 
     const handleStickEnd = () => {
       stickTouchId = null;
       stickKnob.style.transform = `translate(0px, 0px)`;
+      this._stickY = 0;
       if (this.controlMode === 'stick') {
         this.state.steering = 0;
       }
