@@ -86,25 +86,25 @@ export class KartPhysics {
     }
   }
 
-  triggerGlider(launchSpeed = 26.0, boostMult = 1.8, boostDuration = 4.5, ramp = null) {
+  triggerGlider(launchSpeed = 18.0, boostMult = 1.6, boostDuration = 3.5, ramp = null) {
     this.isAirborne = true;
     this.isGliding = true;
     this.airTime = 0;
     this.gliderPitch = 0;
     this.gliderRoll = 0;
 
-    // ジャンプ台の角度方向（Launch Direction）への大射出速度ベクトル
+    // ジャンプ台の角度方向（Launch Direction）への射出初速ベクトル
     let vy = launchSpeed;
-    let forwardSpeedBoost = 68.0;
+    let forwardSpeedBoost = 54.0;
 
     if (ramp) {
       const angle = ramp.rampAngle || 0.40; // 約23度
       const sinA = Math.sin(angle);
       const cosA = Math.cos(angle);
-      // 斜面角度方向に沿って総合速度72〜76m/sで力強く打ち出し
-      const launchMagnitude = Math.max(this.speed * 1.55, 74.0);
+      // 斜面角度方向に沿って総合初速54〜60m/sでバランス良く打ち出し
+      const launchMagnitude = Math.max(this.speed * 1.35, 56.0);
       forwardSpeedBoost = launchMagnitude * cosA;
-      vy = Math.max(launchSpeed, launchMagnitude * sinA);
+      vy = Math.min(22.0, Math.max(launchSpeed, launchMagnitude * sinA));
     }
 
     this.verticalSpeed = vy;
@@ -338,39 +338,39 @@ export class KartPhysics {
         // グライダー滑空制御
         const pitchIn = inputState.pitch || 0;
 
-        // 空中前進速度の維持（地上摩擦を受けない爽快な超高速飛行）
-        this.speed = Math.max(this.speed, this.maxSpeed * 1.5);
+        // 空中前進速度の自然な推移（過剰な固定を解除し、自然なエアドラッグを適用）
+        if (this.speed > this.maxSpeed * 1.25) {
+          this.speed = THREE.MathUtils.lerp(this.speed, this.maxSpeed * 1.25, dt * 0.8);
+        }
 
         if (this.verticalSpeed > 0 && pitchIn >= -0.1) {
-          // --- 上昇フェーズ: ジャンプ台射出の勢いで大空高く舞い上がる ---
-          // 翼の揚力により重力加速度を通常の約1/3〜1/4 (10.0 m/s²) に軽減
-          let ascentGravity = 10.0;
+          // --- 上昇フェーズ: ジャンプ台射出の勢いで大空へホップ ---
+          // 重力加速度 16.0 m/s² (前入力時は 12.0 m/s²) でスムーズに頂点へ
+          let ascentGravity = 16.0;
           if (pitchIn > 0.1) {
-            // 前入力（機首上げ）: 揚力最大でさらに高く上昇持続
-            ascentGravity = 5.0;
+            ascentGravity = 12.0;
             this.gliderPitch = THREE.MathUtils.lerp(this.gliderPitch, 1.0, dt * 5.0);
           } else {
             this.gliderPitch = THREE.MathUtils.lerp(this.gliderPitch, 0.0, dt * 3.5);
           }
           this.verticalSpeed -= ascentGravity * dt;
         } else {
-          // --- 滑空フェーズ (頂点通過後、または後ろ入力による即時急降下ダイブ) ---
+          // --- 滑空フェーズ (自然落下ほど急激ではないが、着地に向けて確実に降下) ---
           if (pitchIn > 0.1) {
-            // 前入力: 機首上げ（翼が風を捉えて揚力発生、落下速度をほぼ相殺して超長距離滞空）
-            const liftTarget = this.speed > 60.0 ? 0.3 : -0.2;
+            // 前入力: 機首上げ（翼の揚力で落下に抗うが、-2.8m/sで緩やかに確実に降下）
+            const liftTarget = -2.8;
             this.verticalSpeed = THREE.MathUtils.lerp(this.verticalSpeed, liftTarget, dt * 3.2);
             this.gliderPitch = THREE.MathUtils.lerp(this.gliderPitch, 1.0, dt * 5.0);
           } else if (pitchIn < -0.1) {
-            // 後ろ入力: 機首下げ（急降下ダイブ＆猛烈加速）
-            const diveTarget = -22.0;
+            // 後ろ入力: 機首下げ（急降下ダイブ）
+            const diveTarget = -18.0;
             this.verticalSpeed = THREE.MathUtils.lerp(this.verticalSpeed, diveTarget, dt * 5.0);
             this.gliderPitch = THREE.MathUtils.lerp(this.gliderPitch, -1.0, dt * 5.0);
-            // 位置エネルギーが速度に変換され猛烈に加速！
-            this.speed = Math.min(85.0, this.speed + 45.0 * dt);
+            this.speed = Math.min(68.0, this.speed + 30.0 * dt);
           } else {
-            // ニュートラル: 爽快な長距離ロングクルージング
-            const targetVy = -2.2;
-            this.verticalSpeed = THREE.MathUtils.lerp(this.verticalSpeed, targetVy, dt * 2.0);
+            // ニュートラル: 標準滑空降下（-5.5m/sでスムーズに路面へ降りていく）
+            const targetVy = -5.5;
+            this.verticalSpeed = THREE.MathUtils.lerp(this.verticalSpeed, targetVy, dt * 2.5);
             this.gliderPitch = THREE.MathUtils.lerp(this.gliderPitch, 0.0, dt * 3.5);
           }
         }
