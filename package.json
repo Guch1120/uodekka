@@ -3,6 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "check:release": "node scripts/check-release.mjs",
+    "build": "node scripts/check-release.mjs && node scripts/build-static.mjs",
     "dev:worker": "wrangler dev",
     "deploy:worker": "wrangler deploy"
   },

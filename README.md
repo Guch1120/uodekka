@@ -81,6 +81,10 @@
   - 参加人数が12人に満たない場合、不足枠はCPUが自動参戦し、常に白熱の12人レースを楽しめます。
 
 ## 起動方法
+公開前は `npm run build` を実行します。競合マーカー、JavaScript（HTML内を含む）の構文、相対モジュール参照、ソースと `.vercel/output/static` の不一致があれば失敗します。成功した場合のみ `dist` を作成します。Vercelの通常ビルドにも同じチェックを設定しています。`--prebuilt` による直接公開はビルドチェックを迂回するため使用しないでください。
+
+起動検証は `node tests/startup.cjs`（Playwrightが必要）です。既存環境は `PLAYWRIGHT_MODULE` / `CHROME_PATH` で指定できます。正常なホーム・ソロ開始と、取得失敗・構文エラー・初期化エラー時の診断表示を検証します。実機Safari/Androidと公開後の確認は別途必要です。
+
 静的ファイルとして動作するため、ローカルWebサーバー（例: `python3 -m http.server 8000` または `npx serve`）を起動し、ブラウザで `http://localhost:8000` にアクセスしてください。
 
 ## ホーム・ルームUI
