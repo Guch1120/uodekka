@@ -504,6 +504,28 @@ export class Game {
       if (!kart || kart.isRespawning) continue;
 
       for (const obs of this.courseObstacles) {
+        // 高さ（Y座標）の判定：立体交差や高低差での誤衝突を防止
+        const dy = kart.mesh.position.y - obs.position.y;
+        let maxDyUpper = 1.8;
+        let maxDyLower = 1.8;
+        if (obs.type === 'tire_wall') {
+          maxDyUpper = 1.6;
+          maxDyLower = 1.6;
+        } else if (obs.type === 'tree') {
+          maxDyUpper = 5.5; // 幹の高さ
+          maxDyLower = 1.5;
+        } else if (obs.type === 'rock') {
+          maxDyUpper = 2.2;
+          maxDyLower = 2.2;
+        } else if (obs.height) {
+          maxDyUpper = obs.height;
+          maxDyLower = obs.height;
+        }
+
+        if (dy > maxDyUpper || dy < -maxDyLower) {
+          continue;
+        }
+
         const dx = kart.mesh.position.x - obs.position.x;
         const dz = kart.mesh.position.z - obs.position.z;
         const dist = Math.hypot(dx, dz);
@@ -538,6 +560,7 @@ export class Game {
       if (!kart || kart.isRespawning) continue;
 
       for (const panel of this.courseTrack.dashPanels) {
+        if (Math.abs(kart.mesh.position.y - panel.position.y) > 2.5) continue;
         const dist = kart.mesh.position.distanceTo(panel.position);
         if (dist < (panel.radius || 6.0)) {
           // ダッシュボードを踏んだ！ 瞬間ダッシュ + 2秒間ブースト

@@ -361,7 +361,8 @@ export class KartPhysics {
     for (let i = 0; i < samples; i++) {
       const t = i / samples;
       const pt = curve.getPointAt(t);
-      const d = (pos.x - pt.x) ** 2 + (pos.z - pt.z) ** 2;
+      const dy = pos.y - (pt.y + 0.35);
+      const d = (pos.x - pt.x) ** 2 + dy * dy * 1.5 + (pos.z - pt.z) ** 2;
       if (d < minDist) {
         minDist = d;
         bestT = t;
@@ -373,7 +374,8 @@ export class KartPhysics {
       for (const offset of [-step, step]) {
         const t = (bestT + offset + 1) % 1;
         const p = curve.getPointAt(t);
-        const d = (pos.x - p.x) ** 2 + (pos.z - p.z) ** 2;
+        const dy = pos.y - (p.y + 0.35);
+        const d = (pos.x - p.x) ** 2 + dy * dy * 1.5 + (pos.z - p.z) ** 2;
         if (d < minDist) { minDist = d; bestT = t; }
       }
       step /= 2;

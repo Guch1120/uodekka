@@ -27,6 +27,28 @@
   <script defer src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 </head>
 <body>
+  <!-- 縦持ち時の横画面案内オーバーレイ -->
+  <div id="orientation-prompt" class="orientation-prompt">
+    <div class="rotate-phone-icon">
+      <svg viewBox="0 0 100 100" fill="none" stroke="#f1c40f" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="25" y="15" width="50" height="70" rx="8"/>
+        <line x1="45" y1="78" x2="55" y2="78" stroke-width="4"/>
+        <path d="M78 35 A 35 35 0 0 1 78 65" stroke-dasharray="6,6"/>
+        <polygon points="75,60 82,70 70,70" fill="#f1c40f"/>
+      </svg>
+    </div>
+    <h3>画面を横向きにしてください</h3>
+    <p>このゲームは横画面専用です。端末を横向きにするか、回転ロック有効時は下のボタンを押して横画面モードを有効化してください。</p>
+    <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 16px;">
+      <button id="btn-force-landscape" class="primary-btn" style="font-size: 16px; padding: 12px 24px;">
+        📱 横画面でゲームを開始
+      </button>
+      <button id="btn-dismiss-orientation" class="secondary-btn" style="font-size: 14px; padding: 10px 16px; background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; cursor: pointer;">
+        このまま続ける
+      </button>
+    </div>
+  </div>
+
   <!-- 画像と余白を含め、画面全体をタッチしてロビーへ進む -->
   <button id="title-screen" class="title-screen" type="button" aria-label="画面をタッチしてゲームをはじめる">
     <img src="frontend/images/title-screen.png" alt="UO:De Car" width="3360" height="1560" fetchpriority="high" draggable="false">
@@ -40,10 +62,57 @@
     const titleScreen = document.getElementById('title-screen');
     const status = document.getElementById('title-screen-status');
     const app = document.getElementById('app');
+    const orientationPrompt = document.getElementById('orientation-prompt');
+    const btnForceLandscape = document.getElementById('btn-force-landscape');
+    const btnDismissOrientation = document.getElementById('btn-dismiss-orientation');
+
+    function enableForcedLandscape() {
+      if (orientationPrompt) {
+        orientationPrompt.classList.add('dismissed');
+      }
+      if (document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else if (document.documentElement.webkitRequestFullscreen) {
+        document.documentElement.webkitRequestFullscreen().catch(() => {});
+      }
+      if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('landscape').catch(() => {
+          document.body.classList.add('force-landscape');
+          window.dispatchEvent(new Event('resize'));
+        });
+      } else {
+        document.body.classList.add('force-landscape');
+        window.dispatchEvent(new Event('resize'));
+      }
+    }
+
+    if (btnForceLandscape) {
+      btnForceLandscape.addEventListener('click', (e) => {
+        e.stopPropagation();
+        enableForcedLandscape();
+      });
+    }
+    if (btnDismissOrientation) {
+      btnDismissOrientation.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (orientationPrompt) orientationPrompt.classList.add('dismissed');
+      });
+    }
+
+    window.addEventListener('resize', () => {
+      if (window.innerWidth > window.innerHeight && orientationPrompt) {
+        orientationPrompt.classList.add('dismissed');
+      }
+    });
 
     titleScreen.addEventListener('click', async (event) => {
       event.stopPropagation();
       if (titleScreen.disabled) return;
+
+      // タッチ操作時に横画面ロックを試行
+      if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('landscape').catch(() => {});
+      }
 
       titleScreen.disabled = true;
       status.textContent = '読み込み中…';
