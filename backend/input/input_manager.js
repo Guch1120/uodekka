@@ -156,6 +156,22 @@ export class InputManager {
     const size = pos.size || `${this.stickSize}px`;
     stickEl.style.width = size;
     stickEl.style.height = size;
+    stickEl.style.transform = 'translate(0px, 0px)';
+    stickEl.style.transition = '';
+    this.updateStickHomeCenter();
+  }
+
+  updateStickHomeCenter() {
+    const stickEl = document.getElementById('ctrl-stick');
+    if (!stickEl) return;
+    const prevTransform = stickEl.style.transform;
+    const prevTransition = stickEl.style.transition;
+    stickEl.style.transform = 'none';
+    stickEl.style.transition = 'none';
+    const r = stickEl.getBoundingClientRect();
+    this.stickHomeCenter = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    stickEl.style.transform = prevTransform;
+    stickEl.style.transition = prevTransition;
   }
 
   setControlMode(mode) {
@@ -536,10 +552,10 @@ export class InputManager {
       }
       if (this.dynamicStickEnabled && isStickShifted) {
         isStickShifted = false;
-        stickBase.classList.add('stick-returning');
-        this.restoreStickHomePosition();
+        stickBase.style.transition = 'transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1)';
+        stickBase.style.transform = 'translate(0px, 0px)';
         setTimeout(() => {
-          stickBase.classList.remove('stick-returning');
+          if (!isStickShifted) stickBase.style.transition = '';
         }, 250);
       }
       stickOrigin = null;
@@ -599,28 +615,12 @@ export class InputManager {
           stickTouchId = touch.identifier;
 
           if (!isDirectStick && this.dynamicStickEnabled) {
-            // スティックからズレた位置をタップした場合、タップ位置を基準としてスティックを表示
-            stickBase.classList.remove('stick-returning');
+            this.updateStickHomeCenter();
             isStickShifted = true;
-            const size = parseFloat(stickBase.style.width || this.layout.stick?.size || this.stickSize || 130);
-            const radius = size / 2;
-
-            const isForcedLandscapeInPortrait = document.body.classList.contains('force-landscape') && (window.innerHeight > window.innerWidth);
-            if (isForcedLandscapeInPortrait) {
-              const isReverse = document.body.classList.contains('rotate-reverse');
-              const localX = isReverse ? (window.innerHeight - touch.clientY) : touch.clientY;
-              const localY = isReverse ? touch.clientX : (window.innerWidth - touch.clientX);
-              stickBase.style.left = `${localX - radius}px`;
-              stickBase.style.top = `${localY - radius}px`;
-            } else {
-              const rootRect = this.controlsRoot.getBoundingClientRect();
-              const localX = touch.clientX - rootRect.left;
-              const localY = touch.clientY - rootRect.top;
-              stickBase.style.left = `${localX - radius}px`;
-              stickBase.style.top = `${localY - radius}px`;
-            }
-            stickBase.style.right = 'auto';
-            stickBase.style.bottom = 'auto';
+            stickBase.style.transition = 'none';
+            const shiftX = touch.clientX - this.stickHomeCenter.x;
+            const shiftY = touch.clientY - this.stickHomeCenter.y;
+            stickBase.style.transform = `translate(${shiftX}px, ${shiftY}px)`;
 
             stickRect = stickBase.getBoundingClientRect();
             stickOrigin = { x: touch.clientX, y: touch.clientY };
@@ -686,17 +686,12 @@ export class InputManager {
         isMouseDownStick = true;
 
         if (!isDirectStick && this.dynamicStickEnabled) {
-          stickBase.classList.remove('stick-returning');
+          this.updateStickHomeCenter();
           isStickShifted = true;
-          const size = parseFloat(stickBase.style.width || this.layout.stick?.size || this.stickSize || 130);
-          const radius = size / 2;
-          const rootRect = this.controlsRoot.getBoundingClientRect();
-          const localX = e.clientX - rootRect.left;
-          const localY = e.clientY - rootRect.top;
-          stickBase.style.left = `${localX - radius}px`;
-          stickBase.style.top = `${localY - radius}px`;
-          stickBase.style.right = 'auto';
-          stickBase.style.bottom = 'auto';
+          stickBase.style.transition = 'none';
+          const shiftX = e.clientX - this.stickHomeCenter.x;
+          const shiftY = e.clientY - this.stickHomeCenter.y;
+          stickBase.style.transform = `translate(${shiftX}px, ${shiftY}px)`;
 
           stickRect = stickBase.getBoundingClientRect();
           stickOrigin = { x: e.clientX, y: e.clientY };

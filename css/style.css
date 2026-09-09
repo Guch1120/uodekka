@@ -448,10 +448,6 @@ canvas {
   box-sizing: border-box;
 }
 
-.stick-base.stick-returning {
-  transition: left 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), top 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), bottom 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), right 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
 .stick-knob {
   width: 42%;
   height: 42%;
