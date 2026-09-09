@@ -64,6 +64,12 @@ export class InputManager {
     this.gyroActive = false;
     this.onEscape = null; // Escキー中断コールバック
 
+    // スティックサイズ（80px〜200px, デフォルト 130px）
+    this.stickSize = 130;
+    // タップ位置追従（ダイナミック/フローティング）スティック設定（デフォルト有効）
+    const savedDynamicStick = localStorage.getItem('kart_dynamic_stick');
+    this.dynamicStickEnabled = savedDynamicStick !== null ? savedDynamicStick === 'true' : true;
+
     // 横画面基準のデフォルトUI配置レイアウト（ミニマップやスピードメーターと重複しない最適配置）
     this.defaultLayout = {
       stick: { left: '40px', bottom: '35px', size: '130px' },
@@ -95,11 +101,16 @@ export class InputManager {
         if (parsed.item && (parsed.item.top || parsed.item.left)) {
           parsed.item = Object.assign({}, this.defaultLayout.item);
         }
-        return Object.assign({}, this.defaultLayout, parsed);
+        const layout = Object.assign({}, this.defaultLayout, parsed);
+        if (layout.stick && layout.stick.size) {
+          this.stickSize = parseInt(layout.stick.size, 10) || 130;
+        }
+        return layout;
       }
     } catch (e) {
       console.warn('Failed to parse saved layout', e);
     }
+    this.stickSize = 130;
     return JSON.parse(JSON.stringify(this.defaultLayout));
   }
 
@@ -109,8 +120,42 @@ export class InputManager {
 
   resetLayout() {
     this.layout = JSON.parse(JSON.stringify(this.defaultLayout));
+    this.stickSize = 130;
     this.saveLayout();
     this.applyLayoutToElements();
+  }
+
+  setStickSize(size) {
+    const s = Math.max(80, Math.min(200, Math.round(Number(size) || 130)));
+    this.stickSize = s;
+    if (!this.layout.stick) {
+      this.layout.stick = Object.assign({}, this.defaultLayout.stick);
+    }
+    this.layout.stick.size = `${s}px`;
+    this.saveLayout();
+    const stickEl = document.getElementById('ctrl-stick');
+    if (stickEl) {
+      stickEl.style.width = `${s}px`;
+      stickEl.style.height = `${s}px`;
+    }
+  }
+
+  setDynamicStick(enabled) {
+    this.dynamicStickEnabled = !!enabled;
+    localStorage.setItem('kart_dynamic_stick', this.dynamicStickEnabled ? 'true' : 'false');
+  }
+
+  restoreStickHomePosition() {
+    const stickEl = document.getElementById('ctrl-stick');
+    if (!stickEl) return;
+    const pos = this.layout.stick || this.defaultLayout.stick;
+    stickEl.style.left = pos.left || 'auto';
+    stickEl.style.right = pos.right || 'auto';
+    stickEl.style.top = pos.top || 'auto';
+    stickEl.style.bottom = pos.bottom || 'auto';
+    const size = pos.size || `${this.stickSize}px`;
+    stickEl.style.width = size;
+    stickEl.style.height = size;
   }
 
   setControlMode(mode) {
@@ -440,15 +485,15 @@ export class InputManager {
     // スティックのドラッグ操作 (dxがプラスなら右旋回: steer = +dx / maxRadius)
     let stickTouchId = null;
     let stickRect = null;
+    let stickOrigin = null;
+    let isStickShifted = false;
 
     const handleStickMove = (clientX, clientY) => {
-      if (!stickRect) return;
-      const centerX = stickRect.left + stickRect.width / 2;
-      const centerY = stickRect.top + stickRect.height / 2;
+      if (!stickRect || !stickOrigin) return;
       const maxRadius = stickRect.width / 2;
 
-      let dx = clientX - centerX;
-      let dy = clientY - centerY;
+      let dx = clientX - stickOrigin.x;
+      let dy = clientY - stickOrigin.y;
 
       // CSSによる90度強制横持ちモードの場合（縦画面ロック時のみ）、タッチ座標系を要素ローカル系に合わせて変換
       const isForcedLandscapeInPortrait = document.body.classList.contains('force-landscape') && (window.innerHeight > window.innerWidth);
@@ -484,23 +529,110 @@ export class InputManager {
 
     const handleStickEnd = () => {
       stickTouchId = null;
-      stickKnob.style.transform = `translate(0px, 0px)`;
+      stickKnob.style.transform = 'translate(0px, 0px)';
       this._stickY = 0;
       if (this.controlMode === 'stick') {
         this.state.steering = 0;
       }
+      if (this.dynamicStickEnabled && isStickShifted) {
+        isStickShifted = false;
+        stickBase.classList.add('stick-returning');
+        this.restoreStickHomePosition();
+        setTimeout(() => {
+          stickBase.classList.remove('stick-returning');
+        }, 250);
+      }
+      stickOrigin = null;
+      stickRect = null;
     };
 
     this.resetCallbacks.push(handleStickEnd);
     window.addEventListener('touchcancel', () => this.resetState());
 
+    // スティックエリア判定 (画面左半分 & 画面下部75%エリア)
+    const checkInStickArea = (clientX, clientY) => {
+      const isForcedLandscapeInPortrait = document.body.classList.contains('force-landscape') && (window.innerHeight > window.innerWidth);
+      if (isForcedLandscapeInPortrait) {
+        const isReverse = document.body.classList.contains('rotate-reverse');
+        const localX = isReverse ? (window.innerHeight - clientY) : clientY;
+        const localY = isReverse ? clientX : (window.innerWidth - clientX);
+        const rootW = window.innerHeight;
+        const rootH = window.innerWidth;
+        return localX < rootW * 0.5 && localY > rootH * 0.25;
+      }
+      return clientX < window.innerWidth * 0.5 && clientY > window.innerHeight * 0.25;
+    };
+
+    // スティック要素自体への直接タッチ
     stickBase.addEventListener('touchstart', (e) => {
-      if (!this.canDrive()) return;
+      if (!this.canDrive() || this.isEditingLayout) return;
+      if (this.controlMode !== 'stick') return;
       e.preventDefault();
+      e.stopPropagation();
       const touch = e.changedTouches[0];
       stickTouchId = touch.identifier;
       stickRect = stickBase.getBoundingClientRect();
+      stickOrigin = { x: stickRect.left + stickRect.width / 2, y: stickRect.top + stickRect.height / 2 };
       handleStickMove(touch.clientX, touch.clientY);
+    }, { passive: false });
+
+    // スティックエリア内（スティックからズレた位置含む）へのタッチ（タップ追従スティック）
+    window.addEventListener('touchstart', (e) => {
+      if (!this.canDrive() || this.isEditingLayout) return;
+      if (this.controlMode !== 'stick') return;
+      if (stickTouchId !== null) return;
+
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        const target = document.elementFromPoint(touch.clientX, touch.clientY);
+
+        // 除外するUI: ポーズ、設定、音量、ミニマップ、HUDボタンなど
+        if (target && target.closest('button, input, select, textarea, .modal-backdrop, #btn-open-pause, #btn-open-settings, #btn-mute-audio, .hud-top-right, .hud-top-center, .hud-pause-btn')) {
+          continue;
+        }
+
+        const isDirectStick = !!(target && target.closest('#ctrl-stick'));
+        const inStickArea = checkInStickArea(touch.clientX, touch.clientY);
+
+        if (isDirectStick || inStickArea) {
+          e.preventDefault();
+          stickTouchId = touch.identifier;
+
+          if (!isDirectStick && this.dynamicStickEnabled) {
+            // スティックからズレた位置をタップした場合、タップ位置を基準としてスティックを表示
+            stickBase.classList.remove('stick-returning');
+            isStickShifted = true;
+            const size = parseFloat(stickBase.style.width || this.layout.stick?.size || this.stickSize || 130);
+            const radius = size / 2;
+
+            const isForcedLandscapeInPortrait = document.body.classList.contains('force-landscape') && (window.innerHeight > window.innerWidth);
+            if (isForcedLandscapeInPortrait) {
+              const isReverse = document.body.classList.contains('rotate-reverse');
+              const localX = isReverse ? (window.innerHeight - touch.clientY) : touch.clientY;
+              const localY = isReverse ? touch.clientX : (window.innerWidth - touch.clientX);
+              stickBase.style.left = `${localX - radius}px`;
+              stickBase.style.top = `${localY - radius}px`;
+            } else {
+              const rootRect = this.controlsRoot.getBoundingClientRect();
+              const localX = touch.clientX - rootRect.left;
+              const localY = touch.clientY - rootRect.top;
+              stickBase.style.left = `${localX - radius}px`;
+              stickBase.style.top = `${localY - radius}px`;
+            }
+            stickBase.style.right = 'auto';
+            stickBase.style.bottom = 'auto';
+
+            stickRect = stickBase.getBoundingClientRect();
+            stickOrigin = { x: touch.clientX, y: touch.clientY };
+            handleStickMove(touch.clientX, touch.clientY);
+          } else {
+            stickRect = stickBase.getBoundingClientRect();
+            stickOrigin = { x: stickRect.left + stickRect.width / 2, y: stickRect.top + stickRect.height / 2 };
+            handleStickMove(touch.clientX, touch.clientY);
+          }
+          break;
+        }
+      }
     }, { passive: false });
 
     window.addEventListener('touchmove', (e) => {
@@ -520,6 +652,79 @@ export class InputManager {
           handleStickEnd();
           break;
         }
+      }
+    });
+
+    // マウスでのスティック操作対応（PC実機検証・デバッグ用）
+    let isMouseDownStick = false;
+    stickBase.addEventListener('mousedown', (e) => {
+      if (!this.canDrive() || this.isEditingLayout || e.button !== 0) return;
+      if (this.controlMode !== 'stick') return;
+      e.preventDefault();
+      e.stopPropagation();
+      isMouseDownStick = true;
+      stickRect = stickBase.getBoundingClientRect();
+      stickOrigin = { x: stickRect.left + stickRect.width / 2, y: stickRect.top + stickRect.height / 2 };
+      handleStickMove(e.clientX, e.clientY);
+    });
+
+    window.addEventListener('mousedown', (e) => {
+      if (!this.canDrive() || this.isEditingLayout || e.button !== 0) return;
+      if (this.controlMode !== 'stick') return;
+      if (stickTouchId !== null || isMouseDownStick) return;
+
+      const target = document.elementFromPoint(e.clientX, e.clientY);
+      if (target && target.closest('button, input, select, textarea, .modal-backdrop, #btn-open-pause, #btn-open-settings, #btn-mute-audio, .hud-top-right, .hud-top-center, .hud-pause-btn')) {
+        return;
+      }
+
+      const isDirectStick = !!(target && target.closest('#ctrl-stick'));
+      const inStickArea = checkInStickArea(e.clientX, e.clientY);
+
+      if (isDirectStick || inStickArea) {
+        e.preventDefault();
+        isMouseDownStick = true;
+
+        if (!isDirectStick && this.dynamicStickEnabled) {
+          stickBase.classList.remove('stick-returning');
+          isStickShifted = true;
+          const size = parseFloat(stickBase.style.width || this.layout.stick?.size || this.stickSize || 130);
+          const radius = size / 2;
+          const rootRect = this.controlsRoot.getBoundingClientRect();
+          const localX = e.clientX - rootRect.left;
+          const localY = e.clientY - rootRect.top;
+          stickBase.style.left = `${localX - radius}px`;
+          stickBase.style.top = `${localY - radius}px`;
+          stickBase.style.right = 'auto';
+          stickBase.style.bottom = 'auto';
+
+          stickRect = stickBase.getBoundingClientRect();
+          stickOrigin = { x: e.clientX, y: e.clientY };
+          handleStickMove(e.clientX, e.clientY);
+        } else {
+          stickRect = stickBase.getBoundingClientRect();
+          stickOrigin = { x: stickRect.left + stickRect.width / 2, y: stickRect.top + stickRect.height / 2 };
+          handleStickMove(e.clientX, e.clientY);
+        }
+      }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isMouseDownStick || this.isEditingLayout) return;
+      handleStickMove(e.clientX, e.clientY);
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isMouseDownStick) {
+        isMouseDownStick = false;
+        handleStickEnd();
+      }
+    });
+
+    this.resetCallbacks.push(() => {
+      if (isMouseDownStick) {
+        isMouseDownStick = false;
+        handleStickEnd();
       }
     });
 
@@ -559,10 +764,27 @@ export class InputManager {
     bar.id = 'layout-edit-banner';
     bar.className = 'layout-edit-banner';
     bar.innerHTML = `
-      <span>ボタンをドラッグして好きな位置に配置してください</span>
+      <div class="layout-banner-content">
+        <span class="layout-banner-title">ボタンをドラッグして好きな位置に配置してください</span>
+        <div class="layout-stick-size-control">
+          <span>スティックサイズ:</span>
+          <input type="range" id="layout-stick-size-slider" min="80" max="200" step="5" value="${this.stickSize}">
+          <span id="layout-stick-size-val">${this.stickSize}px</span>
+        </div>
+      </div>
       <button id="btn-save-layout" class="primary-btn">配置を保存して終了</button>
     `;
     document.body.appendChild(bar);
+
+    const layoutStickSlider = bar.querySelector('#layout-stick-size-slider');
+    const layoutStickVal = bar.querySelector('#layout-stick-size-val');
+    if (layoutStickSlider) {
+      layoutStickSlider.oninput = (e) => {
+        const val = parseInt(e.target.value, 10);
+        if (layoutStickVal) layoutStickVal.textContent = `${val}px`;
+        this.setStickSize(val);
+      };
+    }
 
     const keys = ['stick', 'accel', 'brake', 'item', 'drift'];
     const cleanupFns = [];

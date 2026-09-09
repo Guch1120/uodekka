@@ -39,6 +39,28 @@ export class SettingsModal {
             </div>
           </div>
 
+          <div class="setting-row" id="stick-size-setting-row">
+            <div class="setting-label">
+              <strong>スティックの大きさ</strong>
+              <div class="subtext">画面左のバーチャルスティックの直径（80px〜200px）</div>
+            </div>
+            <div class="slider-group">
+              <input type="range" id="input-stick-size" min="80" max="200" step="5" value="130">
+              <span id="label-stick-size-val" class="slider-value-badge">130px</span>
+            </div>
+          </div>
+
+          <div class="setting-row" id="dynamic-stick-setting-row">
+            <div class="setting-label">
+              <strong>タップ追従スティック</strong>
+              <div class="subtext">画面左下をタップした位置を原点としてスティックを表示・操作</div>
+            </div>
+            <div class="toggle-group">
+              <button id="btn-dynamic-stick-on" class="toggle-btn active">ON (推奨)</button>
+              <button id="btn-dynamic-stick-off" class="toggle-btn">固定位置</button>
+            </div>
+          </div>
+
           <div class="setting-row">
             <div class="setting-label">
               <strong>自動アクセル</strong>
@@ -114,11 +136,34 @@ export class SettingsModal {
     const btnEditLayout = modal.querySelector('#btn-edit-layout');
     const btnResetLayout = modal.querySelector('#btn-reset-layout');
 
+    const inputStickSize = modal.querySelector('#input-stick-size');
+    const labelStickSizeVal = modal.querySelector('#label-stick-size-val');
+    const btnDynamicStickOn = modal.querySelector('#btn-dynamic-stick-on');
+    const btnDynamicStickOff = modal.querySelector('#btn-dynamic-stick-off');
+
     const btnAutoAccelOn = modal.querySelector('#btn-auto-accel-on');
     const btnAutoAccelOff = modal.querySelector('#btn-auto-accel-off');
 
     btnClose.onclick = () => this.hide();
     btnSave.onclick = () => this.hide();
+
+    inputStickSize.oninput = (e) => {
+      const val = parseInt(e.target.value, 10);
+      labelStickSizeVal.textContent = `${val}px`;
+      this.inputManager.setStickSize(val);
+    };
+
+    btnDynamicStickOn.onclick = () => {
+      btnDynamicStickOn.classList.add('active');
+      btnDynamicStickOff.classList.remove('active');
+      this.inputManager.setDynamicStick(true);
+    };
+
+    btnDynamicStickOff.onclick = () => {
+      btnDynamicStickOff.classList.add('active');
+      btnDynamicStickOn.classList.remove('active');
+      this.inputManager.setDynamicStick(false);
+    };
 
     btnAutoAccelOn.onclick = () => {
       btnAutoAccelOn.classList.add('active');
@@ -173,7 +218,9 @@ export class SettingsModal {
 
     btnResetLayout.onclick = () => {
       this.inputManager.resetLayout();
-      alert('ボタン配置を初期値にリセットしました。');
+      if (inputStickSize) inputStickSize.value = 130;
+      if (labelStickSizeVal) labelStickSizeVal.textContent = '130px';
+      alert('ボタン配置を初期状態に戻しました。');
     };
   }
 
@@ -188,6 +235,25 @@ export class SettingsModal {
     } else {
       btnStick.classList.add('active');
       btnGyro.classList.remove('active');
+    }
+
+    const stickSize = this.inputManager.stickSize || 130;
+    const inputStickSize = this.modalEl.querySelector('#input-stick-size');
+    const labelStickSizeVal = this.modalEl.querySelector('#label-stick-size-val');
+    if (inputStickSize) inputStickSize.value = stickSize;
+    if (labelStickSizeVal) labelStickSizeVal.textContent = `${stickSize}px`;
+
+    const isDynamic = this.inputManager.dynamicStickEnabled !== false;
+    const btnDynamicStickOn = this.modalEl.querySelector('#btn-dynamic-stick-on');
+    const btnDynamicStickOff = this.modalEl.querySelector('#btn-dynamic-stick-off');
+    if (btnDynamicStickOn && btnDynamicStickOff) {
+      if (isDynamic) {
+        btnDynamicStickOn.classList.add('active');
+        btnDynamicStickOff.classList.remove('active');
+      } else {
+        btnDynamicStickOff.classList.add('active');
+        btnDynamicStickOn.classList.remove('active');
+      }
     }
 
     const isInverted = this.inputManager.invertSteering;

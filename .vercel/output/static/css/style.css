@@ -442,16 +442,25 @@ canvas {
   display: flex;
   align-items: center;
   justify-content: center;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  box-sizing: border-box;
+}
+
+.stick-base.stick-returning {
+  transition: left 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), top 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), bottom 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), right 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .stick-knob {
-  width: 55px;
-  height: 55px;
+  width: 42%;
+  height: 42%;
   border-radius: 50%;
   background: #3498db;
   border: 3px solid #ffffff;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
   pointer-events: none;
+  box-sizing: border-box;
 }
 
 /* 各種ボタン */
@@ -510,12 +519,47 @@ canvas {
   background: #f39c12;
   color: #111;
   font-weight: bold;
-  padding: 12px 20px;
+  padding: 10px 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
   z-index: 100;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+  box-sizing: border-box;
+}
+
+.layout-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.layout-banner-title {
+  font-size: 15px;
+}
+
+.layout-stick-size-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.18);
+  padding: 4px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #fff;
+}
+
+.layout-stick-size-control input[type="range"] {
+  width: 100px;
+  cursor: pointer;
+  accent-color: #0284c7;
+}
+
+#layout-stick-size-val {
+  min-width: 45px;
+  font-weight: 800;
 }
 
 /* ================= モーダルダイアログ ================= */
@@ -632,6 +676,36 @@ canvas {
   border-color: #38bdf8;
   background: #0369a1;
   color: #fff;
+}
+
+/* スライダーコントロール */
+.slider-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.slider-group input[type="range"], .setting-row input[type="range"] {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  background: #334155;
+  outline: none;
+  cursor: pointer;
+  accent-color: #38bdf8;
+}
+
+.slider-value-badge {
+  background: #1e293b;
+  border: 1px solid #38bdf8;
+  color: #38bdf8;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 14px;
+  min-width: 55px;
+  text-align: center;
 }
 
 /* ボタン & 入力スタイル */
