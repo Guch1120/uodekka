@@ -99,6 +99,17 @@ export class Game {
       };
     }
 
+    // Escキーでの一時中断・再開
+    this.inputManager.onEscape = () => {
+      if (!this.isRunning) return;
+      if (this.isPaused) {
+        this.resumeRace();
+        this.pauseModal.hide();
+      } else {
+        this.openPauseMenu();
+      }
+    };
+
     // 画面強制横持ちボタン
     const btnForceLandscape = document.getElementById('btn-force-landscape');
     if (btnForceLandscape) {

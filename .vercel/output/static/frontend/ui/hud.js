@@ -26,16 +26,18 @@ export class HUD {
     hudDiv.innerHTML = `
       <div class="hud-top-left">
         <div class="hud-top-left-badges">
+          <!-- 存在感のある大型の順位表示バッジ -->
           <div class="hud-badge position-badge">
             <span id="hud-pos-num">1</span><span class="pos-suffix">st</span>
           </div>
           <div class="hud-badge lap-badge">
-            LAP <span id="hud-lap-current">1</span>/<span id="hud-lap-total">3</span>
+            <span class="lap-label">LAP</span>
+            <span class="lap-numbers"><span id="hud-lap-current">1</span>/<span id="hud-lap-total">3</span></span>
           </div>
         </div>
-        <!-- 指の邪魔にならない左上配置のミニマップ -->
+        <!-- 拡大された大型ミニマップ -->
         <div class="hud-minimap-wrapper">
-          <canvas id="hud-minimap" width="130" height="130"></canvas>
+          <canvas id="hud-minimap" width="260" height="260"></canvas>
         </div>
       </div>
 
@@ -55,7 +57,7 @@ export class HUD {
         <div id="hud-item-slot" class="item-slot-box empty">
           <div class="item-icon-wrapper" id="hud-item-icon"></div>
         </div>
-        <button id="btn-open-pause" class="icon-btn" title="一時停止・中断">
+        <button id="btn-open-pause" class="icon-btn" title="一時停止・中断 (Esc)">
           ${Icons.getSvg('pause')}
         </button>
         <button id="btn-open-settings" class="icon-btn" title="設定">
@@ -72,9 +74,16 @@ export class HUD {
         <div class="respawn-timer-circle" id="hud-respawn-timer">2</div>
       </div>
 
-      <div class="hud-bottom-right-info">
+      <!-- 画面下部中央：スピードメーター（右下ボタンと重ならない快適配置） -->
+      <div class="hud-bottom-center-info">
         <div class="speedometer">
           <span id="hud-speed-val">0</span> <span class="unit">km/h</span>
+        </div>
+        <div class="pc-key-guide">
+          <span>[W/A/S/D] 運転</span>
+          <span>[Space] ドリフト</span>
+          <span>[E] アイテム</span>
+          <span>[Esc] 一時停止</span>
         </div>
       </div>
     `;
@@ -164,6 +173,12 @@ export class HUD {
     const suffixEl = this.element.querySelector('.pos-suffix');
     const pos = playerState.position || 1;
     suffixEl.textContent = pos === 1 ? 'st' : (pos === 2 ? 'nd' : (pos === 3 ? 'rd' : 'th'));
+
+    const posBadge = this.element.querySelector('.position-badge');
+    if (posBadge) {
+      posBadge.classList.remove('pos-1', 'pos-2', 'pos-3', 'pos-4');
+      posBadge.classList.add(`pos-${Math.min(pos, 4)}`);
+    }
 
     const curLap = playerState.currentLap || 1;
     const totLaps = playerState.totalLaps || 3;
@@ -258,13 +273,13 @@ export class HUD {
     const centerX = (minX + maxX) / 2;
     const centerZ = (minZ + maxZ) / 2;
 
-    const toMapX = (x) => (w / 2) + ((x - centerX) / maxRange) * (w - 28);
-    const toMapY = (z) => (h / 2) + ((z - centerZ) / maxRange) * (h - 28);
+    const toMapX = (x) => (w / 2) + ((x - centerX) / maxRange) * (w - 44);
+    const toMapY = (z) => (h / 2) + ((z - centerZ) / maxRange) * (h - 44);
 
     // コースアウトライン（黒縁）
     ctx.beginPath();
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.lineWidth = 8;
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.lineWidth = 14;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     trackPoints.forEach((p, idx) => {
@@ -276,10 +291,10 @@ export class HUD {
     ctx.closePath();
     ctx.stroke();
 
-    // コースライン本体（明るい白線）
+    // コースライン本体（鮮明な白線）
     ctx.beginPath();
     ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 5;
+    ctx.lineWidth = 9;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     trackPoints.forEach((p, idx) => {
@@ -291,32 +306,32 @@ export class HUD {
     ctx.closePath();
     ctx.stroke();
 
-    // カートアイコン描画
+    // カートアイコン描画（サイズ拡大で見やすく）
     kartPositions.forEach(k => {
       const mx = toMapX(k.x);
       const my = toMapY(k.z);
 
       if (k.isLocal) {
-        // 自機：大きく目立つシアンブルー + 外枠パルスリング
+        // 自機：大きく目立つシアンブルー + 白リング
         ctx.beginPath();
-        ctx.arc(mx, my, 7, 0, Math.PI * 2);
+        ctx.arc(mx, my, 12, 0, Math.PI * 2);
         ctx.fillStyle = '#0284c7';
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(mx, my, 5, 0, Math.PI * 2);
+        ctx.arc(mx, my, 9, 0, Math.PI * 2);
         ctx.fillStyle = '#38bdf8';
         ctx.fill();
         ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 3;
         ctx.stroke();
       } else {
-        // ライバルカート：鮮やかな赤/黄色
+        // ライバルカート：鮮やかなカラー + 白フチ
         ctx.beginPath();
-        ctx.arc(mx, my, 4.5, 0, Math.PI * 2);
+        ctx.arc(mx, my, 8, 0, Math.PI * 2);
         ctx.fillStyle = k.color || '#ef4444';
         ctx.fill();
         ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 2.5;
         ctx.stroke();
       }
     });

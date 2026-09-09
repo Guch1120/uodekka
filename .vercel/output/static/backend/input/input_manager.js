@@ -18,7 +18,8 @@ export class InputManager {
       itemPressStartTime: 0
     };
 
-    this.controlMode = localStorage.getItem('kart_control_mode') || 'gyro'; // 'gyro' or 'stick'
+    const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    this.controlMode = localStorage.getItem('kart_control_mode') || (isTouch ? 'gyro' : 'stick'); // PCは既定でstick
     this.gyroSensitivity = parseFloat(localStorage.getItem('kart_gyro_sens') || '0.7');
     // 直感的なステアリング操作（右傾けで右旋回）をデフォルトにするため、反転を初期値(true)に設定
     const savedInvert = localStorage.getItem('kart_invert_steer');
@@ -29,14 +30,15 @@ export class InputManager {
     this.keyboardSteering = false;
     this.gyroGamma = 0;
     this.gyroActive = false;
+    this.onEscape = null; // Escキー中断コールバック
 
-    // 横画面基準のデフォルトUI配置レイアウト
+    // 横画面基準のデフォルトUI配置レイアウト（ミニマップやスピードメーターと重複しない最適配置）
     this.defaultLayout = {
       stick: { left: '40px', bottom: '35px', size: '130px' },
-      accel: { right: '40px', bottom: '35px', size: '95px' },
-      brake: { right: '155px', bottom: '35px', size: '75px' },
-      item: { left: '40px', top: '100px', size: '75px' },
-      drift: { right: '65px', bottom: '150px', size: '75px' }
+      accel: { right: '35px', bottom: '35px', size: '95px' },
+      brake: { right: '150px', bottom: '35px', size: '75px' },
+      item: { right: '150px', bottom: '135px', size: '75px' }, // 左上から右側へ移動し、左上ミニマップとの重複を解消
+      drift: { right: '55px', bottom: '150px', size: '75px' }
     };
 
     this.layout = this.loadLayout();
@@ -56,6 +58,10 @@ export class InputManager {
         if (parsed.accelerator && !parsed.accel) {
           parsed.accel = parsed.accelerator;
           delete parsed.accelerator;
+        }
+        // 過去のキャッシュで左上ミニマップに重なる位置（top/left指定）がある場合は新配置へ移行
+        if (parsed.item && (parsed.item.top || parsed.item.left)) {
+          parsed.item = Object.assign({}, this.defaultLayout.item);
         }
         return Object.assign({}, this.defaultLayout, parsed);
       }
@@ -173,18 +179,47 @@ export class InputManager {
 
   bindKeyboardEvents() {
     const gameKeys = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
-      'KeyA', 'KeyD', 'KeyW', 'KeyS', 'ShiftLeft', 'ShiftRight', 'Space', 'KeyE', 'KeyQ', 'Enter']);
+      'KeyA', 'KeyD', 'KeyW', 'KeyS', 'ShiftLeft', 'ShiftRight', 'Space', 'KeyE', 'KeyQ', 'Enter', 'Escape']);
+
+    const normalizeCode = (e) => {
+      if (gameKeys.has(e.code)) return e.code;
+      const k = e.key ? e.key.toLowerCase() : '';
+      if (k === 'w') return 'KeyW';
+      if (k === 'a') return 'KeyA';
+      if (k === 's') return 'KeyS';
+      if (k === 'd') return 'KeyD';
+      if (k === 'e') return 'KeyE';
+      if (k === 'q') return 'KeyQ';
+      if (k === ' ') return 'Space';
+      if (k === 'escape') return 'Escape';
+      return e.code;
+    };
+
     window.addEventListener('keydown', (e) => {
-      if (!gameKeys.has(e.code) || !this.canDrive() ||
+      const code = normalizeCode(e);
+
+      // Escapeキーによる一時中断・ポーズ切替
+      if (code === 'Escape') {
+        if (!e.target.closest?.('input, textarea, select, [contenteditable="true"]')) {
+          e.preventDefault();
+          if (this.onEscape) {
+            this.onEscape();
+          }
+          return;
+        }
+      }
+
+      if (!gameKeys.has(code) || !this.canDrive() ||
           e.target.closest?.('input, textarea, select, button, [contenteditable="true"]') ||
           e.ctrlKey || e.metaKey || e.altKey) return;
       e.preventDefault();
-      this.keyboardKeys[e.code] = true;
+      this.keyboardKeys[code] = true;
       this.updateKeyboardState(this.keyboardKeys);
     });
     window.addEventListener('keyup', (e) => {
-      if (!this.keyboardKeys[e.code]) return;
-      delete this.keyboardKeys[e.code];
+      const code = normalizeCode(e);
+      if (!this.keyboardKeys[code]) return;
+      delete this.keyboardKeys[code];
       if (!this.canDrive()) { this.resetState(); return; }
       this.updateKeyboardState(this.keyboardKeys);
     });
