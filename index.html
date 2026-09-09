@@ -99,6 +99,11 @@
       });
     }
 
+    // 初期ロード時にすでに横画面ならオーバーレイを非表示にしておく
+    if (window.innerWidth > window.innerHeight && orientationPrompt) {
+      orientationPrompt.classList.add('dismissed');
+    }
+
     window.addEventListener('resize', () => {
       if (window.innerWidth > window.innerHeight && orientationPrompt) {
         orientationPrompt.classList.add('dismissed');
@@ -108,6 +113,10 @@
     titleScreen.addEventListener('click', async (event) => {
       event.stopPropagation();
       if (titleScreen.disabled) return;
+
+      if (orientationPrompt) {
+        orientationPrompt.classList.add('dismissed');
+      }
 
       // タッチ操作時に横画面ロックを試行
       if (screen.orientation && screen.orientation.lock) {
