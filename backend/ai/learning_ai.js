@@ -167,8 +167,7 @@ export class CourseKnowledgeBase {
 
   // ラップ完了時に学習データをコースプロファイルに反映
   commitLap(lapTime = null, isClean = true) {
-    if (this.currentLapSamples.size < NUM_TRACK_BINS * 0.3) {
-      this.currentLapSamples.clear();
+    if (this.currentLapSamples.size === 0) {
       return;
     }
 
