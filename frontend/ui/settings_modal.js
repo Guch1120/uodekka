@@ -41,6 +41,17 @@ export class SettingsModal {
 
           <div class="setting-row">
             <div class="setting-label">
+              <strong>自動アクセル</strong>
+              <div class="subtext">前進アクセルを自動で行います（OFFで手動ボタン操作）</div>
+            </div>
+            <div class="toggle-group">
+              <button id="btn-auto-accel-on" class="toggle-btn active">ON (推奨)</button>
+              <button id="btn-auto-accel-off" class="toggle-btn">OFF</button>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-label">
               <strong>ハンドル操作の向き（左右反転）</strong>
               <div class="subtext">右に傾けた/倒したときの旋回方向（直感的な向きが推奨です）</div>
             </div>
@@ -103,8 +114,23 @@ export class SettingsModal {
     const btnEditLayout = modal.querySelector('#btn-edit-layout');
     const btnResetLayout = modal.querySelector('#btn-reset-layout');
 
+    const btnAutoAccelOn = modal.querySelector('#btn-auto-accel-on');
+    const btnAutoAccelOff = modal.querySelector('#btn-auto-accel-off');
+
     btnClose.onclick = () => this.hide();
     btnSave.onclick = () => this.hide();
+
+    btnAutoAccelOn.onclick = () => {
+      btnAutoAccelOn.classList.add('active');
+      btnAutoAccelOff.classList.remove('active');
+      this.inputManager.setAutoAccelerate(true);
+    };
+
+    btnAutoAccelOff.onclick = () => {
+      btnAutoAccelOff.classList.add('active');
+      btnAutoAccelOn.classList.remove('active');
+      this.inputManager.setAutoAccelerate(false);
+    };
 
     btnGyro.onclick = () => {
       btnGyro.classList.add('active');
@@ -173,6 +199,17 @@ export class SettingsModal {
     } else {
       btnNorm.classList.add('active');
       btnInv.classList.remove('active');
+    }
+
+    const isAutoAccel = this.inputManager.autoAccelerate;
+    const btnAutoAccelOn = this.modalEl.querySelector('#btn-auto-accel-on');
+    const btnAutoAccelOff = this.modalEl.querySelector('#btn-auto-accel-off');
+    if (isAutoAccel) {
+      btnAutoAccelOn.classList.add('active');
+      btnAutoAccelOff.classList.remove('active');
+    } else {
+      btnAutoAccelOff.classList.add('active');
+      btnAutoAccelOn.classList.remove('active');
     }
   }
 

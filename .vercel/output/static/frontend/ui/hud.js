@@ -187,9 +187,8 @@ export class HUD {
     }
     this.lastRecordedLap = curLap;
 
-    this.lapEl.textContent = Math.min(curLap, totLaps);
-    this.lapTotalEl.textContent = totLaps;
-    this.speedEl.textContent = Math.round(Math.abs(playerState.speed || 0) * 3);
+    const kmh = Math.round(Math.abs(playerState.speed || 0) * 3);
+    this.speedEl.textContent = (playerState.speed < -0.4) ? `R ${kmh}` : kmh;
 
     // アイコンが変わったときだけ DOM を更新する。
     const itemIcon = playerState.holdingItem?.icon || null;

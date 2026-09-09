@@ -6,10 +6,14 @@ export class InputManager {
   constructor(container) {
     this.container = container;
 
+    // 自動アクセル（デフォルト有効）
+    const savedAutoAccel = localStorage.getItem('kart_auto_accelerate');
+    this.autoAccelerate = savedAutoAccel !== null ? savedAutoAccel === 'true' : true;
+    this._rawAccelerating = false;
+
     // 入力状態
     this.state = {
       steering: 0,        // -1.0 (左) 〜 +1.0 (右)
-      accelerating: 0,    // 0.0 〜 1.0
       braking: 0,         // 0.0 〜 1.0
       drift: false,       // ドリフト/ミニターボ
       itemHeld: false,    // アイテム長押し（後方保持）
@@ -17,6 +21,20 @@ export class InputManager {
       isForwardThrow: false, // 前方投げフラグ (長押し後リリース: 前方放物線 / 単押し: 後方設置)
       itemPressStartTime: 0
     };
+
+    Object.defineProperty(this.state, 'accelerating', {
+      get: () => {
+        if (!this.canDrive()) return 0;
+        if (this.state.braking > 0) return 0;
+        if (this.autoAccelerate) return 1;
+        return this._rawAccelerating ? 1 : 0;
+      },
+      set: (val) => {
+        this._rawAccelerating = !!val;
+      },
+      configurable: true,
+      enumerable: true
+    });
 
     const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
     this.controlMode = localStorage.getItem('kart_control_mode') || (isTouch ? 'gyro' : 'stick'); // PCは既定でstick
@@ -90,6 +108,19 @@ export class InputManager {
   setInvertSteering(invert) {
     this.invertSteering = invert;
     localStorage.setItem('kart_invert_steer', invert ? 'true' : 'false');
+  }
+
+  setAutoAccelerate(enabled) {
+    this.autoAccelerate = !!enabled;
+    localStorage.setItem('kart_auto_accelerate', this.autoAccelerate ? 'true' : 'false');
+    this.updateAccelButtonVisibility();
+  }
+
+  updateAccelButtonVisibility() {
+    const btnAccel = document.getElementById('ctrl-accel');
+    if (btnAccel) {
+      btnAccel.style.display = (this.autoAccelerate && !this.isEditingLayout) ? 'none' : 'flex';
+    }
   }
 
   async requestGyroPermission() {
@@ -299,6 +330,7 @@ export class InputManager {
     this.applyLayoutToElements();
     this.bindTouchControls();
     this.updateStickVisibility();
+    this.updateAccelButtonVisibility();
   }
 
   applyLayoutToElements() {
@@ -503,6 +535,7 @@ export class InputManager {
     this.isEditingLayout = true;
     this.controlsRoot.classList.add('customizing-layout');
     this.updateStickVisibility();
+    this.updateAccelButtonVisibility();
 
     const bar = document.createElement('div');
     bar.id = 'layout-edit-banner';
@@ -584,12 +617,15 @@ export class InputManager {
       bar.remove();
       cleanupFns.forEach(fn => fn());
       this.updateStickVisibility();
+      this.updateAccelButtonVisibility();
     };
   }
 
   showControls() {
     if (this.controlsRoot) {
       this.controlsRoot.classList.remove('hidden');
+      this.updateStickVisibility();
+      this.updateAccelButtonVisibility();
     }
   }
 

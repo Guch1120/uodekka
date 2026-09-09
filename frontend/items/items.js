@@ -150,25 +150,37 @@ export const Items = {
       ];
       if (!this.lightningHeld && Math.random() < 0.2) pool.push('blue_shell');
     } else if (ratio < 0.85) {
-      // 下位 (8〜10位)
+      // 下位 (8〜10位): 攻撃・先制系30%, 加速系55%, 逆転系15% (計20枠)
       pool = [
-        'star', 'star',
-        'triple_mushroom', 'triple_mushroom',
-        'blue_shell',
+        // 攻撃・先制系 (6枠 = 30%)
+        'red_shell', 'red_shell', 'red_shell',
+        'green_shell',
         'bobomb',
-        'mushroom'
-      ];
-      if (!this.lightningHeld) pool.push('lightning');
-    } else {
-      // 最下位層 (11〜12位)
-      pool = [
+        'triple_banana',
+        // 加速系 (11枠 = 55%)
+        'triple_mushroom', 'triple_mushroom', 'triple_mushroom', 'triple_mushroom', 'triple_mushroom',
         'star', 'star', 'star',
-        'triple_mushroom', 'triple_mushroom', 'triple_mushroom',
-        'blue_shell', 'blue_shell'
+        'mushroom', 'mushroom', 'mushroom',
+        // 逆転系 (3枠 = 15%)
+        'blue_shell', 'blue_shell',
+        (!this.lightningHeld ? 'lightning' : 'blue_shell')
       ];
-      if (!this.lightningHeld) {
-        pool.push('lightning', 'lightning');
-      }
+    } else {
+      // 最下位層 (11〜12位): 攻撃・先制系30%, 加速系55%, 逆転系15% (計20枠)
+      pool = [
+        // 攻撃・先制系 (6枠 = 30%)
+        'red_shell', 'red_shell', 'red_shell',
+        'green_shell',
+        'bobomb',
+        'triple_banana',
+        // 加速系 (11枠 = 55%)
+        'star', 'star', 'star', 'star',
+        'triple_mushroom', 'triple_mushroom', 'triple_mushroom', 'triple_mushroom', 'triple_mushroom',
+        'mushroom', 'mushroom',
+        // 逆転系 (3枠 = 15%)
+        'blue_shell', 'blue_shell',
+        (!this.lightningHeld ? 'lightning' : 'blue_shell')
+      ];
     }
 
     const pickedId = pool[Math.floor(Math.random() * pool.length)];

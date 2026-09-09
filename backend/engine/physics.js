@@ -150,15 +150,27 @@ export class KartPhysics {
     const currentMaxSpeed = this.maxSpeed * this.boostMultiplier * smallSpeedFactor;
     const currentAccel = this.acceleration * smallSpeedFactor;
 
-    if (accelInput > 0) {
-      this.speed += currentAccel * accelInput * dt;
-    } else if (brakeInput > 0) {
-      this.speed -= this.brakeForce * brakeInput * dt;
+    if (brakeInput > 0) {
+      if (this.speed > 0) {
+        // 前進中の減速ブレーキ（押下時から即座に急減速）
+        this.speed -= this.brakeForce * brakeInput * dt;
+      } else {
+        // 速度が0未満になるとバック（後退）加速
+        const reverseAccel = currentAccel * 0.75;
+        this.speed -= reverseAccel * brakeInput * dt;
+      }
+    } else if (accelInput > 0) {
+      if (this.speed < 0) {
+        // バック中からアクセルを踏んだ場合の即時前進ブレーキ
+        this.speed += this.brakeForce * accelInput * dt;
+      } else {
+        this.speed += currentAccel * accelInput * dt;
+      }
     } else {
       this.speed = THREE.MathUtils.lerp(this.speed, 0, dt * this.inertiaDamping);
     }
 
-    this.speed = Math.max(-12, Math.min(currentMaxSpeed, this.speed));
+    this.speed = Math.max(-12.0, Math.min(currentMaxSpeed, this.speed));
 
     // 5. コース判定 & ダート摩擦減速 & コースアウト
     let nearestT = 0;
@@ -239,8 +251,9 @@ export class KartPhysics {
       steerRate *= this.driftMultiplier;
     }
 
+    const steerDirectionSign = this.speed < -0.5 ? -1 : 1;
     const speedFactor = Math.min(1.0, Math.abs(this.speed) / 10.0);
-    const steerDelta = -inputState.steering * steerRate * speedFactor * dt;
+    const steerDelta = -inputState.steering * steerRate * speedFactor * dt * steerDirectionSign;
     this.mesh.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), steerDelta);
 
     if (this.mesh.userData && this.mesh.userData.wheels) {
