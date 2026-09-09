@@ -5,7 +5,10 @@ const browser=await chromium.launch({executablePath:process.env.CHROME_PATH || u
 const page=await browser.newPage({viewport:{width:1280,height:800}});
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
 await page.goto(process.env.GAME_URL || 'http://localhost:8099');
-await page.evaluate(() => localStorage.setItem('kart_last_read_update_version', '2026.09.10'));
+await page.evaluate(async () => {
+  const { UPDATE_NOTIFICATION } = await import('./frontend/data/updates.js');
+  localStorage.setItem('kart_last_read_update_version', UPDATE_NOTIFICATION.version);
+});
 await page.click('#title-screen');
 await page.waitForFunction(()=>!!window.gameInstance);
 await page.fill('#player-name','テストドライバー');

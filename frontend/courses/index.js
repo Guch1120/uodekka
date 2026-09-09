@@ -205,9 +205,11 @@ export const Courses = {
       const normal = new THREE.Vector3().crossVectors(tangent, up).normalize();
       const forward = tangent.clone();
 
-      const rampW = trackWidth * (rampDef.widthScale || 0.7);
-      const rampL = 7.0;
-      const rampH = rampDef.height || (type === 'glider' ? 2.5 : 1.9);
+      const isGlider = type === 'glider';
+      const rampW = trackWidth * (rampDef.widthScale || 0.75);
+      const rampL = isGlider ? 8.0 : 7.0;
+      const rampH = rampDef.height || (isGlider ? 3.4 : 2.1);
+      const rampAngle = Math.atan2(rampH, rampL);
 
       const rampObj = new THREE.Group();
 
@@ -223,7 +225,6 @@ export const Courses = {
       wedgeGeo.translate(0, 0, -rampW / 2);
       wedgeGeo.rotateY(-Math.PI / 2);
 
-      const isGlider = type === 'glider';
       const rampMat = new THREE.MeshStandardMaterial({
         color: isGlider ? 0x00b4d8 : 0xf39c12,
         emissive: isGlider ? 0x0077b6 : 0xd35400,
@@ -238,7 +239,7 @@ export const Courses = {
       if (isGlider) {
         // グライダーシンボル（2枚の翼型シェブロン）
         for (let s = -1; s <= 1; s += 2) {
-          const chevronGeo = new THREE.ConeGeometry(rampW * 0.14, 3.2, 3);
+          const chevronGeo = new THREE.ConeGeometry(rampW * 0.14, 3.5, 3);
           chevronGeo.rotateX(Math.PI / 2);
           const chevronMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
           const chevronMesh = new THREE.Mesh(chevronGeo, chevronMat);
@@ -246,14 +247,14 @@ export const Courses = {
           rampObj.add(chevronMesh);
         }
         // 青い上昇気流リング
-        const ringGeo = new THREE.TorusGeometry(rampW * 0.32, 0.12, 8, 16);
+        const ringGeo = new THREE.TorusGeometry(rampW * 0.35, 0.15, 8, 16);
         const ringMat = new THREE.MeshBasicMaterial({ color: 0x90e0ef });
         const ring = new THREE.Mesh(ringGeo, ringMat);
-        ring.position.set(0, rampH + 0.6, -rampL * 0.25);
+        ring.position.set(0, rampH + 0.8, -rampL * 0.25);
         rampObj.add(ring);
       } else {
         // 通常ジャンプ台：大きな白矢印
-        const arrowGeo = new THREE.ConeGeometry(rampW * 0.2, 3.8, 3);
+        const arrowGeo = new THREE.ConeGeometry(rampW * 0.2, 4.0, 3);
         arrowGeo.rotateX(Math.PI / 2);
         const arrowMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
         const arrowMesh = new THREE.Mesh(arrowGeo, arrowMat);
@@ -264,14 +265,22 @@ export const Courses = {
       rampObj.position.copy(p);
       rampObj.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), forward);
 
+      // スロープの傾斜方向に沿った3D射出ベクトル (Launch Vector)
+      const cosA = Math.cos(rampAngle);
+      const sinA = Math.sin(rampAngle);
+      const launchDir = forward.clone().multiplyScalar(cosA).add(new THREE.Vector3(0, sinA, 0)).normalize();
+
       jumpRampGroup.add(rampObj);
       jumpRamps.push({
         position: rampObj.position.clone(),
         forward: forward.clone(),
+        launchDir: launchDir,
+        rampAngle: rampAngle,
         t: t,
         type: type,
-        radius: trackWidth * 0.38,
-        height: rampH
+        radius: trackWidth * 0.4,
+        height: rampH,
+        rampLength: rampL
       });
 
       // 加速板とジャンプ台は基本セット：ジャンプ台の手前直前に加速板を追加

@@ -896,12 +896,12 @@ export class Game {
         const triggerRadius = (ramp.radius || 15.0);
         if (distSq < triggerRadius * triggerRadius) {
           if (ramp.type === 'glider') {
-            kart.triggerGlider(16.0, 1.6, 3.5);
+            kart.triggerGlider(26.0, 1.8, 4.5, ramp);
             if (kart === this.localPlayerKart) {
-              this.showItemNotification('🪂 グライダー展開！大空を滑空！', 2000);
+              this.showItemNotification('🪂 グライダー展開！大空を大滑空！', 2000);
             }
           } else {
-            kart.triggerJump(14.0, 1.5, 2.0);
+            kart.triggerJump(16.0, 1.5, 2.0, ramp);
             if (kart === this.localPlayerKart) {
               this.showItemNotification('🚀 大ジャンプ！', 1500);
             }
