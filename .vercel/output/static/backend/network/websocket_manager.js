@@ -52,12 +52,37 @@ export class WebSocketManager {
     }
     if (data.type === 'START_RACE') { this.phase = 'starting'; this.onGameStart?.(data); return; }
     if (data.type === 'KART_STATE' && data.state && data.senderId !== this.myPeerId) this.onPeerStateReceived?.(data.senderId, data.state);
+    if (data.type === 'CPU_STATES' && Array.isArray(data.states) && !this.isHost) this.onCpuStatesReceived?.(data.states);
     if (data.type === 'ITEM_USE' && data.senderId !== this.myPeerId) this.onItemEvent?.(data);
   }
-  send(data) { if (this.socket?.readyState === WebSocket.OPEN) this.socket.send(JSON.stringify(data)); }
+  send(data) {
+    if (this.socket?.readyState === WebSocket.OPEN) {
+      try {
+        this.socket.send(JSON.stringify(data));
+      } catch (err) {
+        this.record('send-error', { error: err?.message });
+        throw err;
+      }
+    }
+  }
   selectCourse(courseId) { if (!this.isHost || !COURSES.has(courseId)) return false; this.courseId = courseId; this.send({ type: 'SELECT_COURSE', courseId }); return true; }
-  broadcastStartRace() { if (!this.isHost || !this.courseId || this.phase !== 'lobby') return false; this.phase = 'starting'; this.send({ type: 'START_RACE' }); return true; }
-  sendKartState(state) { this.send({ type: 'KART_STATE', state }); }
+  broadcastStartRace(aiRacers = []) { if (!this.isHost || !this.courseId || this.phase !== 'lobby') return false; this.phase = 'starting'; this.send({ type: 'START_RACE', aiRacers }); return true; }
+  sendKartState(state) {
+    if (!this.roomId || this.socket?.readyState !== WebSocket.OPEN) return;
+    if (this.socket.bufferedAmount > 32768) {
+      this.record('backpressure-drop', { type: 'KART_STATE', bufferedAmount: this.socket.bufferedAmount });
+      return;
+    }
+    this.send({ type: 'KART_STATE', state });
+  }
+  sendCpuStates(states) {
+    if (!this.isHost || !this.roomId || this.socket?.readyState !== WebSocket.OPEN) return;
+    if (this.socket.bufferedAmount > 32768) {
+      this.record('backpressure-drop', { type: 'CPU_STATES', bufferedAmount: this.socket.bufferedAmount });
+      return;
+    }
+    this.send({ type: 'CPU_STATES', states });
+  }
   sendItemEvent(data) { this.send({ type: 'ITEM_USE', ...data }); }
   reconnect() { if (this.reconnectTimer || !this.roomId) return; this.report('reconnecting', 'ゲームサーバーに再接続しています…'); this.reconnectTimer = setTimeout(async () => { this.reconnectTimer = null; if (++this.reconnectCount > 3) return this.onDisconnected?.('ゲームサーバーに再接続できません。'); try { const endpoint = new URL(this.url, location.href); endpoint.searchParams.set('room', this.roomId); await this.connect(endpoint.toString()); this.send({ type: 'JOIN_ROOM', roomId: this.roomId, name: this.members.find(m => m.id === this.myPeerId)?.name, vehicleKey: this.members.find(m => m.id === this.myPeerId)?.vehicleKey }); } catch { this.reconnect(); } }, this.timeouts.reconnect); }
   leaveRoom() { clearTimeout(this.roomTimer); clearTimeout(this.reconnectTimer); this.reconnectTimer = null; this.pendingReject?.(new Error('接続をキャンセルしました。')); this.pendingReject = null; this.pendingResolve = null; const socket = this.socket; this.socket = null; socket?.close(); this.roomId = null; this.myPeerId = null; this.isHost = false; this.members = []; this.courseId = null; this.phase = 'lobby'; }

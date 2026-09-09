@@ -54,9 +54,15 @@ export class Room {
     }
     if (message.type === 'START_RACE') {
       if (member.id !== room.hostId || room.phase !== 'lobby' || !room.courseId) return;
-      room.phase = 'starting'; await this.ctx.storage.put('room', room); await this.publish(); return this.broadcast({ type: 'START_RACE', courseId: room.courseId, delayMs: 2200 });
+      room.phase = 'starting'; await this.ctx.storage.put('room', room); await this.publish();
+      const aiRacers = Array.isArray(message.aiRacers) ? message.aiRacers : [];
+      return this.broadcast({ type: 'START_RACE', courseId: room.courseId, delayMs: 2200, aiRacers });
     }
     if (message.type === 'KART_STATE' || message.type === 'ITEM_USE') return this.broadcast({ ...message, senderId: member.id }, socket);
+    if (message.type === 'CPU_STATES') {
+      if (member.id !== room.hostId) return;
+      return this.broadcast({ ...message, senderId: member.id }, socket);
+    }
   }
   async webSocketClose(socket) {
     const attachment = socket.deserializeAttachment() || {}; if (!attachment.memberId) return;

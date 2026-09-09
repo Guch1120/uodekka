@@ -262,24 +262,45 @@ export class Game {
 
     this.p2p.onCpuStatesReceived = (states) => {
       if (!this.isRunning || !Array.isArray(states)) return;
-      states.forEach(state => {
-        let aiKart = this.otherPlayers.get(state.id);
-        if (!aiKart) {
-          const vKey = state.vehicleKey || 'standard_red';
-          const mesh = Vehicles.createKartMesh(vKey, state.color, state.accent);
-          this.scene.add(mesh);
-          const physics = new KartPhysics(mesh, Vehicles.types[vKey] || Vehicles.types.standard_red, false);
-          aiKart = { id: state.id, name: state.name, mesh, physics, isAI: false, isHostControlled: false, colorHex: state.colorHex };
-          this.otherPlayers.set(state.id, aiKart);
-        }
-        if (!aiKart.isHostControlled) {
-          aiKart.mesh.position.set(state.x, state.y, state.z);
-          aiKart.mesh.quaternion.set(state.qx, state.qy, state.qz, state.qw);
-          aiKart.physics.currentLap = state.lap;
-          aiKart.physics.progress = state.progress;
-          aiKart.physics.speed = state.speed;
-        }
-      });
+      try {
+        states.forEach(state => {
+          let aiKart = this.otherPlayers.get(state.id);
+          if (!aiKart) {
+            const vKey = state.vehicleKey || 'standard_red';
+            const mesh = Vehicles.createKartMesh(vKey, state.color, state.accent);
+            this.scene.add(mesh);
+            const physics = new KartPhysics(mesh, Vehicles.types[vKey] || Vehicles.types.standard_red, false);
+            aiKart = { id: state.id, name: state.name, mesh, physics, isAI: false, isHostControlled: false, colorHex: state.colorHex };
+            this.otherPlayers.set(state.id, aiKart);
+          }
+          if (!aiKart.isHostControlled) {
+            aiKart.mesh.position.set(state.x, state.y, state.z);
+            aiKart.mesh.quaternion.set(state.qx, state.qy, state.qz, state.qw);
+            aiKart.physics.currentLap = state.lap;
+            aiKart.physics.progress = state.progress;
+            aiKart.physics.speed = state.speed;
+          }
+        });
+      } catch (err) {
+        console.error('[Game] Error applying CPU states:', err);
+        this.p2p.record?.('cpu-state-error', { error: err?.message });
+      }
+    };
+
+    const prevOnDisconnected = this.p2p.onDisconnected;
+    this.p2p.onDisconnected = (msg) => {
+      prevOnDisconnected?.(msg);
+      if (this.isRunning) {
+        this.hud?.showNotification(`通信切断: ${msg || 'サーバーとの通信が切れました。'}`, 4000);
+      }
+    };
+
+    const prevOnConnectionError = this.p2p.onConnectionError;
+    this.p2p.onConnectionError = (msg) => {
+      prevOnConnectionError?.(msg);
+      if (this.isRunning) {
+        this.hud?.showNotification(`通信エラー: ${msg || 'エラーが発生しました。'}`, 4000);
+      }
     };
   }
 
@@ -380,11 +401,41 @@ export class Game {
       // ソロ：プレイヤー1人 ＋ CPU 11台 ＝ 合計12台
       this.spawnAICarts(config.vehicleKey, 11, 1);
     } else if (config.mode === 'multi_host') {
-      // マルチホスト：参加者M人 ＋ 不足(12 - M)台のCPU ＝ 合計12台
-      const memberCount = this.p2p.members.length;
-      const neededCpu = Math.max(0, 12 - memberCount);
-      if (neededCpu > 0) {
-        this.spawnAICarts(config.vehicleKey, neededCpu, memberCount);
+      // マルチホスト：共有されたaiRacers編成に基づいてCPUを配置
+      if (config.aiRacers && config.aiRacers.length > 0) {
+        config.aiRacers.forEach(bot => {
+          const grid = this.getGridTransform(curve, bot.gridIndex);
+          const vKey = bot.vehicleKey || 'standard_red';
+          const mesh = Vehicles.createKartMesh(vKey, bot.color, bot.accent);
+          mesh.position.copy(grid.pos);
+          mesh.rotation.set(0, grid.yaw, 0, 'YXZ');
+          this.scene.add(mesh);
+
+          const physics = new KartPhysics(mesh, Vehicles.types[vKey] || Vehicles.types.standard_red, false);
+          physics.alignToTrack(curve, grid.progress);
+          physics.totalLaps = this.currentCourseConfig.totalLaps;
+          physics.progress = grid.progress;
+          physics.lastSafeT = grid.progress;
+
+          this.otherPlayers.set(bot.id, {
+            id: bot.id,
+            name: bot.name,
+            mesh,
+            physics,
+            isAI: true,
+            isHostControlled: true,
+            personality: bot,
+            aiOffset: bot.offsetBias || 0,
+            speedMultiplier: bot.speedScale || 1.0,
+            colorHex: '#' + (bot.color || 0xe74c3c).toString(16).padStart(6, '0')
+          });
+        });
+      } else {
+        const memberCount = this.p2p.members.length;
+        const neededCpu = Math.max(0, 12 - memberCount);
+        if (neededCpu > 0) {
+          this.spawnAICarts(config.vehicleKey, neededCpu, memberCount);
+        }
       }
     } else if (config.mode === 'multi_guest') {
       // マルチゲスト：ホストから送られたCPUカートリストを配置
@@ -491,10 +542,18 @@ export class Game {
     const dt = Math.min(this.clock.getDelta(), 0.1);
 
     if (this.isRunning && this.localPlayerKart && !this.isPaused) {
-      this.updateGame(dt);
+      try {
+        this.updateGame(dt);
+      } catch (err) {
+        this.handleGameLoopError(err);
+      }
     }
 
-    this.renderer.render();
+    try {
+      this.renderer.render();
+    } catch (err) {
+      console.error('[Game] Render error:', err);
+    }
   }
 
   updateGame(dt) {
@@ -610,51 +669,8 @@ export class Game {
       allKartPositions
     }, this.courseTrack.points);
 
-    // 9. マルチプレイ位置送信（自機 + ホスト主導のCPU位置）
-    if (this.p2p.roomId) {
-      this.p2p.sendKartState({
-        vehicleKey: this.currentGameConfig.vehicleKey,
-        x: this.localPlayerKart.mesh.position.x,
-        y: this.localPlayerKart.mesh.position.y,
-        z: this.localPlayerKart.mesh.position.z,
-        qx: this.localPlayerKart.mesh.quaternion.x,
-        qy: this.localPlayerKart.mesh.quaternion.y,
-        qz: this.localPlayerKart.mesh.quaternion.z,
-        qw: this.localPlayerKart.mesh.quaternion.w,
-        speed: this.localPlayerKart.speed,
-        lap: this.localPlayerKart.currentLap,
-        progress: this.localPlayerKart.progress
-      });
-
-      if (this.p2p.isHost) {
-        const cpuStates = [];
-        this.otherPlayers.forEach(p => {
-          if (p.isAI) {
-            cpuStates.push({
-              id: p.id,
-              name: p.name,
-              vehicleKey: p.personality?.vehicleKey || 'standard_red',
-              color: p.personality?.color,
-              accent: p.personality?.accent,
-              colorHex: p.colorHex,
-              x: p.mesh.position.x,
-              y: p.mesh.position.y,
-              z: p.mesh.position.z,
-              qx: p.mesh.quaternion.x,
-              qy: p.mesh.quaternion.y,
-              qz: p.mesh.quaternion.z,
-              qw: p.mesh.quaternion.w,
-              speed: p.physics.speed,
-              lap: p.physics.currentLap,
-              progress: p.physics.progress
-            });
-          }
-        });
-        if (cpuStates.length > 0) {
-          this.p2p.sendCpuStates(cpuStates);
-        }
-      }
-    }
+    // 9. マルチプレイ位置送信（自機 + ホスト主導のCPU位置、約20Hz制限・例外保護）
+    this.updateNetworkSync(dt);
 
     if (this.localPlayerKart.isFinished && !this._finishedNotified) {
       this._finishedNotified = true;
@@ -717,6 +733,78 @@ export class Game {
         });
         this.activeResultModal.show();
       }, 1200);
+    }
+  }
+
+  updateNetworkSync(dt, now = performance.now()) {
+    if (!this.p2p?.roomId) return;
+    if (now - (this._lastNetworkSendTime || 0) < 50) return;
+    this._lastNetworkSendTime = now;
+
+    try {
+      this.p2p.sendKartState({
+        vehicleKey: this.currentGameConfig?.vehicleKey || 'standard_red',
+        x: this.localPlayerKart.mesh.position.x,
+        y: this.localPlayerKart.mesh.position.y,
+        z: this.localPlayerKart.mesh.position.z,
+        qx: this.localPlayerKart.mesh.quaternion.x,
+        qy: this.localPlayerKart.mesh.quaternion.y,
+        qz: this.localPlayerKart.mesh.quaternion.z,
+        qw: this.localPlayerKart.mesh.quaternion.w,
+        speed: this.localPlayerKart.speed,
+        lap: this.localPlayerKart.currentLap,
+        progress: this.localPlayerKart.progress
+      });
+
+      if (this.p2p.isHost) {
+        const cpuStates = [];
+        this.otherPlayers.forEach(p => {
+          if (p.isAI) {
+            cpuStates.push({
+              id: p.id,
+              name: p.name,
+              vehicleKey: p.personality?.vehicleKey || 'standard_red',
+              color: p.personality?.color,
+              accent: p.personality?.accent,
+              colorHex: p.colorHex,
+              x: p.mesh.position.x,
+              y: p.mesh.position.y,
+              z: p.mesh.position.z,
+              qx: p.mesh.quaternion.x,
+              qy: p.mesh.quaternion.y,
+              qz: p.mesh.quaternion.z,
+              qw: p.mesh.quaternion.w,
+              speed: p.physics.speed,
+              lap: p.physics.currentLap,
+              progress: p.physics.progress
+            });
+          }
+        });
+        if (cpuStates.length > 0) {
+          this.p2p.sendCpuStates(cpuStates);
+        }
+      }
+    } catch (err) {
+      this.handleNetworkSyncError(err, now);
+    }
+  }
+
+  handleNetworkSyncError(error, now = performance.now()) {
+    console.error('[Game] Network sync error:', error);
+    this.p2p?.record?.('sync-exception', { message: error?.message, stack: error?.stack });
+    if (!this._lastNetworkErrorNotifTime || now - this._lastNetworkErrorNotifTime > 4000) {
+      this._lastNetworkErrorNotifTime = now;
+      this.hud?.showNotification(`通信同期障害: ${error?.message || '同期エラー'}（診断記録済）`, 3500);
+    }
+  }
+
+  handleGameLoopError(error) {
+    console.error('[Game] Game loop error:', error);
+    this.p2p?.record?.('game-loop-exception', { message: error?.message, stack: error?.stack });
+    const now = performance.now();
+    if (!this._lastGameErrorNotifTime || now - this._lastGameErrorNotifTime > 4000) {
+      this._lastGameErrorNotifTime = now;
+      this.hud?.showNotification(`処理例外発生: ${error?.message || 'エラー'}`, 3500);
     }
   }
 
