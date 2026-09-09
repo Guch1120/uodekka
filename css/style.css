@@ -978,3 +978,48 @@ canvas {
   border-radius: 6px;
   pointer-events: none;
 }
+
+/* Three synchronized course editor views. */
+.editor-dialog { max-width: 1200px; min-height: 0; }
+.editor-views, .editor-inspector { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 9px 16px; background: #152438; }
+.editor-inspector { color: #c6d5e5; font-size: 12px; }
+.editor-inspector label { display: flex; align-items: center; gap: 6px; }
+#editor-height { width: 66px; padding: 7px; background: #1e293b; color: white; border: 1px solid #64748b; border-radius: 6px; }
+#editor-status { padding: 4px 16px; min-height: 24px; font-size: 12px; color: #ffca95; background: #152438; }
+#editor-preview { position: absolute; inset: 0; }
+#editor-preview canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+#editor-preview[hidden], #editor-canvas[hidden] { display: none; }
+.editor-canvas-container { min-height: 240px; }
+.editor-tool-btn:disabled { opacity: .4; cursor: not-allowed; }
+.editor-tool-btn:focus-visible, .editor-inspector input:focus-visible, .editor-inspector select:focus-visible { outline: 2px solid #ff773e; outline-offset: 2px; }
+.editor-header h2 { font-size: 18px; }
+.editor-help-text { color: #a8bfd0; right: 10px; }
+@media (max-width: 700px), (max-height: 550px) {
+  .editor-dialog { width: 100%; height: 96dvh; max-height: 96dvh; overflow-y: auto; }
+  .editor-header { flex-wrap: wrap; gap: 8px; padding: 10px; }
+  .editor-header-actions { gap: 6px; }
+  .editor-toolbar, .editor-views, .editor-inspector { padding: 7px 10px; gap: 6px; }
+  .editor-toolbar .info-group { margin-left: 0; flex-wrap: wrap; gap: 8px; }
+  .editor-tool-btn { padding: 9px; font-size: 12px; }
+  .editor-canvas-container { flex: 1 0 300px; }
+  .editor-text-input { max-width: 180px; }
+  #editor-saved { max-width: 160px; }
+}
+
+.editor-toolbar[hidden] { display: none; }
+.editor-options { padding: 8px 16px; background: #101e30; color: #bdcfde; font-size: 12px; }
+.editor-options summary { cursor: pointer; padding: 4px 0; }
+.editor-options .info-group { margin: 8px 0; flex-wrap: wrap; }
+.editor-options > label { display: inline-flex; gap: 6px; align-items: center; margin: 4px 6px 4px 0; }
+.editor-options input { user-select: text; -webkit-user-select: text; }
+.editor-header, .editor-views, .editor-toolbar, .editor-options, .editor-inspector, #editor-status { flex-shrink: 0; }
+@media (orientation: landscape) and (max-height: 550px) {
+  .editor-header h2 { display: none; }
+  .editor-header { padding: 5px 10px; justify-content: flex-end; }
+  .editor-header-actions button { padding: 5px 10px; font-size: 12px; }
+  .editor-views, .editor-inspector { padding: 5px 10px; }
+  .editor-views .editor-tool-btn { padding: 6px 9px; }
+  .editor-options { padding: 3px 10px; }
+  .editor-canvas-container { min-height: 160px; flex: 1 1 auto; }
+  .editor-help-text { font-size: 10px; }
+}

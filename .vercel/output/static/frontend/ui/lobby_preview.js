@@ -1,4 +1,5 @@
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+import { courseCurve } from '../courses/course_curve.js';
 import { Vehicles } from '../vehicles/vehicles.js';
 
 export class GaragePreview {
@@ -68,7 +69,7 @@ export class GaragePreview {
 }
 
 export function courseArt(course) {
-  const points = new THREE.CatmullRomCurve3(course.points, true, 'centripetal').getPoints(180);
+  const points = courseCurve(course).getPoints(180);
   const xs = points.map(p => p.x), zs = points.map(p => p.z);
   const minX = Math.min(...xs), maxX = Math.max(...xs), minZ = Math.min(...zs), maxZ = Math.max(...zs);
   const scale = Math.min(410 / (maxX - minX || 1), 230 / (maxZ - minZ || 1));

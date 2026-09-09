@@ -1,6 +1,7 @@
 // frontend/courses/index.js
 // コース管理 & コース3Dメッシュ（道路・ガードレール・スタートライン）の生成
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+import { courseCurve } from './course_curve.js';
 import { Course1 } from './course1.js';
 import { Course2 } from './course2.js';
 import { Course3 } from './course3.js';
@@ -30,7 +31,7 @@ export const Courses = {
               ambientColor: raw.ambientColor || 0xffffff,
               trackWidth: raw.trackWidth || 32,
               totalLaps: raw.totalLaps || 3,
-              points: raw.points.map(p => new THREE.Vector3(p.x, p.y, p.z)),
+              points: raw.points.map(p => new THREE.Vector3(p.x, Number.isFinite(p.y) ? p.y : 0, p.z)),
               itemBoxLocations: raw.itemBoxLocations || [0.2, 0.5, 0.8],
               dashPanels: raw.dashPanels || [0.35, 0.65],
               tireWallSegments: raw.tireWallSegments || [
@@ -62,7 +63,7 @@ export const Courses = {
    * スプライン曲線から押し出し/リボン状の3D道路ジオメトリを生成
    */
   buildTrack(courseConfig) {
-    const curve = new THREE.CatmullRomCurve3(courseConfig.points, true, 'centripetal');
+    const curve = courseCurve(courseConfig);
     const divisions = 240;
     const points = curve.getPoints(divisions);
     const trackWidth = courseConfig.trackWidth || 16;
@@ -108,6 +109,7 @@ export const Courses = {
     roadGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
     roadGeo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
     roadGeo.setIndex(indices);
+    roadGeo.computeVertexNormals();
 
     // コース別の路面テクスチャ表現
     let roadMat;
@@ -389,7 +391,7 @@ export const Courses = {
     line.position.copy(p0);
     line.position.y += 0.1;
     line.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), forward);
-    line.rotateX(-Math.PI / 2);
+    // Geometry already lies in the XZ plane; do not rotate it twice.
 
     group.add(postL);
     group.add(postR);

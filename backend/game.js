@@ -65,7 +65,8 @@ export class Game {
       this.startRace({
         mode: 'solo',
         courseId: customCourseId,
-        vehicleKey: 'standard_red',
+        vehicleKey: this.lobbyModal.vehicleKey,
+        playerName: this.lobbyModal.playerName,
         isHost: true
       });
     });
@@ -286,6 +287,7 @@ export class Game {
 
     const vehicleConfig = Vehicles.types[config.vehicleKey] || Vehicles.types.standard_red;
     this.localPlayerKart = new KartPhysics(localKartMesh, vehicleConfig, true);
+    this.localPlayerKart.alignToTrack(curve, startT);
     this.localPlayerKart.totalLaps = this.currentCourseConfig.totalLaps;
     this.localPlayerKart.progress = startT;
     this.localPlayerKart.lastSafeT = startT;
@@ -358,6 +360,7 @@ export class Game {
       this.scene.add(mesh);
 
       const physics = new KartPhysics(mesh, Vehicles.types[vKey], false);
+      physics.alignToTrack(curve, t);
       physics.totalLaps = this.currentCourseConfig.totalLaps;
       physics.progress = t;
       physics.lastSafeT = t;

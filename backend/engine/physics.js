@@ -233,7 +233,7 @@ export class KartPhysics {
       }
     }
 
-    // 7. ステアリング旋回 (ローカルY軸回転: rotateY を使用して上下反転時でも常に自分の頭上軸で旋回)
+    // 7. ワールドY軸で旋回し、路面の傾きは移動後に再計算
     let steerRate = this.handling;
     if (this.isDrifting) {
       steerRate *= this.driftMultiplier;
@@ -241,7 +241,7 @@ export class KartPhysics {
 
     const speedFactor = Math.min(1.0, Math.abs(this.speed) / 10.0);
     const steerDelta = -inputState.steering * steerRate * speedFactor * dt;
-    this.mesh.rotateY(steerDelta);
+    this.mesh.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), steerDelta);
 
     if (this.mesh.userData && this.mesh.userData.wheels) {
       const wheels = this.mesh.userData.wheels;
@@ -257,10 +257,26 @@ export class KartPhysics {
 
     // 高さ追従
     if (courseSpline) {
-      const trackPoint = courseSpline.getPointAt(nearestT);
-      this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, trackPoint.y + 0.35, dt * 10);
+      nearestT = this.findNearestTrackT(courseSpline, this.mesh.position);
+      this.alignToTrack(courseSpline, nearestT);
       this.updateLapProgress(nearestT);
     }
+  }
+
+  alignToTrack(curve, t) {
+    const center = curve.getPointAt(t), tangent = curve.getTangentAt(t).normalize();
+    const horizontalSq = tangent.x * tangent.x + tangent.z * tangent.z;
+    if (horizontalSq < 0.0001) return;
+    const grade = tangent.y / horizontalSq;
+    const normal = new THREE.Vector3(-tangent.x * grade, 1, -tangent.z * grade).normalize();
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.mesh.quaternion);
+    forward.y = -(normal.x * forward.x + normal.z * forward.z) / normal.y;
+    forward.normalize();
+    const right = new THREE.Vector3().crossVectors(forward, normal).normalize();
+    const basis = new THREE.Matrix4().makeBasis(right, normal, forward.clone().negate());
+    this.mesh.quaternion.setFromRotationMatrix(basis);
+    this.mesh.position.y = center.y + 0.35 +
+      ((this.mesh.position.x - center.x) * tangent.x + (this.mesh.position.z - center.z) * tangent.z) * grade;
   }
 
   updateItemHolding(inputState, gameState) {
@@ -345,11 +361,22 @@ export class KartPhysics {
     for (let i = 0; i < samples; i++) {
       const t = i / samples;
       const pt = curve.getPointAt(t);
-      const d = pos.distanceToSquared(pt);
+      const d = (pos.x - pt.x) ** 2 + (pos.z - pt.z) ** 2;
       if (d < minDist) {
         minDist = d;
         bestT = t;
       }
+    }
+    // Refine locally so elevation and road contact do not jump between coarse samples.
+    let step = 1 / samples;
+    for (let pass = 0; pass < 7; pass++) {
+      for (const offset of [-step, step]) {
+        const t = (bestT + offset + 1) % 1;
+        const p = curve.getPointAt(t);
+        const d = (pos.x - p.x) ** 2 + (pos.z - p.z) ** 2;
+        if (d < minDist) { minDist = d; bestT = t; }
+      }
+      step /= 2;
     }
     return bestT;
   }
