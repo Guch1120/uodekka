@@ -5,7 +5,7 @@ import { GameRenderer } from './engine/renderer.js';
 import { KartPhysics } from './engine/physics.js';
 import { FollowCamera } from './engine/camera.js';
 import { InputManager } from './input/input_manager.js';
-import { P2PManager } from './network/p2p_manager.js';
+import { WebSocketManager } from './network/websocket_manager.js';
 
 import { Vehicles } from '../frontend/vehicles/vehicles.js';
 import { Courses } from '../frontend/courses/index.js';
@@ -31,8 +31,8 @@ export class Game {
     this.inputManager = new InputManager(this.appContainer);
     this.followCamera = new FollowCamera(this.camera, null);
 
-    // サーバーレスP2P通信管理
-    this.p2p = new P2PManager();
+    // ゲームサーバー経由のWebSocket通信管理
+    this.p2p = new WebSocketManager();
 
     // UI
     this.hud = new HUD(this.appContainer);
@@ -161,7 +161,7 @@ export class Game {
     if (this.hud) this.hud.hide();
     if (this.inputManager) this.inputManager.hideControls();
 
-    // P2P接続中なら切断
+    // マルチプレイ接続中なら切断
     this.p2p.leaveRoom();
     // ロビー画面を再表示
     this.lobbyModal.show();
@@ -480,6 +480,14 @@ export class Game {
       input.isForwardThrow = false;
       const item = this.localPlayerKart.holdingItem;
       item.use(this.localPlayerKart, this, throwDir);
+      if (this.p2p.roomId && (item.id === 'banana' || item.id === 'lightning')) {
+        this.p2p.sendItemEvent({
+          itemType: item.id,
+          ownerId: this.p2p.myPeerId,
+          pos: [this.localPlayerKart.mesh.position.x, this.localPlayerKart.mesh.position.y, this.localPlayerKart.mesh.position.z],
+          rot: [this.localPlayerKart.mesh.quaternion.x, this.localPlayerKart.mesh.quaternion.y, this.localPlayerKart.mesh.quaternion.z, this.localPlayerKart.mesh.quaternion.w]
+        });
+      }
       item.remainingUses = (item.remainingUses || 1) - 1;
 
       if (item.remainingUses <= 0) {
@@ -510,7 +518,7 @@ export class Game {
       this.localPlayerKart.progress
     );
 
-    // 3. 他プレイヤー (AIまたはP2P) 更新
+    // 3. 他プレイヤー (AIまたはWebSocket) 更新
     this.otherPlayers.forEach((player) => {
       if (player.isAI) {
         this.updateAIPlayer(player, dt);
@@ -566,7 +574,11 @@ export class Game {
       allKartPositions
     }, this.courseTrack.points);
 
+<<<<<<< HEAD
     // 9. P2Pマルチプレイ位置送信（自機 + ホスト主導のCPU位置）
+=======
+    // 9. WebSocketマルチプレイ位置送信
+>>>>>>> 288f01f (migrate multiplayer to Cloudflare Durable Objects)
     if (this.p2p.roomId) {
       this.p2p.sendKartState({
         vehicleKey: this.currentGameConfig.vehicleKey,

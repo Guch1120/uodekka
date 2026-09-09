@@ -1,0 +1,12 @@
+{
+  "name": "uodekka-racing",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev:worker": "wrangler dev",
+    "deploy:worker": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.129.1"
+  }
+}

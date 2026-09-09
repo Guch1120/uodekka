@@ -23,8 +23,8 @@
     }
   </script>
 
-  <!-- PeerJS (サーバーレス WebRTC P2P通信ライブラリ) -->
-  <script defer src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <!-- Cloudflare WorkerのWebSocketゲームサーバー。 -->
+  <script>window.MULTIPLAYER_SERVER_URL = window.MULTIPLAYER_SERVER_URL || 'wss://uodekka-multiplayer.kurehiro1009.workers.dev/ws';</script>
 </head>
 <body>
   <!-- 縦持ち時の横画面案内オーバーレイ -->

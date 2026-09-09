@@ -1,7 +1,6 @@
-import { RelaySetupDialog } from './relay_setup_dialog.js';
 import { Vehicles } from '../vehicles/vehicles.js';
 import { Courses } from '../courses/index.js';
-import { P2PManager } from '../../backend/network/p2p_manager.js';
+import { normalizeRoomId } from '../../backend/network/room_id.js';
 import { GaragePreview, courseArt } from './lobby_preview.js';
 import { CPU_ROSTER } from '../../backend/ai/cpu_driver.js';
 
@@ -53,7 +52,6 @@ export class LobbyModal {
             <div class="garage-mode-panel"><div class="garage-mode-heading"><span class="garage-eyebrow">02 / CHOOSE YOUR RACE</span><h2>さあ、走り出そう。</h2></div>
               <button id="tab-solo" class="garage-mode garage-mode-solo"><span class="garage-mode-icon">01</span><span><small>SOLO RACE</small><strong>ソロゲーム</strong><span class="garage-mode-description">CPUと競う、自分だけのレース。</span></span><span class="garage-mode-arrow">↗</span><span class="garage-mode-tag">CPU 対戦</span></button>
               <section class="garage-mode garage-mode-multi"><span class="garage-mode-icon">02</span><div><small>MULTIPLAYER</small><h2>マルチゲーム</h2><p>ルームに集まって、友だちと対戦。</p></div><div class="garage-multi-actions"><button id="tab-create">ホスト <span>ルームを作成 ↗</span></button><button id="tab-join">ゲスト <span>ルームに参加 ↗</span></button></div></section>
-              <button type="button" data-relay-help class="garage-copy-link">中継サーバーの設定・接続ヘルプ</button>
               <button id="tab-editor" class="garage-editor-link">＋ コースを作る <span>COURSE EDITOR ↗</span></button>
             </div>
           </section>
@@ -65,36 +63,25 @@ export class LobbyModal {
             <div class="garage-setup-side"><div class="garage-course-actions"><button id="course-confirm" class="garage-button garage-button-green">✓ コース決定</button><button id="course-random" class="garage-button garage-button-light">⤨ ランダム決定</button></div><p id="course-confirmation" class="garage-note" aria-live="polite">コースを選んで確定してください。</p>${stats()}<button id="btn-start-solo" class="garage-button garage-button-start" disabled>ゲームスタート <span>→</span></button></div>
           </section>
           <section class="garage-screen garage-setup" data-screen="room" hidden>
-            <section class="garage-members-panel"><div class="garage-section-heading"><div><span class="garage-eyebrow">MULTIPLAYER / PADDOCK</span><h1>ルームメンバー</h1></div><span id="member-count" class="garage-chip"></span></div><div class="garage-room-code"><span>ROOM ID <strong id="display-room-id"></strong></span><button id="room-copy" class="garage-subtle">招待URLをコピー ↗</button></div><p class="garage-network-note" role="status"></p><button type="button" data-relay-help class="garage-copy-link">中継サーバーの設定手順</button><button id="room-diagnostics" class="garage-copy-link">接続診断をコピー</button><pre id="room-diagnostics-text" class="garage-diagnostics" hidden></pre><ul id="players-list" class="garage-members"></ul><p class="garage-note">ホストがコースを決めると、全員の画面に表示されます。</p></section>
+            <section class="garage-members-panel"><div class="garage-section-heading"><div><span class="garage-eyebrow">MULTIPLAYER / PADDOCK</span><h1>ルームメンバー</h1></div><span id="member-count" class="garage-chip"></span></div><div class="garage-room-code"><span>ROOM ID <strong id="display-room-id"></strong></span><button id="room-copy" class="garage-subtle">招待URLをコピー ↗</button></div><p class="garage-network-note" role="status"></p><button id="room-diagnostics" class="garage-copy-link">接続診断をコピー</button><pre id="room-diagnostics-text" class="garage-diagnostics" hidden></pre><ul id="players-list" class="garage-members"></ul><p class="garage-note">ホストがコースを決めると、全員の画面に表示されます。</p></section>
             <div class="garage-setup-side"><section class="garage-room-course"><span class="garage-eyebrow">NEXT CIRCUIT</span><h2 id="room-course-name" aria-live="polite">コース未決定</h2><button id="room-random" class="garage-button garage-button-light">⤨ ランダムコース決定</button><p id="room-role-note" class="garage-note"></p></section>${stats()}<button id="btn-host-start" class="garage-button garage-button-start" disabled>ゲームスタート <span>→</span></button></div>
           </section>
         </main>
         <footer class="garage-footer"><span>UO:De Car / RACING CLUB</span><span id="garage-status" role="status" aria-live="polite">好きな車体で、好きな走りを。</span><span>LET'S RACE ↗</span></footer>
       </div>
-      <dialog id="room-dialog" class="garage-dialog" aria-labelledby="room-dialog-title"><form id="room-form"><div class="garage-dialog-heading"><span class="garage-eyebrow" id="room-dialog-kicker"></span><button type="button" id="room-dialog-close" class="garage-close" aria-label="閉じる">×</button></div><h2 id="room-dialog-title"></h2><p id="room-dialog-description"></p><label for="input-room-id">ルームID</label><input id="input-room-id" maxlength="32" pattern="[a-zA-Z0-9]+(-[a-zA-Z0-9]+)*" minlength="3" required placeholder="例：weekend-race" autocapitalize="none" spellcheck="false" autocomplete="off"><small>半角英数字で3〜32文字。ハイフンは文字の間に1つずつ</small><label class="garage-invite-label" for="invite-url">招待URL</label><input id="invite-url" readonly aria-label="招待URL" placeholder="ルームIDを入力すると表示されます"><button type="button" id="dialog-copy" class="garage-copy-link">招待URLをコピー ↗</button><p class="garage-network-note" role="status"></p><button type="button" data-relay-help class="garage-copy-link">中継サーバーの設定手順</button><button type="button" id="dialog-diagnostics" class="garage-copy-link">接続診断をコピー</button><pre id="dialog-diagnostics-text" class="garage-diagnostics" hidden></pre><p id="room-dialog-status" role="status" aria-live="polite"></p><button type="submit" id="room-submit" class="garage-button garage-button-start"></button></form></dialog>
+      <dialog id="room-dialog" class="garage-dialog" aria-labelledby="room-dialog-title"><form id="room-form"><div class="garage-dialog-heading"><span class="garage-eyebrow" id="room-dialog-kicker"></span><button type="button" id="room-dialog-close" class="garage-close" aria-label="閉じる">×</button></div><h2 id="room-dialog-title"></h2><p id="room-dialog-description"></p><label for="input-room-id">ルームID</label><input id="input-room-id" maxlength="32" pattern="[a-zA-Z0-9]+(-[a-zA-Z0-9]+)*" minlength="3" required placeholder="例：weekend-race" autocapitalize="none" spellcheck="false" autocomplete="off"><small>半角英数字で3〜32文字。ハイフンは文字の間に1つずつ</small><label class="garage-invite-label" for="invite-url">招待URL</label><input id="invite-url" readonly aria-label="招待URL" placeholder="ルームIDを入力すると表示されます"><button type="button" id="dialog-copy" class="garage-copy-link">招待URLをコピー ↗</button><p class="garage-network-note" role="status"></p><button type="button" id="dialog-diagnostics" class="garage-copy-link">接続診断をコピー</button><pre id="dialog-diagnostics-text" class="garage-diagnostics" hidden></pre><p id="room-dialog-status" role="status" aria-live="polite"></p><button type="submit" id="room-submit" class="garage-button garage-button-start"></button></form></dialog>
       <div id="race-countdown" class="garage-countdown" role="alert" hidden><div><span class="garage-eyebrow">GET READY</span><h2>まもなくゲームが開始されます</h2><p id="countdown-course"></p><strong>3 · 2 · 1</strong></div></div>`;
     this.container.appendChild(this.modalEl);
     this.el('#player-name').value = localStorage.getItem('kart_player_name') || '';
     this.preview = new GaragePreview(this.el('#garage-vehicle-preview'));
     this.refreshCourses();
-    this.relaySetup = new RelaySetupDialog(this.modalEl);
     this.bindEvents();
     this.updateVehicle();
     this.p2pManager.onConnectionStatus = info => {
       const dialog = this.el('#room-dialog');
       if (dialog.open) this.el('#room-dialog-status').textContent = info.message;
       else if (this.screen === 'room') this.setStatus(info.message);
-      const config = this.p2pManager.networkConfig;
-      const note = !config ? '' : config.relayConfigured
-        ? '直接接続できない場合は中継経由で接続します。'
-        : config.reason === 'not-configured'
-          ? '中継サーバーが未設定です。設定手順をご確認ください。回線によっては参加できません。'
-          : '中継設定を取得できません。接続ヘルプから設定と通信状態をご確認ください。';
-      this.modalEl.querySelectorAll('.garage-network-note').forEach(el => { el.textContent = note; });
-      if (this.busy && config && !config.relayConfigured && this.relayHelpAttempt !== this.connectionAttempt) {
-        this.relayHelpAttempt = this.connectionAttempt;
-        this.relaySetup.show(config);
-      }
+      this.modalEl.querySelectorAll('.garage-network-note').forEach(el => { el.textContent = 'ゲームサーバー経由で接続しています。'; });
     };
     this.p2pManager.onRoomState = () => this.updateRoom();
     this.p2pManager.onGameStart = data => this.startMultiplayer(data);
@@ -113,9 +100,6 @@ export class LobbyModal {
 
   bindEvents() {
     const on = (id, fn) => { this.el(id).onclick = fn; };
-    this.modalEl.querySelectorAll('[data-relay-help]').forEach(button => {
-      button.onclick = () => this.relaySetup.show(this.p2pManager.networkConfig);
-    });
     // Text entry and menu touches must not operate the race controls behind this UI.
     ['keydown', 'keyup', 'touchstart', 'touchend'].forEach(type => this.modalEl.addEventListener(type, event => event.stopPropagation()));
     this.el('#player-name').addEventListener('input', () => localStorage.setItem('kart_player_name', this.playerName));
@@ -291,7 +275,7 @@ export class LobbyModal {
   async connectRoom() {
     if (this.busy) return;
     let roomId;
-    try { roomId = P2PManager.normalizeRoomId(this.el('#input-room-id').value); }
+    try { roomId = normalizeRoomId(this.el('#input-room-id').value); }
     catch (error) { this.el('#room-dialog-status').textContent = error.message; return; }
     const attempt = ++this.connectionAttempt;
     this.busy = true;
@@ -346,7 +330,7 @@ export class LobbyModal {
   }
 
   inviteUrl(value) {
-    const id = P2PManager.normalizeRoomId(value);
+    const id = normalizeRoomId(value);
     const url = new URL(window.location.href);
     url.search = ''; url.hash = ''; url.searchParams.set('room', id);
     return url.href;
@@ -392,7 +376,6 @@ export class LobbyModal {
 
   startMultiplayer(data) {
     if (this.starting || !this.p2pManager.roomId) return;
-    this.relaySetup.close();
     this.starting = true;
     this.el('#countdown-course').textContent = Courses.getCourse(data.courseId).name;
     this.el('#race-countdown').hidden = false;
@@ -417,7 +400,6 @@ export class LobbyModal {
   }
 
   returnHome() {
-    this.relaySetup.close();
     this.connectionAttempt++;
     clearTimeout(this.startTimer);
     this.p2pManager.leaveRoom();
@@ -431,5 +413,5 @@ export class LobbyModal {
   setStatus(text) { this.el('#garage-status').textContent = text; }
   populateCourseSelects() { this.refreshCourses(); }
   show() { this.modalEl.hidden = false; this.returnHome(); this.refreshCourses(); }
-  hide() { this.relaySetup.close(); this.modalEl.hidden = true; }
+  hide() { this.modalEl.hidden = true; }
 }
