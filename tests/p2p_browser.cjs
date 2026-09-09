@@ -22,6 +22,7 @@ const assert = require('node:assert/strict');
   await host.locator('[data-screen="room"]').waitFor({state:'visible',timeout:25000});
   await guest.click('#tab-join');await guest.fill('#input-room-id',room);await guest.click('#room-submit');
   await guest.locator('[data-screen="room"]').waitFor({state:'visible',timeout:90000});
+  for (const page of pages) if (await page.locator('#relay-setup-dialog').isVisible()) await page.locator('#relay-setup-dialog [data-close]').first().click();
   assert.equal(await host.locator('#players-list .garage-member').count(),2);
   assert.equal(await guest.locator('#players-list .garage-member').count(),2);
   assert(await guest.locator('#room-random').isDisabled());

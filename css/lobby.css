@@ -230,3 +230,17 @@
 .garage-network-note { font-size: 11px; line-height: 1.7; color: #946026; }
 .garage-dialog .garage-network-note { color: #946026; margin: 10px 0; }
 .garage-diagnostics { max-height: 130px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 10px; user-select: text; -webkit-user-select: text; }
+
+.garage-relay-dialog { width: min(620px, calc(100vw - 28px)); }
+.garage-relay-dialog h2 { font-size: 24px; }
+.garage-relay-dialog p, .garage-relay-dialog li, .garage-relay-dialog dd { font-size: 14px; line-height: 1.8; }
+.garage-relay-dialog summary { cursor: pointer; font-weight: 700; padding: 12px 0; }
+.garage-relay-dialog ol { padding-left: 24px; }
+.garage-relay-dialog li { margin-bottom: 18px; }
+.garage-relay-dialog a { color: #176783; text-decoration: underline; }
+.garage-relay-dialog dl { background: #e7eef2; border-radius: 10px; padding: 12px; }
+.garage-relay-dialog dt { font-weight: 700; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; }
+.garage-relay-dialog dd { margin: 4px 0 12px; }
+.garage-relay-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.garage-relay-actions button { flex: 1; }
+#relay-setup-status { background: #fff2d9; border-radius: 10px; padding: 12px; }
