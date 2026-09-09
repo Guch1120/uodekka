@@ -271,6 +271,8 @@ export const Courses = {
 
     let stackCounter = 0;
 
+    const sidePoints = { inner: [], outer: [] };
+
     for (let i = 0; i < totalSamples; i++) {
       const t = i * step;
       const pt = curve.getPointAt(t);
@@ -309,15 +311,59 @@ export const Courses = {
 
         tireGroup.add(stack);
 
-        // 衝突判定用オブスタクル情報
-        // カートとの接触で跳ね返す（半径 1.6m）
-        obstacles.push({
-          position: new THREE.Vector3(wallPos.x, wallPos.y, wallPos.z),
-          radius: 1.6,
-          type: 'tire_wall'
+        // 壁セグメント生成用にポイントを記録
+        const inwardNormal = normal.clone().multiplyScalar(side.key === 'inner' ? 1 : -1);
+        sidePoints[side.key].push({
+          index: i,
+          pos: new THREE.Vector3(wallPos.x, wallPos.y, wallPos.z),
+          tangent: tangent.clone(),
+          inwardNormal: inwardNormal
         });
       });
     }
+
+    // 連続するタイヤ位置を線分（連続体の壁セグメント）として構築
+    sides.forEach(side => {
+      const pts = sidePoints[side.key];
+      for (let j = 0; j < pts.length; j++) {
+        const curr = pts[j];
+        let next = null;
+
+        // 次のインデックスが連続しているかチェック
+        if (j + 1 < pts.length && pts[j + 1].index === curr.index + 1) {
+          next = pts[j + 1];
+        } else if (j === pts.length - 1 && pts[0].index === 0 && curr.index === totalSamples - 1) {
+          // 0境界をまたいで1周繋がっている場合
+          next = pts[0];
+        }
+
+        if (next) {
+          const segDir = new THREE.Vector3().subVectors(next.pos, curr.pos);
+          const segLen = segDir.length();
+          if (segLen > 0.01) {
+            segDir.normalize();
+            const avgInward = curr.inwardNormal.clone().add(next.inwardNormal).normalize();
+            obstacles.push({
+              p1: curr.pos,
+              p2: next.pos,
+              tangent: segDir,
+              inwardNormal: avgInward,
+              radius: 1.4, // タイヤ半径0.9m + 余裕
+              type: 'tire_wall_segment'
+            });
+          }
+        } else {
+          // 孤立した端点用のフォールバック（球コライダー）
+          obstacles.push({
+            position: curr.pos,
+            radius: 1.4,
+            inwardNormal: curr.inwardNormal,
+            tangent: curr.tangent,
+            type: 'tire_wall'
+          });
+        }
+      }
+    });
 
     return { group: tireGroup, obstacles: obstacles };
   },

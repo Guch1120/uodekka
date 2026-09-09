@@ -504,48 +504,125 @@ export class Game {
       if (!kart || kart.isRespawning) continue;
 
       for (const obs of this.courseObstacles) {
-        // 高さ（Y座標）の判定：立体交差や高低差での誤衝突を防止
-        const dy = kart.mesh.position.y - obs.position.y;
-        let maxDyUpper = 1.8;
-        let maxDyLower = 1.8;
-        if (obs.type === 'tire_wall') {
-          maxDyUpper = 1.6;
-          maxDyLower = 1.6;
-        } else if (obs.type === 'tree') {
-          maxDyUpper = 5.5; // 幹の高さ
-          maxDyLower = 1.5;
-        } else if (obs.type === 'rock') {
-          maxDyUpper = 2.2;
-          maxDyLower = 2.2;
-        } else if (obs.height) {
-          maxDyUpper = obs.height;
-          maxDyLower = obs.height;
-        }
+        if (obs.type === 'tire_wall_segment') {
+          // --- 連続体タイヤウォール（線分セグメント）の衝突判定 ---
+          const abX = obs.p2.x - obs.p1.x;
+          const abY = obs.p2.y - obs.p1.y;
+          const abZ = obs.p2.z - obs.p1.z;
+          const abLenSq = abX * abX + abY * abY + abZ * abZ;
+          if (abLenSq < 0.0001) continue;
 
-        if (dy > maxDyUpper || dy < -maxDyLower) {
-          continue;
-        }
+          // カート位置から線分への最短射影パラメータ u
+          const acX = kart.mesh.position.x - obs.p1.x;
+          const acY = kart.mesh.position.y - obs.p1.y;
+          const acZ = kart.mesh.position.z - obs.p1.z;
+          let u = (acX * abX + acY * abY + acZ * abZ) / abLenSq;
+          u = Math.max(0, Math.min(1, u));
 
-        const dx = kart.mesh.position.x - obs.position.x;
-        const dz = kart.mesh.position.z - obs.position.z;
-        const dist = Math.hypot(dx, dz);
-        const minDist = obs.radius + 1.2; // 障害物半径 + カート半径
+          const qX = obs.p1.x + u * abX;
+          const qY = obs.p1.y + u * abY;
+          const qZ = obs.p1.z + u * abZ;
 
-        if (dist < minDist) {
-          // 木や岩に衝突！
-          // 1. カートを押し出し（めり込み防止）
-          const overlap = minDist - dist;
-          const pushX = (dx / (dist || 1)) * overlap;
-          const pushZ = (dz / (dist || 1)) * overlap;
-          kart.mesh.position.x += pushX;
-          kart.mesh.position.z += pushZ;
+          // 高さ（Y座標）の判定：立体交差での上下誤衝突防止
+          const dy = kart.mesh.position.y - qY;
+          if (Math.abs(dy) > 1.6) continue;
 
-          // 2. 速度大幅減衰 & 反動バウンス
-          kart.speed = -kart.speed * 0.35;
+          // XZ平面上の最短距離
+          const dx = kart.mesh.position.x - qX;
+          const dz = kart.mesh.position.z - qZ;
+          const dist = Math.hypot(dx, dz);
+          const minDist = (obs.radius || 1.4) + 1.2; // 壁厚み + カート半径 (約2.6m)
 
-          if (kart === this.localPlayerKart && Math.abs(kart.speed) > 4.0) {
-            const name = obs.type === 'tire_wall' ? 'タイヤウォール' : (obs.type === 'tree' ? '木' : '岩');
-            this.showItemNotification(`${name}に激突！`);
+          if (dist < minDist) {
+            // 1. 壁面法線方向への滑らかな押し出し（めり込み防止）
+            const overlap = minDist - dist;
+            let pushX, pushZ;
+            if (dist > 0.01) {
+              pushX = (dx / dist) * overlap;
+              pushZ = (dz / dist) * overlap;
+            } else {
+              pushX = (obs.inwardNormal ? obs.inwardNormal.x : 1) * overlap;
+              pushZ = (obs.inwardNormal ? obs.inwardNormal.z : 0) * overlap;
+            }
+            kart.mesh.position.x += pushX;
+            kart.mesh.position.z += pushZ;
+
+            // 2. 車体向き（ヨー角）をレース進行方向・脱出方向へ補正
+            // 壁の進行方向（tangent）およびコース内側向き（inwardNormal）から脱出角度を算出
+            const inNorm = obs.inwardNormal || { x: 0, z: 0 };
+            const escapeX = obs.tangent.x * 0.85 + inNorm.x * 0.25;
+            const escapeZ = obs.tangent.z * 0.85 + inNorm.z * 0.25;
+            const targetYaw = Math.atan2(-escapeX, -escapeZ);
+            kart.mesh.rotation.set(0, targetYaw, 0, 'YXZ');
+            kart.mesh.quaternion.setFromEuler(kart.mesh.rotation);
+
+            // 3. 速度制御：バック不要でスムーズに復帰できるように前進低速を維持
+            if (kart.speed > 0) {
+              kart.speed = Math.max(2.0, Math.min(kart.speed * 0.25, 6.0));
+            } else {
+              kart.speed = 0;
+            }
+
+            if (kart === this.localPlayerKart && (!this._lastWallHitTime || performance.now() - this._lastWallHitTime > 1200)) {
+              this._lastWallHitTime = performance.now();
+              this.showItemNotification('タイヤウォールに接触！');
+            }
+          }
+        } else {
+          // --- 木・岩など通常の点障害物の衝突判定 ---
+          const dy = kart.mesh.position.y - obs.position.y;
+          let maxDyUpper = 1.8;
+          let maxDyLower = 1.8;
+          if (obs.type === 'tire_wall') {
+            maxDyUpper = 1.6;
+            maxDyLower = 1.6;
+          } else if (obs.type === 'tree') {
+            maxDyUpper = 5.5; // 幹の高さ
+            maxDyLower = 1.5;
+          } else if (obs.type === 'rock') {
+            maxDyUpper = 2.2;
+            maxDyLower = 2.2;
+          } else if (obs.height) {
+            maxDyUpper = obs.height;
+            maxDyLower = obs.height;
+          }
+
+          if (dy > maxDyUpper || dy < -maxDyLower) {
+            continue;
+          }
+
+          const dx = kart.mesh.position.x - obs.position.x;
+          const dz = kart.mesh.position.z - obs.position.z;
+          const dist = Math.hypot(dx, dz);
+          const minDist = obs.radius + 1.2; // 障害物半径 + カート半径
+
+          if (dist < minDist) {
+            const overlap = minDist - dist;
+            const pushX = (dx / (dist || 1)) * overlap;
+            const pushZ = (dz / (dist || 1)) * overlap;
+            kart.mesh.position.x += pushX;
+            kart.mesh.position.z += pushZ;
+
+            if (obs.type === 'tire_wall') {
+              // タイヤウォール点コライダーの場合も進行方向へ補正
+              if (obs.tangent) {
+                const inNorm = obs.inwardNormal || { x: 0, z: 0 };
+                const escapeX = obs.tangent.x * 0.85 + inNorm.x * 0.25;
+                const escapeZ = obs.tangent.z * 0.85 + inNorm.z * 0.25;
+                const targetYaw = Math.atan2(-escapeX, -escapeZ);
+                kart.mesh.rotation.set(0, targetYaw, 0, 'YXZ');
+                kart.mesh.quaternion.setFromEuler(kart.mesh.rotation);
+              }
+              kart.speed = Math.max(0, kart.speed * 0.25);
+            } else {
+              // 木や岩に衝突時は反動バウンス
+              kart.speed = -kart.speed * 0.35;
+            }
+
+            if (kart === this.localPlayerKart && Math.abs(kart.speed) > 3.0) {
+              const name = obs.type === 'tire_wall' ? 'タイヤウォール' : (obs.type === 'tree' ? '木' : '岩');
+              this.showItemNotification(`${name}に激突！`);
+            }
           }
         }
       }
