@@ -4,9 +4,9 @@ import { P2PManager } from '../backend/network/p2p_manager.js';
 import { validateIceServers, loadIceConfig } from '../backend/network/ice_config.js';
 
 const registry = new Map(), peers = [], policies = [];
-let sequence = 0, stalls = 0, dropStates = 0, suppressOpen = false;
+let sequence = 0, stalls = 0, dropStates = 0, suppressOpen = false, failIce = false;
 class Connection extends EventEmitter {
-  constructor(peer, metadata) { super(); this.peer = peer; this.metadata = metadata; this.open = false; }
+  constructor(peer, metadata) { super(); this.peer = peer; this.metadata = metadata; this.open = false; this.peerConnection = new EventTarget(); }
   send(data) {
     if (data.type === 'ROOM_STATE' && dropStates > 0) { dropStates--; return; }
     queueMicrotask(() => { if(this.other?.open) this.other.emit('data', structuredClone(data)); });
@@ -22,7 +22,10 @@ class Peer extends EventEmitter {
   connect(id, options) {
     policies.push(this.options.config.iceTransportPolicy);
     const local = new Connection(id, options.metadata); this.links.push(local);
-    if(stalls-- > 0) return local;
+    if(stalls-- > 0) {
+      if (failIce) queueMicrotask(()=>{local.peerConnection.iceConnectionState='failed';local.peerConnection.dispatchEvent(new Event('iceconnectionstatechange'));});
+      return local;
+    }
     queueMicrotask(()=>{
       const host=registry.get(id);
       if(!host) { this.emit('error',{type:'peer-unavailable'}); return; }
@@ -51,6 +54,14 @@ try {
  assert(!guest.getDiagnostics().includes('test-secret'));
  assert(!guest.getDiagnostics().includes('relay.example'));
  console.log('PASS: retry uses a new relay-only peer, destroys stale transport, and redacts diagnostics');
+
+ guest.leaveRoom();policies.length=0;stalls=1;failIce=true;
+ guest.timeouts.connecting=10000;
+ await guest.joinRoom('test-room');
+ assert.deepEqual(policies,['all','relay']);
+ assert(guest.diagnostics.some(e=>e.event==='attempt-failed' && e.code==='ice-failed'));
+ guest.timeouts.connecting=35;failIce=false;
+ console.log('PASS: terminal ICE failure immediately retries with relay instead of waiting for timeout');
 
  guest.leaveRoom(); policies.length=0; dropStates=2;
  await guest.joinRoom('test-room');

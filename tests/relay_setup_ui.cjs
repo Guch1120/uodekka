@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 (async () => {
  const browser = await chromium.launch({headless:true, executablePath:process.env.CHROME_PATH, args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
  try {
-  const page=await browser.newPage({viewport:{width:390,height:844}});
+  const page=await browser.newPage({viewport:{width:844,height:390}});
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(process.env.GAME_URL || 'http://localhost:8100');
   await page.click('#title-screen');await page.waitForFunction(()=>!!window.gameInstance);

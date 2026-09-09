@@ -139,7 +139,7 @@ export class P2PManager {
     reconnect();
   }
 
-  observeConnection(conn, generation, progress = () => {}) {
+  observeConnection(conn, generation, progress = () => {}, failed = () => {}) {
     const pc = conn.peerConnection;
     if (!pc?.addEventListener) return;
     pc.addEventListener('icecandidate', e => {
@@ -154,6 +154,7 @@ export class P2PManager {
       if (generation !== this.generation) return;
       this.record('ice-state', { state: pc.iceConnectionState });
       if (['checking', 'connected', 'completed'].includes(pc.iceConnectionState)) progress();
+      if (pc.iceConnectionState === 'failed') failed();
     });
   }
 
@@ -271,6 +272,8 @@ export class P2PManager {
       arm(this.timeouts.connecting);
       this.observeConnection(conn, generation, () => {
         if (!settled && this.connectionStage === 'connecting') arm(Math.max(this.timeouts.progress, this.timeouts.connecting - (Date.now() - began)));
+      }, () => {
+        if (!settled) fail(failure('ice-failed', '通信経路の確立に失敗しました。中継経路を含めて再確認します。', true));
       });
       conn.on('open', () => {
         if (generation !== this.generation || (settled && !joined)) { conn.close(); return; }

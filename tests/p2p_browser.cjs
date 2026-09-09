@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
  const base=process.env.GAME_URL || 'http://localhost:8100';
  try {
   for(let i=0;i<2;i++){
-   const context=await browser.newContext({viewport:i===0?{width:1280,height:800}:{width:390,height:844}});
+   const context=await browser.newContext({viewport:i===0?{width:1280,height:800}:{width:844,height:390}});
    const page=await context.newPage();pages.push(page);page.on('pageerror',e=>errors.push(e.message));
    if (process.env.FORCE_RELAY === '1') await page.addInitScript(() => {
     const Original = window.RTCPeerConnection;

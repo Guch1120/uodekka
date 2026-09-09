@@ -1,3 +1,4 @@
+import { probeRelay } from '../../backend/network/relay_probe.js';
 import { loadIceConfig } from '../../backend/network/ice_config.js';
 
 export class RelaySetupDialog {
@@ -24,15 +25,17 @@ export class RelaySetupDialog {
         </ol>
       </details>
       <p class="garage-note">この案内を閉じても接続処理は続きます。再確認は設定の取得を調べるもので、実際の中継接続の成功を保証するものではありません。</p>
-      <div class="garage-relay-actions"><button type="button" id="relay-recheck" class="garage-button garage-button-green">設定を再確認</button><button type="button" class="garage-button garage-button-light" data-close>閉じる</button></div>`;
+      <p id="relay-probe-status" role="status" aria-live="polite"></p><button type="button" id="relay-probe" class="garage-button garage-button-light">この端末の中継接続を検査</button><div class="garage-relay-actions"><button type="button" id="relay-recheck" class="garage-button garage-button-green">設定を再確認</button><button type="button" class="garage-button garage-button-light" data-close>閉じる</button></div>`;
     container.appendChild(this.dialog);
     this.dialog.querySelectorAll('[data-close]').forEach(button => button.onclick = () => this.close());
+    this.dialog.querySelector('#relay-probe').onclick = () => this.recheck(true);
     this.dialog.querySelector('#relay-recheck').onclick = () => this.recheck();
     this.dialog.addEventListener('close', () => { this.request?.abort(); });
   }
 
   show(config = null) {
     this.request?.abort();
+    this.dialog.querySelector('#relay-probe-status').textContent = '';
     this.setStatus(config);
     if (!this.dialog.open) this.dialog.showModal();
     this.dialog.querySelector('#relay-setup-title').focus();
@@ -48,17 +51,31 @@ export class RelaySetupDialog {
           : '中継設定を取得できませんでした。未作成とは限りません。管理者は通信状態、環境変数、サービスの稼働状況と /api/ice-servers の配信を確認してください。';
   }
 
-  async recheck() {
+  async recheck(testConnection = false) {
     this.request?.abort();
     const request = this.request = new AbortController();
     const button = this.dialog.querySelector('#relay-recheck');
-    button.disabled = true;
+    const probeButton = this.dialog.querySelector('#relay-probe');
+    button.disabled = probeButton.disabled = true;
+    const output = this.dialog.querySelector('#relay-probe-status');
+    output.textContent = '';
     this.dialog.querySelector('#relay-setup-status').textContent = '中継設定を確認しています…';
     try {
       const config = await loadIceConfig({ signal: request.signal });
-      if (!request.signal.aborted && this.dialog.open) this.setStatus(config);
+      if (!request.signal.aborted && this.dialog.open) {
+        this.setStatus(config);
+        if (testConnection && config.relayConfigured) {
+          output.textContent = 'この端末から中継サーバーへの到達を確認中です（最大12秒）…';
+          const result = await probeRelay(config.iceServers, { signal: request.signal });
+          if (!request.signal.aborted && this.dialog.open) output.textContent = {
+            reachable: '中継候補を取得できました。この端末から中継サーバーへ到達しています。次にホスト・ゲストでルーム参加を確認してください。',
+            unreachable: '中継候補を取得できませんでした。管理者は認証の有効期限と利用上限を確認してください。UDPが制限された回線では、サービスが提供するTURNのTCP/TLS経路（443番など）も設定してください。',
+            unsupported: 'このブラウザではWebRTCを利用できません。SafariまたはChromeでゲームを開いてください。'
+          }[result.status] || '';
+        }
+      }
     } catch { /* Closing the guide cancels only this configuration check. */ }
-    finally { if (this.request === request) button.disabled = false; }
+    finally { if (this.request === request) button.disabled = probeButton.disabled = false; }
   }
 
   close() { this.request?.abort(); if (this.dialog.open) this.dialog.close(); }
