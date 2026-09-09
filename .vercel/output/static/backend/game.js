@@ -610,11 +610,7 @@ export class Game {
       allKartPositions
     }, this.courseTrack.points);
 
-<<<<<<< HEAD
-    // 9. P2Pマルチプレイ位置送信（自機 + ホスト主導のCPU位置）
-=======
-    // 9. WebSocketマルチプレイ位置送信
->>>>>>> 288f01f (migrate multiplayer to Cloudflare Durable Objects)
+    // 9. マルチプレイ位置送信（自機 + ホスト主導のCPU位置）
     if (this.p2p.roomId) {
       this.p2p.sendKartState({
         vehicleKey: this.currentGameConfig.vehicleKey,
