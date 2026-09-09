@@ -534,8 +534,8 @@ export class Game {
           const minDist = (obs.radius || 1.4) + 1.2; // 壁厚み + カート半径 (約2.6m)
 
           if (dist < minDist) {
-            // 1. 壁面法線方向への滑らかな押し出し（めり込み防止）
-            const overlap = minDist - dist;
+            // 1. 壁面法線方向への滑らかな押し出し（めり込み防止＋マージン）
+            const overlap = (minDist - dist) + 0.05;
             let pushX, pushZ;
             if (dist > 0.01) {
               pushX = (dx / dist) * overlap;
@@ -556,9 +556,9 @@ export class Game {
             kart.mesh.rotation.set(0, targetYaw, 0, 'YXZ');
             kart.mesh.quaternion.setFromEuler(kart.mesh.rotation);
 
-            // 3. 速度制御：バック不要でスムーズに復帰できるように前進低速を維持
+            // 3. 速度制御：壁に沿って前進加速・即時復帰できるよう壁スライド摩擦を適用
             if (kart.speed > 0) {
-              kart.speed = Math.max(2.0, Math.min(kart.speed * 0.25, 6.0));
+              kart.speed = Math.max(3.5, kart.speed * 0.8);
             } else {
               kart.speed = 0;
             }
