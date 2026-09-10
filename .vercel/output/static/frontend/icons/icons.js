@@ -82,6 +82,22 @@ export const Icons = {
       <text x="50" y="96" font-size="28" font-weight="900" fill="#fff" text-anchor="middle">×3</text>
     </svg>`,
 
+    poop: `<svg viewBox="0 0 100 100" width="100%" height="100%">
+      <!-- 巻きうんち形状 -->
+      <path d="M50 14 C48 14 42 18 43 24 C44 30 52 30 50 35 C35 35 25 45 30 54 C20 56 12 66 18 78 C22 88 40 92 50 92 C60 92 78 88 82 78 C88 66 80 56 70 54 C75 45 65 35 50 35 C58 35 62 25 55 18 C53 15 51 14 50 14 Z" fill="#854d0e" stroke="#543107" stroke-width="3.5"/>
+      <!-- コミカルな目 -->
+      <ellipse cx="38" cy="62" rx="5" ry="6.5" fill="#ffffff"/>
+      <ellipse cx="62" cy="62" rx="5" ry="6.5" fill="#ffffff"/>
+      <circle cx="39" cy="62" r="2.8" fill="#18181b"/>
+      <circle cx="61" cy="62" r="2.8" fill="#18181b"/>
+      <!-- 口 -->
+      <path d="M43 74 Q50 80 57 74" stroke="#543107" stroke-width="2.8" fill="none" stroke-linecap="round"/>
+      <!-- 異臭の湯気・ハエ -->
+      <path d="M22 32 Q27 24 21 16" stroke="#84cc16" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      <path d="M78 32 Q73 24 79 16" stroke="#84cc16" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      <circle cx="85" cy="18" r="1.8" fill="#3f6212"/>
+    </svg>`,
+
     bobomb: `<svg viewBox="0 0 100 100" width="100%" height="100%">
       <circle cx="50" cy="55" r="36" fill="#1e293b" stroke="#0f172a" stroke-width="4"/>
       <!-- 目 -->

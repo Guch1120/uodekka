@@ -35,6 +35,10 @@ export class KartPhysics {
     this.isSmall = false;
     this.smallTimer = 0;
 
+    // うんちの異臭パワーによる減速状態
+    this.stinkTimer = 0;
+    this.stinkEffectMesh = null;
+
     // ドリフト火花レベル (0: なし, 1: 青ミニターボ, 2: 橙スーパーミニターボ)
     this.driftSparkLevel = 0;
 
@@ -202,6 +206,25 @@ export class KartPhysics {
       this.mesh.scale.set(1.0, 1.0, 1.0);
     }
 
+    // 2-2. 異臭パワーによる減速効果（うんち被弾・周囲巻き込み）
+    if (this.stinkTimer > 0) {
+      this.stinkTimer -= dt;
+      if (this.stinkEffectMesh) {
+        this.stinkEffectMesh.rotation.y += dt * 3.0;
+        this.stinkEffectMesh.position.y = Math.sin(performance.now() * 0.006) * 0.1;
+      }
+      if (this.stinkTimer <= 0) {
+        this.stinkTimer = 0;
+        if (this.stinkEffectMesh) {
+          this.mesh.remove(this.stinkEffectMesh);
+          this.stinkEffectMesh = null;
+        }
+        if (this.isLocalPlayer && gameState) {
+          gameState.showItemNotification('異臭が晴れた！通常速度に回復！');
+        }
+      }
+    }
+
     // 3. アイテム後方保持
     this.updateItemHolding(inputState, gameState);
 
@@ -211,8 +234,10 @@ export class KartPhysics {
     
     // スモール化時は最高速度と加速度が45%低下
     const smallSpeedFactor = this.isSmall ? 0.55 : 1.0;
-    const currentMaxSpeed = this.maxSpeed * this.boostMultiplier * smallSpeedFactor;
-    const currentAccel = this.acceleration * smallSpeedFactor;
+    // 異臭パワー時は最高速度と加速度が45%低下
+    const stinkSpeedFactor = this.stinkTimer > 0 ? 0.55 : 1.0;
+    const currentMaxSpeed = this.maxSpeed * this.boostMultiplier * smallSpeedFactor * stinkSpeedFactor;
+    const currentAccel = this.acceleration * smallSpeedFactor * stinkSpeedFactor;
 
     if (brakeInput > 0) {
       if (this.speed > 0) {
@@ -598,5 +623,30 @@ export class KartPhysics {
     this.isSmall = true;
     this.smallTimer = Math.max(this.smallTimer, duration);
     this.mesh.scale.set(0.55, 0.55, 0.55);
+  }
+
+  applyStinkDebuff(duration = 4.0, gameState = null) {
+    if (this.invincibleTimer > 0 || this.isRespawning) return;
+    this.stinkTimer = Math.max(this.stinkTimer || 0, duration);
+    if (!this.stinkEffectMesh) {
+      this.createStinkEffect();
+    }
+    if (this.isLocalPlayer && gameState) {
+      gameState.showItemNotification('💩 強烈な異臭パワー！悪臭でスピードダウン！', 2500);
+    }
+  }
+
+  createStinkEffect() {
+    const stinkGroup = new THREE.Group();
+    stinkGroup.name = 'stink_aura';
+    const stinkMat = new THREE.MeshBasicMaterial({ color: 0x84cc16, transparent: true, opacity: 0.65 });
+    for (let i = 0; i < 3; i++) {
+      const geo = new THREE.SphereGeometry(0.25, 6, 6);
+      const puff = new THREE.Mesh(geo, stinkMat);
+      puff.position.set((Math.random() - 0.5) * 0.8, 1.2 + i * 0.35, (Math.random() - 0.5) * 0.8);
+      stinkGroup.add(puff);
+    }
+    this.mesh.add(stinkGroup);
+    this.stinkEffectMesh = stinkGroup;
   }
 }

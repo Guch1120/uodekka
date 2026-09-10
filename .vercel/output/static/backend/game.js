@@ -297,8 +297,12 @@ export class Game {
     this.p2p.onItemEvent = (itemEvent) => {
       if (itemEvent.itemType === 'banana') {
         const dummyKart = { id: itemEvent.ownerId, position: new THREE.Vector3(...itemEvent.pos), rotation: new THREE.Quaternion(...itemEvent.rot) };
-        const b = Items.spawnBanana(dummyKart, this);
+        const b = Items.spawnBanana(dummyKart, this, itemEvent.throwDir || 'backward');
         this.activeWorldItems.push(b);
+      } else if (itemEvent.itemType === 'poop') {
+        const dummyKart = { id: itemEvent.ownerId, position: new THREE.Vector3(...itemEvent.pos), rotation: new THREE.Quaternion(...itemEvent.rot) };
+        const p = Items.spawnPoop(dummyKart, this, itemEvent.throwDir || 'backward');
+        this.activeWorldItems.push(p);
       } else if (itemEvent.itemType === 'lightning') {
         Items.triggerLightning({ id: itemEvent.ownerId, isLocalPlayer: false }, this);
       }
@@ -640,10 +644,11 @@ export class Game {
       input.isForwardThrow = false;
       const item = this.localPlayerKart.holdingItem;
       item.use(this.localPlayerKart, this, throwDir);
-      if (this.p2p.roomId && (item.id === 'banana' || item.id === 'lightning')) {
+      if (this.p2p.roomId && (item.id === 'banana' || item.id === 'poop' || item.id === 'lightning')) {
         this.p2p.sendItemEvent({
           itemType: item.id,
           ownerId: this.p2p.myPeerId,
+          throwDir: throwDir,
           pos: [this.localPlayerKart.mesh.position.x, this.localPlayerKart.mesh.position.y, this.localPlayerKart.mesh.position.z],
           rot: [this.localPlayerKart.mesh.quaternion.x, this.localPlayerKart.mesh.quaternion.y, this.localPlayerKart.mesh.quaternion.z, this.localPlayerKart.mesh.quaternion.w]
         });
@@ -1282,6 +1287,9 @@ export class Game {
 
         // 投擲主自身への当たり判定判定（発射直後や空中飛行中の自爆防止）
         if (item.ownerId === kart.id) {
+          if ((item.type === 'poop' || item.type === 'banana') && (item.ownerGraceTimer && item.ownerGraceTimer > 0)) {
+            continue;
+          }
           if (item.type === 'bobomb' && ((item.ownerGraceTimer && item.ownerGraceTimer > 0) || !item.hasLanded)) {
             continue;
           }

@@ -96,6 +96,17 @@ export const Items = {
         gameState.activeWorldItems.push(bomb);
       }
     },
+    poop: {
+      id: 'poop',
+      name: 'うんち',
+      icon: 'poop',
+      count: 1,
+      canHoldBehind: true,
+      use(kart, gameState, throwDirection = 'backward') {
+        const poop = Items.spawnPoop(kart, gameState, throwDirection);
+        gameState.activeWorldItems.push(poop);
+      }
+    },
     star: {
       id: 'star',
       name: 'スーパースター',
@@ -126,7 +137,7 @@ export const Items = {
 
     if (position === 1) {
       pool = [
-        'banana', 'banana', 'banana',
+        'banana', 'banana', 'poop', 'poop',
         'triple_banana', 'triple_banana',
         'green_shell', 'green_shell',
         'bobomb'
@@ -136,7 +147,7 @@ export const Items = {
       pool = [
         'red_shell', 'red_shell',
         'green_shell', 'green_shell',
-        'triple_banana', 'banana',
+        'poop', 'triple_banana', 'banana',
         'mushroom', 'bobomb'
       ];
     } else if (ratio < 0.58) {
@@ -145,6 +156,7 @@ export const Items = {
         'red_shell', 'red_shell',
         'triple_mushroom', 'triple_mushroom',
         'mushroom',
+        'poop',
         'bobomb',
         'star'
       ];
@@ -237,6 +249,10 @@ export const Items = {
       const bombGeo = new THREE.SphereGeometry(0.5, 14, 10);
       const bombMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4 });
       group.add(new THREE.Mesh(bombGeo, bombMat));
+    } else if (itemType === 'poop') {
+      const poopMesh = Items.createPoopMesh();
+      poopMesh.scale.set(0.65, 0.65, 0.65);
+      group.add(poopMesh);
     }
     return group;
   },
@@ -306,6 +322,205 @@ export const Items = {
         targetKart.spinOut();
         if (this.ownerId === gameState.localPlayerKart?.id && targetKart !== gameState.localPlayerKart) {
           gameState.showItemNotification('仕掛けたバナナに敵がスリップ！🍌', 2500);
+        }
+      }
+    };
+  },
+
+  createPoopMesh() {
+    const group = new THREE.Group();
+    const poopMat = new THREE.MeshStandardMaterial({
+      color: 0x78350f,
+      roughness: 0.75,
+      metalness: 0.05
+    });
+
+    // 1段目（下段ベース）
+    const tier1Geo = new THREE.CylinderGeometry(0.55, 0.68, 0.32, 12);
+    const tier1 = new THREE.Mesh(tier1Geo, poopMat);
+    tier1.position.y = 0.16;
+    tier1.castShadow = true;
+    group.add(tier1);
+
+    // 2段目（中段）
+    const tier2Geo = new THREE.CylinderGeometry(0.38, 0.48, 0.28, 12);
+    const tier2 = new THREE.Mesh(tier2Geo, poopMat);
+    tier2.position.y = 0.42;
+    tier2.castShadow = true;
+    group.add(tier2);
+
+    // 3段目（最上段コーン＆とんがり）
+    const tier3Geo = new THREE.ConeGeometry(0.32, 0.38, 10);
+    const tier3 = new THREE.Mesh(tier3Geo, poopMat);
+    tier3.position.y = 0.72;
+    tier3.castShadow = true;
+    group.add(tier3);
+
+    // コミカルな目玉
+    const eyeWhiteGeo = new THREE.SphereGeometry(0.08, 8, 8);
+    const eyeWhiteMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const eyePupilGeo = new THREE.SphereGeometry(0.04, 6, 6);
+    const eyePupilMat = new THREE.MeshBasicMaterial({ color: 0x18181b });
+
+    const leftEye = new THREE.Mesh(eyeWhiteGeo, eyeWhiteMat);
+    leftEye.position.set(-0.16, 0.44, 0.44);
+    const leftPupil = new THREE.Mesh(eyePupilGeo, eyePupilMat);
+    leftPupil.position.set(-0.16, 0.44, 0.51);
+    group.add(leftEye, leftPupil);
+
+    const rightEye = new THREE.Mesh(eyeWhiteGeo, eyeWhiteMat);
+    rightEye.position.set(0.16, 0.44, 0.44);
+    const rightPupil = new THREE.Mesh(eyePupilGeo, eyePupilMat);
+    rightPupil.position.set(0.16, 0.44, 0.51);
+    group.add(rightEye, rightPupil);
+
+    // 異臭の湯気エフェクト（緑の浮遊パーティクル）
+    const stinkPuffGeo = new THREE.SphereGeometry(0.07, 6, 6);
+    const stinkPuffMat = new THREE.MeshBasicMaterial({ color: 0x84cc16, transparent: true, opacity: 0.7 });
+    for (let i = 0; i < 3; i++) {
+      const puff = new THREE.Mesh(stinkPuffGeo, stinkPuffMat);
+      puff.position.set((Math.random() - 0.5) * 0.4, 0.95 + i * 0.22, (Math.random() - 0.5) * 0.4);
+      group.add(puff);
+    }
+
+    return group;
+  },
+
+  createStinkExplosion(pos, gameState) {
+    const stinkGroup = new THREE.Group();
+    stinkGroup.position.copy(pos);
+    gameState.scene.add(stinkGroup);
+
+    // 1. 膨張する異臭の煙玉（黄緑）
+    const cloudGeo = new THREE.SphereGeometry(2.0, 16, 16);
+    const cloudMat = new THREE.MeshBasicMaterial({
+      color: 0x84cc16,
+      transparent: true,
+      opacity: 0.85
+    });
+    const cloud = new THREE.Mesh(cloudGeo, cloudMat);
+    stinkGroup.add(cloud);
+
+    // 2. 拡散する悪臭の衝撃波リング（半径18mを可視化）
+    const ringGeo = new THREE.RingGeometry(1.0, 2.5, 32);
+    ringGeo.rotateX(-Math.PI / 2);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: 0xa3e635,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.8
+    });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.position.y = 0.25;
+    stinkGroup.add(ring);
+
+    // 3. 黄緑色の閃光ライト
+    const light = new THREE.PointLight(0x84cc16, 4, 20);
+    stinkGroup.add(light);
+
+    let life = 0.9;
+    const anim = () => {
+      life -= 0.025;
+      if (life <= 0) {
+        gameState.scene.remove(stinkGroup);
+        return;
+      }
+      const progress = 1.0 - (life / 0.9);
+      const scale = 1.0 + progress * 7.5; // 半径約18mまで急速拡大
+      cloud.scale.set(scale * 0.9, scale * 0.6, scale * 0.9);
+      cloudMat.opacity = Math.max(0, 0.85 * (1.0 - progress));
+      ring.scale.set(scale, scale, 1);
+      ringMat.opacity = Math.max(0, 0.8 * (1.0 - progress));
+      light.intensity = 4 * (1.0 - progress);
+      requestAnimationFrame(anim);
+    };
+    anim();
+  },
+
+  spawnPoop(kart, gameState, throwDirection = 'backward') {
+    const group = Items.createPoopMesh();
+    let velocity = new THREE.Vector3();
+    let vy = 0;
+    let isAirborne = false;
+
+    if (throwDirection === 'forward') {
+      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(kart.rotation);
+      group.position.copy(kart.position).addScaledVector(forward, 2.5);
+      group.position.y = kart.position.y + 1.2;
+      const kartSpeed = (kart.speed || 0);
+      velocity = forward.clone().multiplyScalar(Math.max(25, kartSpeed + 22));
+      vy = 12.0; // 上向き初速（放物線）
+      isAirborne = true;
+    } else {
+      const backward = new THREE.Vector3(0, 0, 1).applyQuaternion(kart.rotation);
+      group.position.copy(kart.position).addScaledVector(backward, 3.2);
+      group.position.y = kart.position.y + 0.4;
+    }
+
+    gameState.scene.add(group);
+
+    return {
+      type: 'poop',
+      mesh: group,
+      ownerId: kart.id,
+      radius: 1.3,
+      active: true,
+      canBlockShell: true,
+      ownerGraceTimer: 1.2,
+      update(dt) {
+        if (this.ownerGraceTimer > 0) this.ownerGraceTimer -= dt;
+        if (isAirborne) {
+          vy -= 26.0 * dt;
+          group.position.addScaledVector(velocity, dt);
+          group.position.y += vy * dt;
+          group.rotation.x += dt * 6.0;
+
+          const groundY = gameState.getTrackHeightAt(group.position);
+          if (group.position.y <= groundY + 0.35) {
+            group.position.y = groundY + 0.35;
+            isAirborne = false;
+            velocity.set(0, 0, 0);
+            group.rotation.set(0, 0, 0);
+          }
+        } else {
+          group.rotation.y += dt * 1.5;
+        }
+      },
+      destroy() {
+        if (!this.active) return;
+        this.active = false;
+        gameState.scene.remove(group);
+      },
+      onHit(targetKart) {
+        if (!this.active) return;
+        this.destroy();
+
+        // 1. 直撃したカートはスピン＆異臭デバフ
+        targetKart.spinOut();
+        targetKart.applyStinkDebuff?.(5.0, gameState);
+
+        // 2. 異臭爆発エフェクト
+        Items.createStinkExplosion(group.position, gameState);
+
+        // 3. 周囲半径18mの全カートに異臭パワー減速デバフ（45%減速）を拡散
+        const stinkRadius = 18.0;
+        const allKarts = [gameState.localPlayerKart, ...Array.from(gameState.otherPlayers.values()).map(p => p.physics)];
+        let hitOthersCount = 0;
+        allKarts.forEach(k => {
+          if (!k || k.isRespawning) return;
+          const d = k.mesh.position.distanceTo(group.position);
+          if (d < stinkRadius) {
+            k.applyStinkDebuff?.(4.0, gameState);
+            if (k !== targetKart) hitOthersCount++;
+          }
+        });
+
+        if (this.ownerId === gameState.localPlayerKart?.id) {
+          if (targetKart !== gameState.localPlayerKart) {
+            gameState.showItemNotification('💩 うんちに敵がヒット！異臭パワーで周囲も減速！', 3000);
+          }
+        } else if (targetKart === gameState.localPlayerKart) {
+          gameState.showItemNotification('💩 うんちを踏んでしまった！強烈な悪臭！', 3000);
         }
       }
     };
