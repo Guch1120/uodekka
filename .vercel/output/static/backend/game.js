@@ -448,6 +448,7 @@ export class Game {
     // 12人レースの編成
     if (config.mode === 'solo') {
       // ソロ：プレイヤー1人 ＋ CPU 11台 ＝ 合計12台
+      this.spawnAICarts(config.vehicleKey, 11, 1);
     } else {
       // マルチプレイ：他の参加プレイヤーをグリッドに初期配置
       if (Array.isArray(this.p2p.members)) {
@@ -995,6 +996,25 @@ export class Game {
           const minDist = (obs.radius || 1.4) + 1.2; // 壁厚み + カート半径 (約2.6m)
 
           if (dist < minDist) {
+            // タイヤウォールをレース外側（コース外）からは通り抜け可能にする
+            // inwardNormal は壁からコース中心（内側）を向く単位ベクトル
+            const inNorm = obs.inwardNormal || { x: 0, z: 0 };
+            const sideDot = dx * inNorm.x + dz * inNorm.z;
+
+            // カートがタイヤウォールより外側に位置している場合（sideDot <= 0）は
+            // 壁との衝突を行わず通り抜けを許可する（コース外からの復帰を容易化）
+            if (sideDot <= 0) {
+              continue;
+            }
+
+            // また、外側から内側へ復帰移動中（速度ベクトルがコース内側方向に向いている場合）も
+            // コース復帰を妨げないよう衝突をスキップ
+            const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(kart.mesh.quaternion);
+            const moveInward = (forward.x * inNorm.x + forward.z * inNorm.z) * (kart.speed >= 0 ? 1 : -1);
+            if (moveInward > 0.15) {
+              continue;
+            }
+
             // 1. 壁面法線方向への滑らかな押し出し（めり込み防止＋マージン）
             const overlap = (minDist - dist) + 0.05;
             let pushX, pushZ;
@@ -1010,7 +1030,6 @@ export class Game {
 
             // 2. 車体向き（ヨー角）をレース進行方向・脱出方向へ補正
             // 壁の進行方向（tangent）およびコース内側向き（inwardNormal）から脱出角度を算出
-            const inNorm = obs.inwardNormal || { x: 0, z: 0 };
             const escapeX = obs.tangent.x * 0.85 + inNorm.x * 0.25;
             const escapeZ = obs.tangent.z * 0.85 + inNorm.z * 0.25;
             const targetYaw = Math.atan2(-escapeX, -escapeZ);
@@ -1058,6 +1077,15 @@ export class Game {
           const minDist = obs.radius + 1.2; // 障害物半径 + カート半径
 
           if (dist < minDist) {
+            if (obs.type === 'tire_wall') {
+              const inNorm = obs.inwardNormal || { x: 0, z: 0 };
+              const sideDot = dx * inNorm.x + dz * inNorm.z;
+              if (sideDot <= 0) continue;
+              const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(kart.mesh.quaternion);
+              const moveInward = (forward.x * inNorm.x + forward.z * inNorm.z) * (kart.speed >= 0 ? 1 : -1);
+              if (moveInward > 0.15) continue;
+            }
+
             const overlap = minDist - dist;
             const pushX = (dx / (dist || 1)) * overlap;
             const pushZ = (dz / (dist || 1)) * overlap;
