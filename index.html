@@ -78,31 +78,43 @@
       const dpr = window.devicePixelRatio || 1;
       const screenW = window.screen ? window.screen.width : w;
       const screenH = window.screen ? window.screen.height : h;
+
+      const isForcedLandscapeInPortrait = document.body && document.body.classList.contains('force-landscape') && (h > w);
+      const effW = isForcedLandscapeInPortrait ? h : w;
+      const effH = isForcedLandscapeInPortrait ? w : h;
+
       const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b));
-      const divisor = gcd(Math.round(w), Math.round(h)) || 1;
-      const aspect = `${Math.round(w / divisor)}:${Math.round(h / divisor)}`;
-      const ratio = (w / Math.max(1, h)).toFixed(2);
+      const divisor = gcd(Math.round(effW), Math.round(effH)) || 1;
+      const aspect = `${Math.round(effW / divisor)}:${Math.round(effH / divisor)}`;
+      const ratio = (effW / Math.max(1, effH)).toFixed(2);
       const info = {
         viewportWidth: w,
         viewportHeight: h,
+        effectiveWidth: effW,
+        effectiveHeight: effH,
         screenWidth: screenW,
         screenHeight: screenH,
         dpr,
         aspectRatio: aspect,
         ratioVal: Number(ratio),
-        isLandscape: w >= h,
-        isCompact: h <= 500
+        isLandscape: isForcedLandscapeInPortrait || (w >= h),
+        isCompact: effH <= 500
       };
       window.deviceInfo = info;
       document.documentElement.dataset.aspectRatio = aspect;
-      document.documentElement.dataset.isCompact = String(h <= 500);
+      document.documentElement.dataset.isCompact = String(info.isCompact);
+      document.documentElement.dataset.isLandscape = String(info.isLandscape);
       if (document.body) {
         document.body.dataset.aspectRatio = aspect;
-        document.body.dataset.isCompact = String(h <= 500);
+        document.body.dataset.isCompact = String(info.isCompact);
+        document.body.dataset.isLandscape = String(info.isLandscape);
       }
       return info;
     }
     function handleAppResumeAndResize() {
+      if (window._gameSessionStarted && screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('landscape').catch(() => {});
+      }
       detectDeviceInfo();
       if (window.gameInstance && window.gameInstance.renderer) {
         window.gameInstance.renderer.onResize();
@@ -112,9 +124,7 @@
 
     function stagedResumeSync() {
       handleAppResumeAndResize();
-      setTimeout(handleAppResumeAndResize, 80);
-      setTimeout(handleAppResumeAndResize, 250);
-      setTimeout(handleAppResumeAndResize, 600);
+      [80, 200, 500, 900, 1400].forEach(delay => setTimeout(handleAppResumeAndResize, delay));
     }
 
     detectDeviceInfo();
@@ -122,6 +132,9 @@
     window.addEventListener('orientationchange', stagedResumeSync);
     window.addEventListener('pageshow', stagedResumeSync);
     window.addEventListener('focus', stagedResumeSync);
+    if (screen.orientation && typeof screen.orientation.addEventListener === 'function') {
+      screen.orientation.addEventListener('change', stagedResumeSync);
+    }
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
         stagedResumeSync();
@@ -184,7 +197,7 @@
       if (screen.orientation && screen.orientation.lock) {
         screen.orientation.lock('landscape').catch(() => {});
       }
-
+      window._gameSessionStarted = true;
       titleScreen.disabled = true;
       status.textContent = '読み込み中…';
 

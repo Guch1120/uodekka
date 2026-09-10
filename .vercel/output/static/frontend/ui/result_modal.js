@@ -62,11 +62,16 @@ export class ResultModal {
     const racers = this.data.racers || [];
     const racersHtml = racers.slice(0, 12).map((r, i) => {
       const isLocal = r.isLocal;
+      const perks = r.inRacePerks || {};
+      const perkIcons = Object.entries(perks).map(([id, count]) => {
+        const def = InRacePerks.definitions[id];
+        return def ? `<span class="racer-perk-badge" title="${def.name} Lv.${count}">${def.icon}${count > 1 ? `<small>${count}</small>` : ''}</span>` : '';
+      }).join('');
       return `
         <li class="result-standing-item ${isLocal ? 'current-player' : ''}">
           <span class="standing-rank">${i + 1}</span>
           <span class="standing-dot" style="background-color: ${r.colorHex || '#e74c3c'}"></span>
-          <span class="standing-name">${r.name || 'CPU'}</span>
+          <span class="standing-name">${r.name || 'CPU'}${perkIcons ? `<span class="standing-perks">${perkIcons}</span>` : ''}</span>
           <span class="standing-time">${r.totalTime ? ResultModal.formatTime(r.totalTime) : (isLocal ? totalTimeStr : 'FINISH')}</span>
         </li>
       `;

@@ -1246,6 +1246,11 @@ body.force-landscape .orientation-prompt {
   }
 }
 
+body.force-landscape .result-main-grid {
+  grid-template-columns: 1.1fr 1fr !important;
+  gap: 16px !important;
+}
+
 /* ================= デウス・エクス・マキナ 復帰演出 ================= */
 .respawn-banner {
   position: absolute;
@@ -1805,6 +1810,31 @@ body.force-landscape .orientation-prompt {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.standing-perks {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+}
+
+.racer-perk-badge {
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0 3px;
+  border-radius: 4px;
+}
+
+.racer-perk-badge small {
+  font-size: 8px;
+  font-weight: 800;
+  color: #f59e0b;
+  margin-left: 1px;
 }
 
 .standing-time {

@@ -355,6 +355,12 @@ export class Game {
             aiKart.physics.currentLap = state.lap;
             aiKart.physics.progress = state.progress;
             aiKart.physics.speed = state.speed;
+            if (state.inRacePerks) {
+              aiKart.physics.inRacePerks = state.inRacePerks;
+            }
+            if (state.coins !== undefined) {
+              aiKart.physics.coins = state.coins;
+            }
             if (state.isFinished && !aiKart.physics.isFinished) {
               aiKart.physics.isFinished = true;
               aiKart.physics.finishTime = state.finishTime || performance.now();
@@ -973,7 +979,8 @@ export class Game {
           name: name,
           isLocal: isLocal,
           colorHex: colorHex,
-          totalTime: Math.max(8000, rTime)
+          totalTime: Math.max(8000, rTime),
+          inRacePerks: isLocal ? { ...this.inRacePerks } : { ...(kart.inRacePerks || {}) }
         };
       });
 
@@ -1043,7 +1050,9 @@ export class Game {
               lap: p.physics.currentLap,
               progress: p.physics.progress,
               isFinished: !!p.physics.isFinished,
-              finishTime: p.physics.finishTime || 0
+              finishTime: p.physics.finishTime || 0,
+              coins: p.physics.coins || 0,
+              inRacePerks: p.physics.inRacePerks || {}
             });
           }
         });
@@ -1394,6 +1403,20 @@ export class Game {
 
   updateAIPlayer(aiKart, dt) {
     CPUDriver.stepAI(aiKart, dt, this.courseTrack, this.currentCourseConfig, this.knowledgeBase, this);
+
+    // CPU周回チェック ＆ 周回完了コインボーナス（確実に強化されるための保証）
+    if (aiKart.physics) {
+      aiKart._lastLap = aiKart._lastLap || 1;
+      if (aiKart.physics.currentLap > aiKart._lastLap) {
+        aiKart._lastLap = aiKart.physics.currentLap;
+        aiKart.physics.coins = (aiKart.physics.coins || 0) + 2;
+        aiKart.physics.coinBonusSpeed = Math.min(10, aiKart.physics.coins) * 0.35;
+        if (aiKart.physics.coins >= (aiKart.physics.nextPerkThreshold || 3)) {
+          aiKart.physics.nextPerkThreshold = (aiKart.physics.nextPerkThreshold || 3) + 3;
+          this.grantAIPerk(aiKart.physics);
+        }
+      }
+    }
   }
 
   updateItemBoxes(dt) {
@@ -1435,9 +1458,6 @@ export class Game {
   updateCoins(dt) {
     if (!this.coins || this.coins.length === 0) return;
     const playerKart = this.localPlayerKart;
-    const magnetActive = this.skillActiveType === 'magnet_barrier' && this.skillActiveTimer > 0;
-    const magnetRadius = 22.0;
-
     const allKarts = [playerKart, ...Array.from(this.otherPlayers.values()).map(p => p.physics)];
     const time = performance.now() * 0.003;
 
@@ -1455,13 +1475,19 @@ export class Game {
       coin.mesh.rotation.y += dt * coin.rotationSpeed;
       coin.mesh.position.y = coin.baseY + Math.sin(time + coin.mesh.position.x) * 0.18;
 
-      const extraMagnet = playerKart ? (playerKart.perkMagnetRadius || 0) : 0;
-      const effectiveMagnetDist = (magnetActive ? 14.0 : 0) + extraMagnet;
-      if (effectiveMagnetDist > 0 && playerKart && !playerKart.isRespawning) {
-        const distToPlayer = coin.pos.distanceTo(playerKart.mesh.position);
-        if (distToPlayer < effectiveMagnetDist) {
-          const pullDir = new THREE.Vector3().subVectors(playerKart.mesh.position, coin.pos).normalize();
-          coin.pos.addScaledVector(pullDir, dt * (magnetActive ? 20.0 : 14.0));
+      // コイン吸引（プレイヤーおよびマグネットスキル/パーク所持者）
+      for (const kart of allKarts) {
+        if (!kart || kart.isRespawning) continue;
+        const isPlayer = (kart === playerKart);
+        const magnetActive = isPlayer && this.skillActiveType === 'magnet_barrier' && this.skillActiveTimer > 0;
+        const extraMagnet = kart.perkMagnetRadius || 0;
+        const effectiveMagnetDist = (magnetActive ? 14.0 : 0) + extraMagnet;
+        if (effectiveMagnetDist > 0 && coin.active) {
+          const distToKart = coin.pos.distanceTo(kart.mesh.position);
+          if (distToKart < effectiveMagnetDist) {
+            const pullDir = new THREE.Vector3().subVectors(kart.mesh.position, coin.pos).normalize();
+            coin.pos.addScaledVector(pullDir, dt * (magnetActive ? 20.0 : 14.0));
+          }
         }
       }
 
@@ -1474,6 +1500,7 @@ export class Game {
 
           if (kart === playerKart) {
             this.playerCoins = (this.playerCoins || 0) + 1;
+            playerKart.coins = this.playerCoins;
             playerKart.coinBonusSpeed = Math.min(10, this.playerCoins) * 0.35;
             SkillsManager.addBankCoins(1);
             this.playCoinSfx();
@@ -1488,11 +1515,54 @@ export class Game {
               this.nextPerkThreshold = (this.nextPerkThreshold || 3) + 3;
               this.triggerInRacePerkSelection();
             }
+          } else {
+            // CPUまたはホストシミュレーション配下の他プレイヤー
+            kart.coins = (kart.coins || 0) + 1;
+            kart.coinBonusSpeed = Math.min(10, kart.coins) * 0.35;
+            if (kart.perkLuckyCoin) {
+              kart.applyBoost(1.2, 0.6);
+            }
+            if (kart.coins >= (kart.nextPerkThreshold || 3)) {
+              kart.nextPerkThreshold = (kart.nextPerkThreshold || 3) + 3;
+              this.grantAIPerk(kart);
+            }
           }
           break;
         }
       }
     });
+  }
+
+  grantAIPerk(kart) {
+    if (!kart || kart.isFinished) return;
+    const choices = InRacePerks.getRandomPerks(3);
+    if (!choices || choices.length === 0) return;
+
+    let personality = null;
+    let aiName = 'ライバル';
+    for (const [id, player] of this.otherPlayers.entries()) {
+      if (player.physics === kart) {
+        personality = player.personality;
+        aiName = player.name || aiName;
+        break;
+      }
+    }
+
+    const preferred = personality?.preferredPerks || [];
+    let chosen = choices.find(c => preferred.includes(c.id));
+    if (!chosen) {
+      chosen = choices[Math.floor(Math.random() * choices.length)];
+    }
+
+    chosen.apply(kart);
+    kart.inRacePerks = kart.inRacePerks || {};
+    kart.inRacePerks[chosen.id] = (kart.inRacePerks[chosen.id] || 0) + 1;
+
+    const now = performance.now();
+    if (!this._lastAiPerkNotifTime || now - this._lastAiPerkNotifTime > 2500) {
+      this._lastAiPerkNotifTime = now;
+      this.showItemNotification(`⚡ ${aiName} が「${chosen.name}」を獲得！`, 2000);
+    }
   }
 
   triggerInRacePerkSelection() {

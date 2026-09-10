@@ -70,6 +70,11 @@ export class KartPhysics {
     this.holdingItem = null;
     this.trailingItemMesh = null;
 
+    // コイン & レース内ローグライクスキル
+    this.coins = 0;
+    this.inRacePerks = {};
+    this.nextPerkThreshold = 3;
+
     this.position = this.mesh.position;
     this.rotation = this.mesh.quaternion;
   }
