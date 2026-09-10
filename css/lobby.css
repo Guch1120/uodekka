@@ -397,85 +397,79 @@
   .garage-footer { padding-top: 15px; }
 }
 @media (max-height: 520px) and (orientation: landscape), (max-width: 850px) and (orientation: landscape) {
-  .garage-shell { padding: 8px 16px; }
-  .garage-header { padding-bottom: 8px; }
+  .garage-shell { padding: 10px 18px; }
+  .garage-header { padding-bottom: 12px; }
   .garage-brand { font-size: 17px; }
   .garage-brand-mark { width: 34px; height: 32px; font-size: 14px; }
   .garage-brand small, .garage-footer > span:first-child, .garage-footer > span:last-child { display: none; }
-  .garage-screen { gap: 14px; grid-template-columns: 1.1fr 1fr; }
-  .garage-section-heading { margin-bottom: 8px; }
-  .garage-section-heading h1 { font-size: 19px; }
+  .garage-screen { gap: 16px; grid-template-columns: 1.1fr 1fr; }
+  .garage-section-heading { margin-bottom: 10px; }
+  .garage-section-heading h1 { font-size: 20px; }
   .garage-eyebrow { font-size: 8px; letter-spacing: 1px; }
   .garage-player-label { width: 40%; font-size: 9px; }
-  .garage-player-label input { min-height: 30px; padding: 4px 8px; font-size: 12px; }
-  .garage-showroom-top { padding: 10px 14px 0; }
-  .garage-vehicle-stage { height: 145px; }
-  .garage-vehicle-caption { padding: 10px 14px; }
-  .garage-vehicle-caption h2 { font-size: 17px; }
+  .garage-player-label input { min-height: 33px; padding: 5px 8px; font-size: 12px; }
+  .garage-showroom-top { padding: 12px 15px 0; }
+  .garage-vehicle-stage { height: 175px; }
+  .garage-vehicle-caption { padding: 12px 15px; }
+  .garage-vehicle-caption h2 { font-size: 18px; }
   .garage-mode-heading { display: none; }
-  .garage-mode-panel { gap: 8px; }
-  .garage-mode { padding: 12px 14px; }
-  .garage-mode-solo { min-height: 90px; }
-  .garage-mode-icon { width: 22px; height: 22px; font-size: 9px; }
-  .garage-mode strong, .garage-mode h2 { font-size: 22px; }
-  .garage-mode small { font-size: 8px; margin-bottom: 4px; }
-  .garage-mode-description, .garage-mode p { font-size: 10px; margin-top: 4px; }
+  .garage-mode-panel { gap: 10px; }
+  .garage-mode { padding: 16px; }
+  .garage-mode-solo { min-height: 116px; }
+  .garage-mode-icon { width: 23px; height: 23px; font-size: 9px; }
+  .garage-mode strong, .garage-mode h2 { font-size: 26px; }
+  .garage-mode small { font-size: 8px; margin-bottom: 5px; }
+  .garage-mode-description, .garage-mode p { font-size: 10px; margin-top: 6px; display: block; }
   .garage-mode-tag { display: none; }
-  .garage-mode-multi { grid-template-columns: 22px 1fr; }
-  .garage-multi-actions { margin-top: 8px; }
-  .garage-multi-actions button { font-size: 15px; padding: 6px 10px; }
-  .garage-multi-actions span { font-size: 8px; }
-  .garage-mode-editor { padding: 10px 14px; }
-  .garage-footer { padding-top: 6px; justify-content: center; }
-  .garage-map-card { height: 180px; min-height: 150px; padding: 10px 24px; }
-  .garage-map svg { max-height: 155px; }
-  .garage-arrow { width: 28px; height: 40px; font-size: 12px !important; }
-  .garage-arrow:first-of-type { left: 8px; } .garage-arrow:last-of-type { right: 8px; }
-  .garage-course-caption { margin-top: 8px; }
-  .garage-course-caption h2 { font-size: 17px; }
-  .garage-setup-side { gap: 6px; }
-  .garage-button { padding: 9px 8px; min-height: 34px; font-size: 11px !important; }
-  .garage-button-start { font-size: 18px !important; padding: 10px 14px; }
-  .garage-specs { padding: 10px 14px; }
-  .garage-specs h2 { font-size: 16px; }
+  .garage-mode-multi { grid-template-columns: 23px 1fr; }
+  .garage-multi-actions { margin-top: 12px; }
+  .garage-multi-actions button { font-size: 16px; padding: 8px 10px; }
+  .garage-multi-actions span { font-size: 9px; }
+  .garage-mode-editor { padding: 14px 16px; }
+  .garage-footer { padding-top: 9px; justify-content: center; }
+  .garage-map-card { height: 210px; min-height: 180px; padding: 12px 28px; }
+  .garage-map svg { max-height: 190px; }
+  .garage-arrow { width: 30px; height: 45px; font-size: 13px !important; }
+  .garage-arrow:first-of-type { left: 9px; } .garage-arrow:last-of-type { right: 9px; }
+  .garage-course-caption { margin-top: 12px; }
+  .garage-course-caption h2 { font-size: 18px; }
+  .garage-setup-side { gap: 8px; }
+  .garage-button { padding: 11px 10px; min-height: 38px; font-size: 12px !important; }
+  .garage-button-start { font-size: 20px !important; padding: 12px 16px; min-height: 42px; }
+  .garage-specs { padding: 13px 16px; }
+  .garage-specs h2 { font-size: 18px; }
   .vehicle-description { font-size: 9px; }
-  .garage-stat-list { margin-top: 10px; gap: 8px; }
-  .garage-stat { font-size: 9px; grid-template-columns: 45px 1fr 26px; gap: 6px; }
-  .garage-members-panel { padding: 14px; }
-  .garage-members-panel h1 { font-size: 19px; }
-  .garage-room-code { padding: 7px 0; }
-  .garage-room-code strong { font-size: 13px; }
-  .garage-room-code button { font-size: 9px !important; padding: 5px; }
-  .garage-members { max-height: 150px; padding: 8px 0; }
-  .garage-member { padding: 8px; }
-  .garage-room-course { padding: 10px 14px; }
-  .garage-room-course h2 { font-size: 16px; margin: 2px 0 6px; }
-  .garage-room-course .garage-note { margin-top: 4px; font-size: 9px; }
-  .garage-dialog { padding: 16px; }
+  .garage-stat-list { margin-top: 13px; gap: 10px; }
+  .garage-stat { font-size: 10px; grid-template-columns: 47px 1fr 28px; gap: 8px; }
+  .garage-members-panel { padding: 16px; }
+  .garage-members-panel h1 { font-size: 21px; }
+  .garage-room-code { padding: 9px 0; }
+  .garage-room-code strong { font-size: 14px; }
+  .garage-room-code button { font-size: 10px !important; padding: 6px; }
+  .garage-members { max-height: 180px; padding: 10px 0; }
+  .garage-member { padding: 10px; }
+  .garage-room-course { padding: 12px 16px; }
+  .garage-room-course h2 { font-size: 18px; margin: 4px 0 8px; }
+  .garage-room-course .garage-note { margin-top: 6px; font-size: 9px; }
+  .garage-dialog { padding: 20px; }
 }
 @media (max-height: 440px) and (orientation: landscape) {
   .garage { overflow-y: auto; overflow-x: hidden; }
-  .garage-shell { padding: 4px 12px 6px; min-height: 100vh; height: auto; justify-content: space-between; }
-  .garage-header { padding-bottom: 2px; }
+  .garage-shell { padding: 6px 14px 8px; min-height: 100vh; height: auto; justify-content: space-between; }
+  .garage-header { padding-bottom: 4px; }
   .garage-section-heading { margin-bottom: 4px; }
-  .garage-section-heading h1 { font-size: 16px; }
-  .garage-vehicle-stage { height: 110px; }
-  .garage-showroom-top { padding: 4px 10px 0; }
-  .garage-vehicle-caption { padding: 6px 10px; }
-  .garage-vehicle-caption h2 { font-size: 14px; }
-  .garage-mode-panel { gap: 4px; }
-  .garage-mode { padding: 6px 10px; }
-  .garage-mode-solo { min-height: 52px; }
-  .garage-mode strong, .garage-mode h2 { font-size: 16px; }
-  .garage-mode-description, .garage-mode p { display: none; }
-  .garage-mode-editor { padding: 6px 10px; }
-  .garage-map-card { height: 125px; min-height: 100px; padding: 4px 16px; }
-  .garage-map svg { max-height: 105px; }
-  .garage-course-caption { margin-top: 4px; }
-  .garage-course-caption h2 { font-size: 15px; }
-  .garage-specs { padding: 6px 10px; }
-  .garage-stat-list { margin-top: 4px; gap: 4px; }
-  .garage-button-start { font-size: 16px !important; padding: 8px 12px; min-height: 34px; }
+  .garage-section-heading h1 { font-size: 18px; }
+  .garage-vehicle-stage { height: 140px; }
+  .garage-showroom-top { padding: 6px 12px 0; }
+  .garage-vehicle-caption { padding: 8px 12px; }
+  .garage-vehicle-caption h2 { font-size: 16px; }
+  .garage-mode-panel { gap: 6px; }
+  .garage-map-card { height: 150px; min-height: 120px; padding: 6px 20px; }
+  .garage-map svg { max-height: 135px; }
+  .garage-course-caption { margin-top: 6px; }
+  .garage-course-caption h2 { font-size: 16px; }
+  .garage-specs { padding: 8px 12px; }
+  .garage-stat-list { margin-top: 6px; gap: 6px; }
   .garage-footer { display: none; }
 }
 @media (max-width: 650px) and (orientation: portrait) {
@@ -504,19 +498,21 @@
   body:not(.force-landscape) .garage-setup-side { gap: 14px; }
 }
 
-body.force-landscape .garage-screen {
-  grid-template-columns: minmax(260px, 340px) 1fr !important;
-  gap: 12px !important;
-}
-body.force-landscape .garage-shell {
-  padding: 6px 14px 10px !important;
-}
-body.force-landscape .garage-vehicle-stage {
-  height: 140px !important;
-}
-body.force-landscape .garage-map-card {
-  height: 130px !important;
-  min-height: 100px !important;
+@media (orientation: portrait) {
+  body.force-landscape .garage-screen {
+    grid-template-columns: minmax(260px, 340px) 1fr !important;
+    gap: 12px !important;
+  }
+  body.force-landscape .garage-shell {
+    padding: 6px 14px 10px !important;
+  }
+  body.force-landscape .garage-vehicle-stage {
+    height: 140px !important;
+  }
+  body.force-landscape .garage-map-card {
+    height: 130px !important;
+    min-height: 100px !important;
+  }
 }
 
 .garage-preview-image { display: block; width: 100%; height: 100%; max-height: 370px; object-fit: contain; }
@@ -696,18 +692,18 @@ body.force-landscape .garage-map-card {
   .garage-skill-unlock-btn { padding: 4px 8px; font-size: 11px; }
   .garage-stat-skill { margin-top: 5px; padding-top: 4px; font-size: 11px; }
 
-  /* Issue #13: ルーム作成・参加ダイアログのスクロールフリー化 */
+  /* Issue #13 & 復帰時対応: ルーム作成・参加ダイアログのスクロールフリー化 */
   .garage-dialog {
     padding: 8px 16px;
     max-height: 94dvh;
-    width: min(640px, calc(100vw - 24px));
+    width: min(620px, calc(100vw - 24px));
     border-radius: 14px;
     overflow-y: hidden;
   }
   .garage-dialog form#room-form {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 4px 14px;
+    gap: 2px 14px;
     align-items: start;
   }
   .garage-dialog-heading {
@@ -716,58 +712,190 @@ body.force-landscape .garage-map-card {
   }
   .garage-dialog h2 {
     grid-column: 1 / -1;
-    font-size: 15px;
+    font-size: 14px;
     margin: 0;
   }
   .garage-dialog p#room-dialog-description {
     grid-column: 1 / -1;
     font-size: 10px;
-    line-height: 1.25;
-    margin: 2px 0 4px;
+    line-height: 1.2;
+    margin: 1px 0 3px;
   }
-  .garage-dialog label {
+  .garage-dialog label[for="input-room-id"] {
+    grid-column: 1;
+    grid-row: 4;
     font-size: 10px;
     margin-bottom: 2px;
     font-weight: 700;
   }
-  .garage-dialog input {
-    padding: 5px 8px;
-    font-size: 12px;
+  .garage-dialog input#input-room-id {
+    grid-column: 1;
+    grid-row: 5;
+    padding: 4px 8px;
+    font-size: 11px;
     border-radius: 6px;
   }
   .garage-dialog small {
+    grid-column: 1;
+    grid-row: 6;
     font-size: 8px;
     margin-top: 1px;
     color: #8193a0;
   }
   .garage-dialog .garage-invite-label {
+    grid-column: 2;
+    grid-row: 4;
     margin-top: 0;
+    font-size: 10px;
+    margin-bottom: 2px;
+    font-weight: 700;
   }
   .garage-dialog #invite-url {
+    grid-column: 2;
+    grid-row: 5;
     font-size: 10px;
-    padding: 5px 8px;
+    padding: 4px 8px;
+    border-radius: 6px;
   }
   .garage-dialog #dialog-copy {
-    font-size: 10px;
-    padding: 3px 6px;
-    margin-top: 3px;
+    grid-column: 2;
+    grid-row: 6;
+    font-size: 9px;
+    padding: 2px 6px;
+    margin-top: 2px;
   }
   .garage-dialog #dialog-diagnostics,
   .garage-dialog #dialog-diagnostics-text {
     display: none;
   }
   .garage-dialog .garage-network-note {
-    margin: 2px 0;
+    grid-column: 1 / -1;
+    margin: 1px 0;
     font-size: 9px;
+    line-height: 1.2;
   }
   .garage-dialog #room-dialog-status {
+    grid-column: 1 / -1;
     font-size: 10px;
-    margin: 2px 0;
+    margin: 1px 0;
+    min-height: 14px;
   }
   .garage-dialog .garage-button-start {
     grid-column: 1 / -1;
     padding: 6px 14px;
     font-size: 13px;
-    margin-top: 4px;
+    margin-top: 3px;
+    min-height: 32px;
   }
+}
+
+body[data-is-compact="true"] .garage-dialog,
+body.force-landscape .garage-dialog {
+  padding: 8px 16px;
+  max-height: 94dvh;
+  width: min(620px, calc(100vw - 24px));
+  border-radius: 14px;
+  overflow-y: hidden;
+}
+body[data-is-compact="true"] .garage-dialog form#room-form,
+body.force-landscape .garage-dialog form#room-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 14px;
+  align-items: start;
+}
+body[data-is-compact="true"] .garage-dialog-heading,
+body.force-landscape .garage-dialog-heading {
+  grid-column: 1 / -1;
+  margin-bottom: 0;
+}
+body[data-is-compact="true"] .garage-dialog h2,
+body.force-landscape .garage-dialog h2 {
+  grid-column: 1 / -1;
+  font-size: 14px;
+  margin: 0;
+}
+body[data-is-compact="true"] .garage-dialog p#room-dialog-description,
+body.force-landscape .garage-dialog p#room-dialog-description {
+  grid-column: 1 / -1;
+  font-size: 10px;
+  line-height: 1.2;
+  margin: 1px 0 3px;
+}
+body[data-is-compact="true"] .garage-dialog label[for="input-room-id"],
+body.force-landscape .garage-dialog label[for="input-room-id"] {
+  grid-column: 1;
+  grid-row: 4;
+  font-size: 10px;
+  margin-bottom: 2px;
+  font-weight: 700;
+}
+body[data-is-compact="true"] .garage-dialog input#input-room-id,
+body.force-landscape .garage-dialog input#input-room-id {
+  grid-column: 1;
+  grid-row: 5;
+  padding: 4px 8px;
+  font-size: 11px;
+  border-radius: 6px;
+}
+body[data-is-compact="true"] .garage-dialog small,
+body.force-landscape .garage-dialog small {
+  grid-column: 1;
+  grid-row: 6;
+  font-size: 8px;
+  margin-top: 1px;
+  color: #8193a0;
+}
+body[data-is-compact="true"] .garage-dialog .garage-invite-label,
+body.force-landscape .garage-dialog .garage-invite-label {
+  grid-column: 2;
+  grid-row: 4;
+  margin-top: 0;
+  font-size: 10px;
+  margin-bottom: 2px;
+  font-weight: 700;
+}
+body[data-is-compact="true"] .garage-dialog #invite-url,
+body.force-landscape .garage-dialog #invite-url {
+  grid-column: 2;
+  grid-row: 5;
+  font-size: 10px;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+body[data-is-compact="true"] .garage-dialog #dialog-copy,
+body.force-landscape .garage-dialog #dialog-copy {
+  grid-column: 2;
+  grid-row: 6;
+  font-size: 9px;
+  padding: 2px 6px;
+  margin-top: 2px;
+}
+body[data-is-compact="true"] .garage-dialog #dialog-diagnostics,
+body.force-landscape .garage-dialog #dialog-diagnostics,
+body[data-is-compact="true"] .garage-dialog #dialog-diagnostics-text,
+body.force-landscape .garage-dialog #dialog-diagnostics-text {
+  display: none;
+}
+body[data-is-compact="true"] .garage-dialog .garage-network-note,
+body.force-landscape .garage-dialog .garage-network-note {
+  grid-column: 1 / -1;
+  margin: 1px 0;
+  font-size: 9px;
+  line-height: 1.2;
+}
+body[data-is-compact="true"] .garage-dialog #room-dialog-status,
+body.force-landscape .garage-dialog #room-dialog-status {
+  grid-column: 1 / -1;
+  font-size: 10px;
+  margin: 1px 0;
+  min-height: 14px;
+}
+body[data-is-compact="true"] .garage-dialog .garage-button-start,
+body.force-landscape .garage-dialog .garage-button-start {
+  grid-column: 1 / -1;
+  padding: 6px 14px;
+  font-size: 13px;
+  margin-top: 3px;
+  min-height: 32px;
 }
