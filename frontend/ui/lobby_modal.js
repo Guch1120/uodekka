@@ -86,7 +86,7 @@ export class LobbyModal {
           <section class="garage-screen garage-setup" data-screen="solo" hidden>
             <div class="garage-course-panel"><div class="garage-section-heading"><div><span class="garage-eyebrow">SOLO / SELECT YOUR COURSE</span><h1>次の舞台を選ぼう。</h1></div><span class="garage-chip">CPU 11台と対戦（合計12人）</span></div>
               <div class="garage-map-card"><div class="garage-map" id="solo-map"></div>${arrow('course-prev', 'prev', '前のコース')}${arrow('course-next', 'next', '次のコース')}<span id="course-counter" class="garage-counter"></span></div>
-              <div class="garage-course-caption"><div><span class="garage-eyebrow">CIRCUIT</span><h2 id="solo-course-name" aria-live="polite"></h2></div><div class="garage-course-badges"><span id="solo-course-laps" class="garage-chip"></span><span id="solo-ai-level" class="garage-chip garage-chip-ai">🧠 CPU学習 Lv.1</span><button type="button" id="btn-reset-ai" class="garage-ai-reset-btn" title="このコースの学習データを初期化">↺ 学習リセット</button></div></div>
+              <div class="garage-course-caption"><div><span class="garage-eyebrow" id="solo-course-theme">CIRCUIT</span><h2 id="solo-course-name" aria-live="polite"></h2><p id="solo-course-description" class="garage-course-description"></p></div><div class="garage-course-badges"><span id="solo-course-laps" class="garage-chip"></span><span id="solo-ai-level" class="garage-chip garage-chip-ai">🧠 CPU学習 Lv.1</span><button type="button" id="btn-reset-ai" class="garage-ai-reset-btn" title="このコースの学習データを初期化">↺ 学習リセット</button></div></div>
             </div>
             <div class="garage-setup-side"><div class="garage-course-actions"><button id="course-confirm" class="garage-button garage-button-green">✓ コース決定</button><button id="course-random" class="garage-button garage-button-light">⤨ ランダム決定</button></div><p id="course-confirmation" class="garage-note" aria-live="polite">コースを選んで確定してください。</p>${stats()}<button id="btn-start-solo" class="garage-button garage-button-start" disabled>ゲームスタート <span>→</span></button></div>
           </section>
@@ -369,6 +369,8 @@ export class LobbyModal {
       map.replaceChildren(image);
     }
     this.el('#solo-course-name').textContent = course.name;
+    this.el('#solo-course-theme').textContent = `${course.themeLabel || 'CIRCUIT'} / LANDMARK TOUR`;
+    this.el('#solo-course-description').textContent = course.description || '';
     this.el('#solo-course-laps').textContent = `${course.totalLaps} LAPS`;
 
     const courseId = this.courseIds[this.courseIndex];

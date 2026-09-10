@@ -6,13 +6,19 @@ import { Course1 } from './course1.js';
 import { Course2 } from './course2.js';
 import { Course3 } from './course3.js';
 import { Course4 } from './course4.js';
+import { Course5 } from './course5.js';
+import { Course6 } from './course6.js';
+import { Course7 } from './course7.js';
 
 export const Courses = {
   list: {
     course1: Course1,
     course2: Course2,
     course3: Course3,
-    course4: Course4
+    course4: Course4,
+    course5: Course5,
+    course6: Course6,
+    course7: Course7
   },
 
   getCourse(id) {
@@ -130,6 +136,12 @@ export const Courses = {
         roughness: 0.9,
         metalness: 0.1
       });
+    } else if (courseConfig.theme === 'metro') {
+      roadMat = new THREE.MeshStandardMaterial({ color: 0x202936, roughness: 0.45, metalness: 0.65, emissive: 0x06111f });
+    } else if (courseConfig.theme === 'polar') {
+      roadMat = new THREE.MeshStandardMaterial({ color: 0x5d7180, roughness: 0.42, metalness: 0.25 });
+    } else if (courseConfig.theme === 'candy') {
+      roadMat = new THREE.MeshStandardMaterial({ color: 0x6e4967, roughness: 0.55, metalness: 0.12, emissive: 0x241026 });
     } else {
       roadMat = new THREE.MeshStandardMaterial({
         color: 0x333333,

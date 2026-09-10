@@ -124,6 +124,7 @@ body[data-is-landscape="true"] .garage-shell {
 .garage-course-caption { display: flex; justify-content: space-between; align-items: center; color: white; margin: 20px 2px 0; gap: 12px; }
 .garage-course-caption .garage-eyebrow { color: #9eb8c9; }
 .garage-course-caption h2 { font-size: clamp(20px, 2vw, 29px); margin-top: 6px; letter-spacing: -.7px; }
+.garage-course-description { margin-top: 5px; color: #b4c8d4; font-size: 11px; line-height: 1.5; }
 .garage-setup-side { display: flex; flex-direction: column; gap: 14px; }
 .garage-course-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .garage-button { border: 0; border-radius: 10px; padding: 17px 18px; font-size: 15px; font-weight: 750 !important; color: var(--ink); min-height: 48px; }

@@ -1,7 +1,7 @@
 import { loadIceConfig } from './ice_config.js';
 
 const VEHICLES = new Set(['standard_red', 'speed_blue', 'handling_green']);
-const COURSES = new Set(['course1', 'course2', 'course3', 'course4']);
+const COURSES = new Set(['course1', 'course2', 'course3', 'course4', 'course5', 'course6', 'course7']);
 const profile = (data = {}) => ({
   name: String(data.name || 'プレイヤー').trim().slice(0, 20) || 'プレイヤー',
   vehicleKey: VEHICLES.has(data.vehicleKey) ? data.vehicleKey : 'standard_red'

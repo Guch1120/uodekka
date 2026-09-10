@@ -1,12 +1,15 @@
 // frontend/courses/course4.js
 // コース4: 「スカイハイ・サーキット」 (大空と浮遊島を巡るジャンプ台＆グライダー滑空コース)
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+import { createThemeEnvironment } from './theme_environment.js';
 
 export const Course4 = {
   id: 'course4',
   previewImage: null,
   name: 'スカイハイ・サーキット',
   theme: 'sky',
+  themeLabel: '天空',
+  description: '空中発着場 → 浮遊島群 → 空中遺跡 → 雲海滑空区間',
   skyColor: 0x4aa3df,
   ambientColor: 0xffffff,
   trackWidth: 32,
@@ -44,66 +47,12 @@ export const Course4 = {
     { start: 0.83, end: 0.96, side: 'both' }
   ],
 
-  createEnvironment(scene) {
-    const group = new THREE.Group();
-    const obstacles = [];
+  sections: [
+    { label: '空中発着場', start: 0, end: 0.24 },
+    { label: '浮遊島群', start: 0.24, end: 0.5 },
+    { label: '空中遺跡', start: 0.5, end: 0.74 },
+    { label: '雲海滑空区間', start: 0.74, end: 1 }
+  ],
 
-    // 下界の雲海（広大な半透明プレーン）
-    const cloudGeo = new THREE.PlaneGeometry(1600, 1600, 16, 16);
-    cloudGeo.rotateX(-Math.PI / 2);
-    const cloudMat = new THREE.MeshStandardMaterial({
-      color: 0xebf3f9,
-      roughness: 0.6,
-      transparent: true,
-      opacity: 0.85
-    });
-    const cloudSea = new THREE.Mesh(cloudGeo, cloudMat);
-    cloudSea.position.y = -12;
-    group.add(cloudSea);
-
-    // 浮遊山岳・天空の岩山（ローポリマウンテン）
-    const rockMat = new THREE.MeshStandardMaterial({ color: 0x5a6a7a, roughness: 0.85 });
-    const greenCapMat = new THREE.MeshStandardMaterial({ color: 0x4caf50, roughness: 0.8 });
-
-    const mountainPositions = [
-      { x: 260, y: -10, z: 120, r: 45, h: 60 },
-      { x: 380, y: -5, z: 280, r: 55, h: 75 },
-      { x: -120, y: -8, z: 250, r: 60, h: 65 },
-      { x: -80, y: -12, z: 60, r: 50, h: 50 },
-      { x: 120, y: -15, z: -160, r: 70, h: 80 }
-    ];
-
-    mountainPositions.forEach(m => {
-      const coneGeo = new THREE.ConeGeometry(m.r, m.h, 7);
-      const rock = new THREE.Mesh(coneGeo, rockMat);
-      rock.position.set(m.x, m.y + m.h / 2, m.z);
-      group.add(rock);
-
-      const capGeo = new THREE.ConeGeometry(m.r * 0.45, m.h * 0.35, 7);
-      const cap = new THREE.Mesh(capGeo, greenCapMat);
-      cap.position.set(m.x, m.y + m.h * 0.82, m.z);
-      group.add(cap);
-    });
-
-    // ぷかぷか浮かぶ雲のモデリング（球体の集合）
-    const cloudBallMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
-    for (let c = 0; c < 24; c++) {
-      const cloudGroup = new THREE.Group();
-      const numBalls = 4 + Math.floor(Math.random() * 4);
-      for (let b = 0; b < numBalls; b++) {
-        const rad = 6 + Math.random() * 8;
-        const ball = new THREE.Mesh(new THREE.SphereGeometry(rad, 8, 8), cloudBallMat);
-        ball.position.set((Math.random() - 0.5) * 20, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 16);
-        cloudGroup.add(ball);
-      }
-      const cx = (Math.random() - 0.5) * 900;
-      const cy = 10 + Math.random() * 30;
-      const cz = (Math.random() - 0.5) * 900;
-      cloudGroup.position.set(cx, cy, cz);
-      group.add(cloudGroup);
-    }
-
-    group.userData = { obstacles };
-    return group;
-  }
+  createEnvironment() { return createThemeEnvironment(this); }
 };

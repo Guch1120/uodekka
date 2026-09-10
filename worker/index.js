@@ -1,7 +1,7 @@
 const MAX_PLAYERS = 12;
 const ROOM_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const VEHICLES = new Set(['standard_red', 'speed_blue', 'handling_green']);
-const COURSES = new Set(['course1', 'course2', 'course3', 'course4']);
+const COURSES = new Set(['course1', 'course2', 'course3', 'course4', 'course5', 'course6', 'course7']);
 
 const json = (socket, value) => { try { socket.send(JSON.stringify(value)); } catch { /* Closed sockets are removed by webSocketClose. */ } };
 const profile = value => ({ name: String(value?.name || 'プレイヤー').trim().slice(0, 20) || 'プレイヤー', vehicleKey: VEHICLES.has(value?.vehicleKey) ? value.vehicleKey : 'standard_red' });

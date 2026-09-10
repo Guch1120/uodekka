@@ -75,7 +75,13 @@ export function courseArt(course) {
   const scale = Math.min(410 / (maxX - minX || 1), 230 / (maxZ - minZ || 1));
   const coords = points.map(p => [300 + (p.x - (minX + maxX) / 2) * scale, 175 + (p.z - (minZ + maxZ) / 2) * scale]);
   const path = coords.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ') + ' Z';
-  const colors = course.theme === 'space' ? ['#202644', '#7379dc', '#9399ff'] : course.theme === 'desert' ? ['#f4d0ac', '#d7a777', '#a86737'] : ['#deecda', '#b7d0a9', '#759d68'];
+  const palettes = {
+    space: ['#202644', '#7379dc', '#9399ff'], desert: ['#f4d0ac', '#d7a777', '#a86737'],
+    sky: ['#b9e7fb', '#8ac7e8', '#477ca5'], metro: ['#1b263b', '#415a77', '#7dd3fc'],
+    polar: ['#dceaf2', '#a5d8ed', '#5b9fbd'], candy: ['#ffd6e5', '#f6a6c1', '#c95d91'],
+    grassland: ['#deecda', '#b7d0a9', '#759d68']
+  };
+  const colors = palettes[course.theme] || palettes.grassland;
   const [x, y] = coords[0];
   return `<svg viewBox="0 0 600 350" role="img" aria-label="選択コースの俯瞰図" xmlns="http://www.w3.org/2000/svg">
     <rect width="600" height="350" rx="12" fill="${colors[0]}"/>
