@@ -4,6 +4,7 @@ import { normalizeRoomId } from '../../backend/network/room_id.js';
 import { GaragePreview, courseArt } from './lobby_preview.js';
 import { CPU_ROSTER } from '../../backend/ai/cpu_driver.js';
 import { UpdateModal } from './update_modal.js';
+import { FeedbackModal } from './feedback_modal.js';
 
 const arrow = (id, direction, label) => `<button id="${id}" class="garage-arrow" aria-label="${label}">${direction === 'prev' ? '◀' : '▶'}</button>`;
 const stats = () => `<section class="garage-specs"><div class="garage-eyebrow">YOUR MACHINE</div><h2 class="vehicle-name"></h2><p class="vehicle-description"></p><div class="garage-stat-list">${[['topSpeed', 'スピード', 50], ['acceleration', '加速', 35], ['weight', '重さ', 1.5]].map(([key, label, max]) => `<label class="garage-stat"><span>${label}</span><meter data-stat="${key}" min="0" max="${max}" aria-label="${label}"></meter><span data-stat-value="${key}" class="garage-stat-value"></span></label>`).join('')}</div></section>`;
@@ -40,6 +41,7 @@ export class LobbyModal {
           <div class="garage-location"><span class="garage-live-dot"></span><span id="garage-location">ホーム / GARAGE</span></div>
           <div class="garage-header-actions">
             <button type="button" id="btn-show-updates" class="garage-subtle update-notice-btn">📢 更新情報</button>
+            <button type="button" id="btn-show-feedback" class="garage-subtle feedback-notice-btn">💬 ご意見・ご要望</button>
             <button id="garage-back" class="garage-subtle" hidden>← ホームへ</button>
           </div>
         </header>
@@ -77,6 +79,7 @@ export class LobbyModal {
       <div id="race-countdown" class="garage-countdown" role="alert" hidden><div><span class="garage-eyebrow">GET READY</span><h2>まもなくゲームが開始されます</h2><p id="countdown-course"></p><strong>3 · 2 · 1</strong></div></div>`;
     this.container.appendChild(this.modalEl);
     this.el('#player-name').value = localStorage.getItem('kart_player_name') || '';
+    this.feedbackModal = new FeedbackModal(this.modalEl, () => this.playerName);
     this.preview = new GaragePreview(this.el('#garage-vehicle-preview'));
     this.refreshCourses();
     this.bindEvents();
@@ -113,6 +116,7 @@ export class LobbyModal {
       const modal = new UpdateModal(this.modalEl);
       modal.show();
     });
+    on('#btn-show-feedback', () => this.feedbackModal.show(this.playerName));
     on('#tab-solo', () => { this.saveProfile(); this.refreshCourses(); this.confirmedCourse = null; this.showScreen('solo'); this.updateCourse(); });
     on('#tab-create', () => this.openDialog('host'));
     on('#tab-join', () => this.openDialog('guest'));

@@ -191,10 +191,21 @@ export class HUD {
 
     const posBadge = this.posBadgeEl;
     if (posBadge) {
-      posBadge.className = `hud-badge position-badge pos-${pos}`;
+      // pos-N クラスのみ差し替え、pulse系クラスは毎フレームのclassName全書き換えで消さない
+      // （0.5sのパルスアニメーションはこのupdate()が次フレームで即座に呼ばれるため、
+      //  className全体を再代入すると再生中に強制終了してしまう）
+      const targetPosClass = `pos-${pos}`;
+      if (!posBadge.classList.contains(targetPosClass)) {
+        Array.from(posBadge.classList).forEach(cls => {
+          if (/^pos-\d+$/.test(cls)) posBadge.classList.remove(cls);
+        });
+        posBadge.classList.add(targetPosClass);
+      }
       // 順位変動時のみ一瞬パルス（上昇=緑／下降=赤）。常時演出はしない。
       if (this.lastPosition !== null && pos !== this.lastPosition) {
-        this._restartAnimation(posBadge, pos < this.lastPosition ? 'pulse-up' : 'pulse-down');
+        posBadge.classList.remove('pulse-up', 'pulse-down');
+        void posBadge.offsetWidth; // reflow強制でアニメーションをリスタート
+        posBadge.classList.add(pos < this.lastPosition ? 'pulse-up' : 'pulse-down');
       }
       this.lastPosition = pos;
     }
