@@ -1,7 +1,7 @@
 import { normalizeRoomId } from './room_id.js';
 
 const VEHICLES = new Set(['standard_red', 'speed_blue', 'handling_green']);
-const COURSES = new Set(['course1', 'course2', 'course3']);
+const COURSES = new Set(['course1', 'course2', 'course3', 'course4']);
 const profile = data => ({ name: String(data?.name || 'プレイヤー').trim().slice(0, 20) || 'プレイヤー', vehicleKey: VEHICLES.has(data?.vehicleKey) ? data.vehicleKey : 'standard_red' });
 
 export class WebSocketManager {
@@ -45,7 +45,7 @@ export class WebSocketManager {
     if (data.type === 'WELCOME') { this.myPeerId = data.id; this.isHost = !!data.isHost; return; }
     if (data.type === 'ROOM_ERROR') { clearTimeout(this.roomTimer); const error = Object.assign(new Error(String(data.message || 'ルームに参加できません。')), { code: data.code, retryable: false }); this.pendingReject?.(error); this.pendingReject = null; this.onConnectionError?.(error.message); return; }
     if (data.type === 'ROOM_STATE') {
-      clearTimeout(this.roomTimer); this.roomId = data.roomId; this.members = Array.isArray(data.members) ? data.members.slice(0, 8) : []; this.courseId = COURSES.has(data.courseId) ? data.courseId : null; this.phase = data.phase || 'lobby';
+      clearTimeout(this.roomTimer); this.roomId = data.roomId; this.members = Array.isArray(data.members) ? data.members.slice(0, 12) : []; this.courseId = COURSES.has(data.courseId) ? data.courseId : null; this.phase = data.phase || 'lobby';
       this.isHost = this.members.some(member => member.id === this.myPeerId && member.isHost); this.onRoomState?.(data);
       if (this.pendingResolve) { const done = this.pendingResolve; this.pendingResolve = null; this.report('connected', 'ルームに接続しました。'); done(this.roomId); }
       return;
@@ -65,8 +65,18 @@ export class WebSocketManager {
       }
     }
   }
+  updateProfile(data = {}) {
+    const p = profile(data);
+    const myMember = this.members.find(m => m.id === this.myPeerId);
+    if (myMember) {
+      myMember.name = p.name;
+      myMember.vehicleKey = p.vehicleKey;
+      this.onRoomState?.({ roomId: this.roomId, members: this.members, courseId: this.courseId, phase: this.phase });
+    }
+    this.send({ type: 'UPDATE_PROFILE', ...p });
+  }
   selectCourse(courseId) { if (!this.isHost || !COURSES.has(courseId)) return false; this.courseId = courseId; this.send({ type: 'SELECT_COURSE', courseId }); return true; }
-  broadcastStartRace(aiRacers = []) { if (!this.isHost || !this.courseId || this.phase !== 'lobby') return false; this.phase = 'starting'; this.send({ type: 'START_RACE', aiRacers }); return true; }
+  broadcastStartRace(aiRacers = []) { if (!this.isHost || !this.courseId || this.phase !== 'lobby') return false; this.phase = 'starting'; this.send({ type: 'START_RACE', courseId: this.courseId, aiRacers }); return true; }
   sendKartState(state) {
     if (!this.roomId || this.socket?.readyState !== WebSocket.OPEN) return;
     if (this.socket.bufferedAmount > 32768) {

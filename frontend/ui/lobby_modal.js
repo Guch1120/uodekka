@@ -36,6 +36,7 @@ export class LobbyModal {
     this.modalEl.className = 'garage';
     this.modalEl.innerHTML = `
       <div class="garage-shell">
+        <div id="garage-toast" class="garage-toast hidden" role="status" aria-live="polite"></div>
         <header class="garage-header">
           <div class="garage-brand"><span class="garage-brand-mark">U<span>•</span>D</span><div>UO:De Car<small>READY. SET. DRIVE.</small></div></div>
           <div class="garage-location"><span class="garage-live-dot"></span><span id="garage-location">ホーム / GARAGE</span></div>
@@ -69,7 +70,29 @@ export class LobbyModal {
             <div class="garage-setup-side"><div class="garage-course-actions"><button id="course-confirm" class="garage-button garage-button-green">✓ コース決定</button><button id="course-random" class="garage-button garage-button-light">⤨ ランダム決定</button></div><p id="course-confirmation" class="garage-note" aria-live="polite">コースを選んで確定してください。</p>${stats()}<button id="btn-start-solo" class="garage-button garage-button-start" disabled>ゲームスタート <span>→</span></button></div>
           </section>
           <section class="garage-screen garage-setup" data-screen="room" hidden>
-            <section class="garage-members-panel"><div class="garage-section-heading"><div><span class="garage-eyebrow">MULTIPLAYER / PADDOCK</span><h1>ルームメンバー</h1></div><span id="member-count" class="garage-chip"></span></div><div class="garage-room-code"><span>ROOM ID <strong id="display-room-id"></strong></span><button id="room-copy" class="garage-subtle">招待URLをコピー ↗</button></div><p class="garage-network-note" role="status"></p><button id="room-diagnostics" class="garage-copy-link">接続診断をコピー</button><pre id="room-diagnostics-text" class="garage-diagnostics" hidden></pre><ul id="players-list" class="garage-members"></ul><p class="garage-note">ホストがコースを決めると、全員の画面に表示されます。</p></section>
+            <section class="garage-members-panel">
+              <div class="garage-section-heading">
+                <div><span class="garage-eyebrow">MULTIPLAYER / PADDOCK</span><h1>ルームメンバー</h1></div>
+                <div class="garage-heading-badges">
+                  <span id="room-online-status" class="garage-chip garage-chip-online">🟢 接続完了</span>
+                  <span id="member-count" class="garage-chip"></span>
+                </div>
+              </div>
+              <div class="garage-room-code">
+                <span>ROOM ID <strong id="display-room-id"></strong></span>
+                <span id="display-room-host" class="garage-room-host-tag"></span>
+                <button id="room-copy" class="garage-subtle">招待URLをコピー ↗</button>
+              </div>
+              <div class="garage-member-name-editor">
+                <label for="room-player-name">自分の名前:</label>
+                <input id="room-player-name" maxlength="20" placeholder="名前を入力" autocomplete="nickname">
+              </div>
+              <p class="garage-network-note" role="status"></p>
+              <button id="room-diagnostics" class="garage-copy-link">接続診断をコピー</button>
+              <pre id="room-diagnostics-text" class="garage-diagnostics" hidden></pre>
+              <ul id="players-list" class="garage-members"></ul>
+              <p class="garage-note">ホストがコースを決めると、全員の画面に表示されます。</p>
+            </section>
             <div class="garage-setup-side"><section class="garage-room-course"><span class="garage-eyebrow">NEXT CIRCUIT</span><h2 id="room-course-name" aria-live="polite">コース未決定</h2><button id="room-random" class="garage-button garage-button-light">⤨ ランダムコース決定</button><p id="room-role-note" class="garage-note"></p></section>${stats()}<button id="btn-host-start" class="garage-button garage-button-start" disabled>ゲームスタート <span>→</span></button></div>
           </section>
         </main>
@@ -87,7 +110,21 @@ export class LobbyModal {
     this.p2pManager.onConnectionStatus = info => {
       const dialog = this.el('#room-dialog');
       if (dialog.open) this.el('#room-dialog-status').textContent = info.message;
-      else if (this.screen === 'room') this.setStatus(info.message);
+      this.setStatus(info.message);
+      const onlineEl = this.el('#room-online-status');
+      if (info.stage === 'connecting' || info.stage === 'signaling' || info.stage === 'reconnecting') {
+        this.showToast('connecting', info.message, 0);
+        if (onlineEl) {
+          onlineEl.className = 'garage-chip garage-chip-connecting';
+          onlineEl.textContent = '🟡 接続試行中…';
+        }
+      } else if (info.stage === 'connected') {
+        this.showToast('connected', 'ゲームサーバーに接続しました。', 2500);
+        if (onlineEl) {
+          onlineEl.className = 'garage-chip garage-chip-online';
+          onlineEl.textContent = '🟢 接続中';
+        }
+      }
       this.modalEl.querySelectorAll('.garage-network-note').forEach(el => { el.textContent = 'ゲームサーバー経由で接続しています。'; });
     };
     this.p2pManager.onRoomState = () => this.updateRoom();
@@ -97,6 +134,7 @@ export class LobbyModal {
       this.modalEl.hidden = false;
       if (this.el('#room-dialog').open) this.el('#room-dialog').close();
       this.returnHome();
+      this.showToast('error', message || 'ゲームサーバーから切断されました。', 4000);
       this.setStatus(message);
     };
     this.p2pManager.onDisconnected = disconnected;
@@ -108,8 +146,26 @@ export class LobbyModal {
   bindEvents() {
     const on = (id, fn) => { this.el(id).onclick = fn; };
     // Text entry and menu touches must not operate the race controls behind this UI.
-    ['keydown', 'keyup', 'touchstart', 'touchend'].forEach(type => this.modalEl.addEventListener(type, event => event.stopPropagation()));
-    this.el('#player-name').addEventListener('input', () => localStorage.setItem('kart_player_name', this.playerName));
+    const handleNameChange = (newName) => {
+      const trimmed = String(newName || '').slice(0, 20);
+      localStorage.setItem('kart_player_name', trimmed.trim());
+      const homeInput = this.el('#player-name');
+      if (homeInput && homeInput.value !== trimmed) {
+        homeInput.value = trimmed;
+      }
+      const roomInput = this.el('#room-player-name');
+      if (roomInput && roomInput.value !== trimmed) {
+        roomInput.value = trimmed;
+      }
+      if (this.p2pManager.roomId && typeof this.p2pManager.updateProfile === 'function') {
+        this.p2pManager.updateProfile({ name: trimmed.trim() || 'プレイヤー', vehicleKey: this.vehicleKey });
+      }
+    };
+    this.el('#player-name').addEventListener('input', e => handleNameChange(e.target.value));
+    const roomNameInput = this.el('#room-player-name');
+    if (roomNameInput) {
+      roomNameInput.addEventListener('input', e => handleNameChange(e.target.value));
+    }
     on('#vehicle-prev', () => this.changeVehicle(-1));
     on('#vehicle-next', () => this.changeVehicle(1));
     on('#btn-show-updates', () => {
@@ -315,6 +371,7 @@ export class LobbyModal {
       this.el('#room-dialog').close();
       this.showScreen('room');
       this.updateRoom();
+      this.showToast('connected', 'ルームに接続しました。', 2500);
       this.setStatus('ルームに接続しました。');
     } catch (error) {
       if (attempt !== this.connectionAttempt) return;
@@ -325,25 +382,84 @@ export class LobbyModal {
     }
   }
 
+  showToast(type, text, durationMs = 3000) {
+    const toast = this.el('#garage-toast');
+    if (!toast) return;
+    clearTimeout(this._toastTimer);
+    toast.className = `garage-toast toast-${type}`;
+    let icon = 'ℹ️';
+    if (type === 'connecting') icon = '<span class="toast-spinner"></span>';
+    else if (type === 'success' || type === 'connected') icon = '✅';
+    else if (type === 'error') icon = '⚠️';
+    toast.innerHTML = `<span class="toast-icon">${icon}</span><span class="toast-text">${text}</span>`;
+    toast.classList.remove('hidden');
+
+    if (durationMs > 0) {
+      this._toastTimer = setTimeout(() => {
+        toast.classList.add('hidden');
+      }, durationMs);
+    }
+  }
+
   updateRoom() {
     const p2p = this.p2pManager;
     this.el('#display-room-id').textContent = p2p.roomId || '';
     this.el('#member-count').textContent = `${p2p.members.length} / 12 人（不足${Math.max(0, 12 - p2p.members.length)}枠はCPU参戦）`;
+
+    const hostMember = p2p.members.find(m => m.isHost);
+    const hostTagEl = this.el('#display-room-host');
+    if (hostTagEl) {
+      hostTagEl.innerHTML = hostMember ? `👑 主催者: <strong>${hostMember.name}</strong>` : '';
+    }
+
+    const roomNameInput = this.el('#room-player-name');
+    if (roomNameInput && document.activeElement !== roomNameInput) {
+      roomNameInput.value = this.playerName;
+    }
+
     const list = this.el('#players-list');
     list.replaceChildren();
     [...p2p.members].sort((a, b) => Number(b.isHost) - Number(a.isHost)).forEach((member, i) => {
+      const isMe = member.id === p2p.myPeerId;
       const row = document.createElement('li');
-      row.className = `garage-member ${member.isHost ? 'is-host' : ''}`;
-      const avatar = document.createElement('span'); avatar.className = 'garage-avatar'; avatar.textContent = member.name.slice(0, 1);
+      row.className = `garage-member ${member.isHost ? 'is-host' : ''} ${isMe ? 'is-me' : ''}`;
+
+      const avatar = document.createElement('span');
+      avatar.className = `garage-avatar ${member.isHost ? 'avatar-host' : ''}`;
+      avatar.textContent = member.isHost ? '👑' : member.name.slice(0, 1);
+
       const info = document.createElement('div');
-      const name = document.createElement('strong'); name.textContent = member.name + (member.id === p2p.myPeerId ? '（あなた）' : '');
-      const car = document.createElement('small'); car.textContent = Vehicles.types[member.vehicleKey]?.name || '';
-      info.append(name, car);
-      const badge = document.createElement('span'); badge.className = 'garage-member-role'; badge.textContent = member.isHost ? 'HOST' : `GUEST ${String(i).padStart(2, '0')}`;
-      row.append(avatar, info, badge); list.appendChild(row);
+      info.className = 'garage-member-info';
+
+      const nameRow = document.createElement('div');
+      nameRow.className = 'garage-member-name-row';
+      const name = document.createElement('strong');
+      name.textContent = member.name;
+      nameRow.appendChild(name);
+
+      if (isMe) {
+        const youTag = document.createElement('span');
+        youTag.className = 'garage-badge-you';
+        youTag.textContent = 'あなた';
+        nameRow.appendChild(youTag);
+      }
+
+      const car = document.createElement('small');
+      car.textContent = Vehicles.types[member.vehicleKey]?.name || '';
+      info.append(nameRow, car);
+
+      const badge = document.createElement('span');
+      badge.className = `garage-member-role ${member.isHost ? 'garage-badge-host' : 'garage-badge-guest'}`;
+      badge.innerHTML = member.isHost ? '<span class="role-icon">👑</span> ホスト' : `<span class="role-icon">🎮</span> ゲスト`;
+
+      row.append(avatar, info, badge);
+      list.appendChild(row);
     });
     if (p2p.members.length === 1) {
-      const empty = document.createElement('li'); empty.className = 'garage-member-empty'; empty.textContent = '＋ 招待URLを送って、友だちを待とう。'; list.appendChild(empty);
+      const empty = document.createElement('li');
+      empty.className = 'garage-member-empty';
+      empty.textContent = '＋ 招待URLを送って、友だちを待とう。不足枠はCPUが参戦します。';
+      list.appendChild(empty);
     }
     this.el('#room-course-name').textContent = p2p.courseId ? Courses.getCourse(p2p.courseId).name : 'コース未決定';
     this.el('#room-random').disabled = !p2p.isHost || this.starting || p2p.phase !== 'lobby';

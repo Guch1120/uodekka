@@ -314,7 +314,8 @@ export class Game {
             const mesh = Vehicles.createKartMesh(vKey, state.color, state.accent);
             this.scene.add(mesh);
             const physics = new KartPhysics(mesh, Vehicles.types[vKey] || Vehicles.types.standard_red, false);
-            aiKart = { id: state.id, name: state.name, mesh, physics, isAI: false, isHostControlled: false, colorHex: state.colorHex };
+            physics.totalLaps = this.currentCourseConfig ? this.currentCourseConfig.totalLaps : 3;
+            aiKart = { id: state.id, name: state.name, mesh, physics, isAI: false, isHostControlled: false, colorHex: state.colorHex || '#e74c3c' };
             this.otherPlayers.set(state.id, aiKart);
           }
           if (!aiKart.isHostControlled) {
@@ -323,6 +324,10 @@ export class Game {
             aiKart.physics.currentLap = state.lap;
             aiKart.physics.progress = state.progress;
             aiKart.physics.speed = state.speed;
+            if (state.isFinished && !aiKart.physics.isFinished) {
+              aiKart.physics.isFinished = true;
+              aiKart.physics.finishTime = state.finishTime || performance.now();
+            }
           }
         });
       } catch (err) {
@@ -443,67 +448,75 @@ export class Game {
     // 12人レースの編成
     if (config.mode === 'solo') {
       // ソロ：プレイヤー1人 ＋ CPU 11台 ＝ 合計12台
-      this.spawnAICarts(config.vehicleKey, 11, 1);
-    } else if (config.mode === 'multi_host') {
-      // マルチホスト：共有されたaiRacers編成に基づいてCPUを配置
-      if (config.aiRacers && config.aiRacers.length > 0) {
-        config.aiRacers.forEach(bot => {
-          const grid = this.getGridTransform(curve, bot.gridIndex);
-          const vKey = bot.vehicleKey || 'standard_red';
-          const mesh = Vehicles.createKartMesh(vKey, bot.color, bot.accent);
-          mesh.position.copy(grid.pos);
-          mesh.rotation.set(0, grid.yaw, 0, 'YXZ');
-          this.scene.add(mesh);
-
-          const physics = new KartPhysics(mesh, Vehicles.types[vKey] || Vehicles.types.standard_red, false);
-          physics.alignToTrack(curve, grid.progress);
-          physics.totalLaps = this.currentCourseConfig.totalLaps;
-          physics.progress = grid.progress;
-          physics.lastSafeT = grid.progress;
-
-          this.otherPlayers.set(bot.id, {
-            id: bot.id,
-            name: bot.name,
-            mesh,
-            physics,
-            isAI: true,
-            isHostControlled: true,
-            personality: bot,
-            aiOffset: bot.offsetBias || 0,
-            speedMultiplier: bot.speedScale || 1.0,
-            colorHex: '#' + (bot.color || 0xe74c3c).toString(16).padStart(6, '0')
-          });
+    } else {
+      // マルチプレイ：他の参加プレイヤーをグリッドに初期配置
+      if (Array.isArray(this.p2p.members)) {
+        this.p2p.members.forEach((member, idx) => {
+          if (member.id !== this.p2p.myPeerId && !this.otherPlayers.has(member.id)) {
+            const grid = this.getGridTransform(curve, idx);
+            const vKey = member.vehicleKey || 'speed_blue';
+            const mesh = Vehicles.createKartMesh(vKey);
+            mesh.position.copy(grid.pos);
+            mesh.rotation.set(0, grid.yaw, 0, 'YXZ');
+            this.scene.add(mesh);
+            const physics = new KartPhysics(mesh, Vehicles.types[vKey] || Vehicles.types.standard_red, false);
+            physics.alignToTrack(curve, grid.progress);
+            physics.totalLaps = this.currentCourseConfig.totalLaps;
+            physics.progress = grid.progress;
+            this.otherPlayers.set(member.id, {
+              id: member.id,
+              name: member.name,
+              mesh,
+              physics,
+              isAI: false,
+              isHostControlled: false,
+              colorHex: '#38bdf8'
+            });
+          }
         });
-      } else {
+      }
+
+      if (config.mode === 'multi_host') {
+        // マルチホスト：参加者M人 ＋ 不足(12 - M)台のCPU ＝ 合計12台
         const memberCount = this.p2p.members.length;
         const neededCpu = Math.max(0, 12 - memberCount);
         if (neededCpu > 0) {
           this.spawnAICarts(config.vehicleKey, neededCpu, memberCount);
         }
-      }
-    } else if (config.mode === 'multi_guest') {
-      // マルチゲスト：ホストから送られたCPUカートリストを配置
-      if (config.aiRacers && config.aiRacers.length > 0) {
-        config.aiRacers.forEach(bot => {
-          const grid = this.getGridTransform(curve, bot.gridIndex);
-          const mesh = Vehicles.createKartMesh(bot.vehicleKey, bot.color, bot.accent);
-          mesh.position.copy(grid.pos);
-          mesh.rotation.set(0, grid.yaw, 0, 'YXZ');
-          this.scene.add(mesh);
-          const physics = new KartPhysics(mesh, Vehicles.types[bot.vehicleKey] || Vehicles.types.standard_red, false);
-          physics.alignToTrack(curve, grid.progress);
-          physics.totalLaps = this.currentCourseConfig.totalLaps;
-          physics.progress = grid.progress;
-          this.otherPlayers.set(bot.id, {
-            id: bot.id,
-            name: bot.name,
-            mesh,
-            physics,
-            isAI: false,
-            isHostControlled: false,
-            colorHex: '#' + (bot.color || 0xe74c3c).toString(16).padStart(6, '0')
+      } else if (config.mode === 'multi_guest') {
+        // マルチゲスト：ホストから送られたCPUカートリストを配置（なければフォールバック自動生成）
+        let bots = config.aiRacers;
+        if (!bots || bots.length === 0) {
+          const memberCount = Math.max(1, this.p2p.members ? this.p2p.members.length : 1);
+          const neededCpu = Math.max(0, 12 - memberCount);
+          bots = CPU_ROSTER.slice(0, neededCpu).map((b, idx) => ({
+            ...b,
+            gridIndex: memberCount + idx
+          }));
+        }
+        if (bots && bots.length > 0) {
+          bots.forEach(bot => {
+            const grid = this.getGridTransform(curve, bot.gridIndex);
+            const vKey = bot.vehicleKey || 'standard_red';
+            const mesh = Vehicles.createKartMesh(vKey, bot.color, bot.accent);
+            mesh.position.copy(grid.pos);
+            mesh.rotation.set(0, grid.yaw, 0, 'YXZ');
+            this.scene.add(mesh);
+            const physics = new KartPhysics(mesh, Vehicles.types[vKey] || Vehicles.types.standard_red, false);
+            physics.alignToTrack(curve, grid.progress);
+            physics.totalLaps = this.currentCourseConfig.totalLaps;
+            physics.progress = grid.progress;
+            this.otherPlayers.set(bot.id, {
+              id: bot.id,
+              name: bot.name,
+              mesh,
+              physics,
+              isAI: false,
+              isHostControlled: false,
+              colorHex: '#' + (bot.color || 0xe74c3c).toString(16).padStart(6, '0')
+            });
           });
-        });
+        }
       }
     }
 
@@ -838,11 +851,13 @@ export class Game {
               qw: p.mesh.quaternion.w,
               speed: p.physics.speed,
               lap: p.physics.currentLap,
-              progress: p.physics.progress
+              progress: p.physics.progress,
+              isFinished: !!p.physics.isFinished,
+              finishTime: p.physics.finishTime || 0
             });
           }
         });
-        if (cpuStates.length > 0) {
+        if (cpuStates.length > 0 && typeof this.p2p.sendCpuStates === 'function') {
           this.p2p.sendCpuStates(cpuStates);
         }
       }

@@ -1,7 +1,7 @@
 import { loadIceConfig } from './ice_config.js';
 
 const VEHICLES = new Set(['standard_red', 'speed_blue', 'handling_green']);
-const COURSES = new Set(['course1', 'course2', 'course3']);
+const COURSES = new Set(['course1', 'course2', 'course3', 'course4']);
 const profile = (data = {}) => ({
   name: String(data.name || 'プレイヤー').trim().slice(0, 20) || 'プレイヤー',
   vehicleKey: VEHICLES.has(data.vehicleKey) ? data.vehicleKey : 'standard_red'
@@ -346,10 +346,32 @@ export class P2PManager {
     this.broadcast({ type: 'CPU_STATES', time: performance.now(), states });
   }
 
+  updateProfile(data = {}) {
+    const p = profile(data);
+    const myMember = this.members.find(m => m.id === this.myPeerId);
+    if (myMember) {
+      myMember.name = p.name;
+      myMember.vehicleKey = p.vehicleKey;
+    }
+    if (this.isHost) {
+      this.publishRoom();
+    } else {
+      this.broadcast({ type: 'UPDATE_PROFILE', ...p });
+    }
+  }
+
   handleDataFromGuest(senderPeerId, data) {
     if (!this.isHost || !this.members.some(m => m.id === senderPeerId) || !data || typeof data !== 'object') return;
     // Only the host can change room state or send START_RACE.
-    if (data.type === 'KART_STATE' && data.state) {
+    if (data.type === 'UPDATE_PROFILE') {
+      const p = profile(data);
+      const member = this.members.find(m => m.id === senderPeerId);
+      if (member) {
+        member.name = p.name;
+        member.vehicleKey = p.vehicleKey;
+        this.publishRoom();
+      }
+    } else if (data.type === 'KART_STATE' && data.state) {
       const payload = { ...data, senderId: senderPeerId };
       this.onPeerStateReceived?.(senderPeerId, data.state);
       this.connections.forEach(c => { if (c.peer !== senderPeerId && c.open) c.send(payload); });

@@ -1,7 +1,7 @@
-const MAX_PLAYERS = 8;
+const MAX_PLAYERS = 12;
 const ROOM_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const VEHICLES = new Set(['standard_red', 'speed_blue', 'handling_green']);
-const COURSES = new Set(['course1', 'course2', 'course3']);
+const COURSES = new Set(['course1', 'course2', 'course3', 'course4']);
 
 const json = (socket, value) => { try { socket.send(JSON.stringify(value)); } catch { /* Closed sockets are removed by webSocketClose. */ } };
 const profile = value => ({ name: String(value?.name || 'プレイヤー').trim().slice(0, 20) || 'プレイヤー', vehicleKey: VEHICLES.has(value?.vehicleKey) ? value.vehicleKey : 'standard_red' });
@@ -37,7 +37,7 @@ export class Room {
       } else if (message.type !== 'JOIN_ROOM') return json(socket, { type: 'ROOM_ERROR', code: 'invalid-message', message: 'ルーム作成または参加を指定してください。' });
       if (!room.roomId) return json(socket, { type: 'ROOM_ERROR', code: 'room-not-found', message: 'ルームが見つかりません。ホストが作成したIDを確認してください。' });
       if (room.phase !== 'lobby') return json(socket, { type: 'ROOM_ERROR', code: 'race-started', message: 'レースはすでに開始しています。' });
-      if (room.members.length >= MAX_PLAYERS) return json(socket, { type: 'ROOM_ERROR', code: 'room-full', message: 'ルームは満員です（最大8人）。' });
+      if (room.members.length >= MAX_PLAYERS) return json(socket, { type: 'ROOM_ERROR', code: 'room-full', message: 'ルームは満員です（最大12人）。' });
       const memberId = message.type === 'CREATE_ROOM' ? room.hostId : crypto.randomUUID();
       room.members.push({ id: memberId, ...profile(message) });
       socket.serializeAttachment({ memberId });
@@ -48,6 +48,13 @@ export class Room {
     const member = room.members.find(item => item.id === attachment.memberId);
     if (!member) return json(socket, { type: 'ROOM_ERROR', code: 'not-in-room', message: 'ルームに参加していません。' });
     if (message.type === 'REQUEST_ROOM_STATE') return this.publish();
+    if (message.type === 'UPDATE_PROFILE') {
+      const p = profile(message);
+      member.name = p.name;
+      member.vehicleKey = p.vehicleKey;
+      await this.ctx.storage.put('room', room);
+      return this.publish();
+    }
     if (message.type === 'SELECT_COURSE') {
       if (member.id !== room.hostId || room.phase !== 'lobby' || !COURSES.has(message.courseId)) return;
       room.courseId = message.courseId; await this.ctx.storage.put('room', room); return this.publish();
