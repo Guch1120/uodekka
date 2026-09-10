@@ -721,10 +721,9 @@ canvas {
 /* ================= モーダルダイアログ ================= */
 .modal-backdrop {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   background: rgba(0, 0, 0, 0.75);
   backdrop-filter: blur(8px);
   display: flex;
@@ -2367,10 +2366,10 @@ body.force-landscape .result-main-grid {
     padding: 6px 12px;
   }
   .update-modal-card {
-    width: min(720px, 96vw);
-    max-height: 94dvh;
+    width: min(680px, 94%);
+    max-height: 94%;
     padding: 8px 16px;
-    border-radius: 14px;
+    border-radius: 12px;
     overflow-y: hidden;
   }
   .update-modal-header {
@@ -2444,9 +2443,10 @@ body.force-landscape .result-main-grid {
 
   /* フィードバックモーダル: 2カラム化 & スクロール不要化 */
   #feedback-modal .modal-dialog {
-    max-width: min(680px, 94vw);
-    max-height: 94dvh;
-    border-radius: 14px;
+    width: min(640px, 94%);
+    max-width: 94%;
+    max-height: 94%;
+    border-radius: 12px;
     overflow-y: hidden;
   }
   #feedback-modal .modal-header {
@@ -2666,10 +2666,10 @@ body.force-landscape .update-modal-backdrop {
 }
 body[data-is-compact="true"] .update-modal-card,
 body.force-landscape .update-modal-card {
-  width: min(720px, 96vw);
-  max-height: 94dvh;
+  width: min(680px, 94%);
+  max-height: 94%;
   padding: 8px 16px;
-  border-radius: 14px;
+  border-radius: 12px;
   overflow-y: hidden;
 }
 body[data-is-compact="true"] .update-modal-header,
@@ -2756,9 +2756,10 @@ body.force-landscape .update-confirm-btn {
 
 body[data-is-compact="true"] #feedback-modal .modal-dialog,
 body.force-landscape #feedback-modal .modal-dialog {
-  max-width: min(680px, 94vw);
-  max-height: 94dvh;
-  border-radius: 14px;
+  width: min(640px, 94%);
+  max-width: 94%;
+  max-height: 94%;
+  border-radius: 12px;
   overflow-y: hidden;
 }
 body[data-is-compact="true"] #feedback-modal .modal-header,

@@ -190,8 +190,10 @@ export class LobbyModal {
     on('#vehicle-prev', () => this.changeVehicle(-1));
     on('#vehicle-next', () => this.changeVehicle(1));
     on('#btn-show-updates', () => {
-      const modal = new UpdateModal(this.modalEl);
-      modal.show();
+      if (!this.updateModal) {
+        this.updateModal = new UpdateModal(this.modalEl);
+      }
+      this.updateModal.show();
     });
     on('#btn-show-feedback', () => this.feedbackModal.show(this.playerName));
     on('#tab-solo', () => { this.saveProfile(); this.refreshCourses(); this.confirmedCourse = null; this.showScreen('solo'); this.updateCourse(); });

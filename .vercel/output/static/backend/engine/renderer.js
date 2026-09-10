@@ -31,10 +31,16 @@ export class GameRenderer {
     this.graphicQuality = (typeof localStorage !== 'undefined' && localStorage.getItem('kart_graphic_quality')) || (isMobile ? 'normal' : 'high');
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setSize(w, h);
+    this.renderer.setSize(w, h, false);
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-    this.container.appendChild(this.renderer.domElement);
+    const dom = this.renderer.domElement;
+    dom.style.position = 'absolute';
+    dom.style.top = '0';
+    dom.style.left = '0';
+    dom.style.width = '100%';
+    dom.style.height = '100%';
+    this.container.appendChild(dom);
 
     // ライティング
     this.ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
@@ -55,7 +61,6 @@ export class GameRenderer {
     this.applyQualitySettings(this.graphicQuality);
 
     // WebGLコンテキスト喪失/復帰イベントの監視
-    const dom = this.renderer.domElement;
     dom.addEventListener('webglcontextlost', (event) => {
       event.preventDefault(); // 復帰可能にするためpreventDefaultを呼ぶ
       this.isContextLost = true;
@@ -72,22 +77,8 @@ export class GameRenderer {
       this.onContextRestored?.();
     }, false);
 
-    // リサイズおよび画面復帰イベント（他アプリ・ホーム画面からの復帰時の比率崩れ防止）
-    const triggerResize = () => {
-      this.onResize();
-      setTimeout(() => this.onResize(), 80);
-      setTimeout(() => this.onResize(), 250);
-      setTimeout(() => this.onResize(), 600);
-    };
+    // リサイズイベントの監視
     window.addEventListener('resize', () => this.onResize());
-    window.addEventListener('orientationchange', triggerResize);
-    window.addEventListener('pageshow', triggerResize);
-    window.addEventListener('focus', triggerResize);
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
-        triggerResize();
-      }
-    });
   }
 
   setGraphicQuality(quality) {
@@ -140,7 +131,7 @@ export class GameRenderer {
       this.camera.aspect = aspect;
       this.camera.updateProjectionMatrix();
     }
-    this.renderer.setSize(w, h);
+    this.renderer.setSize(w, h, false);
   }
 
   render() {

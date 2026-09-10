@@ -79,6 +79,10 @@
       const screenW = window.screen ? window.screen.width : w;
       const screenH = window.screen ? window.screen.height : h;
 
+      if (w >= h && document.body && document.body.classList.contains('force-landscape')) {
+        document.body.classList.remove('force-landscape');
+      }
+
       const isForcedLandscapeInPortrait = document.body && document.body.classList.contains('force-landscape') && (h > w);
       const effW = isForcedLandscapeInPortrait ? h : w;
       const effH = isForcedLandscapeInPortrait ? w : h;
@@ -104,6 +108,8 @@
       document.documentElement.dataset.aspectRatio = aspect;
       document.documentElement.dataset.isCompact = String(info.isCompact);
       document.documentElement.dataset.isLandscape = String(info.isLandscape);
+      document.documentElement.style.setProperty('--app-width', `${effW}px`);
+      document.documentElement.style.setProperty('--app-height', `${effH}px`);
       if (document.body) {
         document.body.dataset.aspectRatio = aspect;
         document.body.dataset.isCompact = String(info.isCompact);
@@ -111,33 +117,37 @@
       }
       return info;
     }
-    function handleAppResumeAndResize() {
+
+    let _resumeDebounceTimer = null;
+    function syncAppLayout() {
       if (window._gameSessionStarted && screen.orientation && screen.orientation.lock) {
         screen.orientation.lock('landscape').catch(() => {});
       }
       detectDeviceInfo();
-      if (window.gameInstance && window.gameInstance.renderer) {
-        window.gameInstance.renderer.onResize();
+      if (window.gameInstance) {
+        if (window.gameInstance.renderer) window.gameInstance.renderer.onResize();
+        if (window.gameInstance.inputManager) window.gameInstance.inputManager.applyLayoutToElements();
       }
       window.dispatchEvent(new Event('resize'));
     }
 
-    function stagedResumeSync() {
-      handleAppResumeAndResize();
-      [80, 200, 500, 900, 1400].forEach(delay => setTimeout(handleAppResumeAndResize, delay));
+    function handleAppResume() {
+      syncAppLayout();
+      if (_resumeDebounceTimer) clearTimeout(_resumeDebounceTimer);
+      _resumeDebounceTimer = setTimeout(syncAppLayout, 140);
     }
 
     detectDeviceInfo();
     window.addEventListener('resize', detectDeviceInfo);
-    window.addEventListener('orientationchange', stagedResumeSync);
-    window.addEventListener('pageshow', stagedResumeSync);
-    window.addEventListener('focus', stagedResumeSync);
+    window.addEventListener('orientationchange', handleAppResume);
+    window.addEventListener('pageshow', handleAppResume);
+    window.addEventListener('focus', handleAppResume);
     if (screen.orientation && typeof screen.orientation.addEventListener === 'function') {
-      screen.orientation.addEventListener('change', stagedResumeSync);
+      screen.orientation.addEventListener('change', handleAppResume);
     }
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
-        stagedResumeSync();
+        handleAppResume();
       }
     });
 

@@ -175,9 +175,12 @@ export class Game {
 
     // 画面サイズ・向き変化監視（横向きになったらプロンプトを閉じ、サイズ再計算）
     window.addEventListener('resize', () => {
-      if (window.innerWidth > window.innerHeight) {
+      if (window.innerWidth >= window.innerHeight) {
         const orientationPrompt = document.getElementById('orientation-prompt');
         if (orientationPrompt) orientationPrompt.classList.add('dismissed');
+        if (document.body.classList.contains('force-landscape')) {
+          document.body.classList.remove('force-landscape');
+        }
       }
       if (this.renderer) this.renderer.onResize();
     });
@@ -261,14 +264,6 @@ export class Game {
         this.renderer.onResize();
       }
       window.dispatchEvent(new Event('resize'));
-      setTimeout(() => {
-        if (this.renderer) this.renderer.onResize();
-        window.dispatchEvent(new Event('resize'));
-      }, 100);
-      setTimeout(() => {
-        if (this.renderer) this.renderer.onResize();
-        window.dispatchEvent(new Event('resize'));
-      }, 300);
     };
 
     // Orientation Lock を試行

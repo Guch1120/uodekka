@@ -66,6 +66,11 @@ export class UpdateModal {
     const latest = UpdateModal.latestRelease;
     const pastReleases = (UPDATE_NOTIFICATION.releases || []).slice(1);
 
+    const existing = this.container.querySelector('#update-modal');
+    if (existing) {
+      existing.remove();
+    }
+
     this.modalEl = document.createElement('div');
     this.modalEl.id = 'update-modal';
     this.modalEl.className = 'modal-backdrop update-modal-backdrop hidden';
