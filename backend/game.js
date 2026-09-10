@@ -153,6 +153,12 @@ export class Game {
       this.activeResultModal.destroy();
       this.activeResultModal = null;
     }
+    if (this.p2p?.roomId) {
+      // マルチプレイ時は他プレイヤー不在のCPUレースを開始せず、安全にロビーへ復帰
+      this.quitRace();
+      this.hud?.showNotification('マルチ対戦が終了しました。もう一度対戦するにはロビーからルームを作成・参加してください。', 4500);
+      return;
+    }
     if (this.currentGameConfig) {
       this.startRace(this.currentGameConfig);
     }
@@ -236,11 +242,23 @@ export class Game {
       if (!this.isRunning) return;
       let peerKart = this.otherPlayers.get(peerId);
       if (!peerKart) {
-        const mesh = Vehicles.createKartMesh(state.vehicleKey || 'speed_blue');
+        const vKey = state.vehicleKey || 'speed_blue';
+        const member = this.p2p.members?.find(m => m.id === peerId);
+        const name = state.name || member?.name || 'ライバル';
+        const mesh = Vehicles.createKartMesh(vKey);
         this.scene.add(mesh);
-        const physics = new KartPhysics(mesh, Vehicles.types[state.vehicleKey || 'speed_blue'], false);
-        peerKart = { id: peerId, mesh, physics, isAI: false };
+        const physics = new KartPhysics(mesh, Vehicles.types[vKey] || Vehicles.types.standard_red, false);
+        peerKart = {
+          id: peerId,
+          name: name,
+          mesh,
+          physics,
+          isAI: false,
+          colorHex: member?.isHost ? '#f59e0b' : '#38bdf8'
+        };
         this.otherPlayers.set(peerId, peerKart);
+      } else if (!peerKart.name && state.name) {
+        peerKart.name = state.name;
       }
 
       peerKart.mesh.position.set(state.x, state.y, state.z);
@@ -666,6 +684,7 @@ export class Game {
       isRespawning: this.localPlayerKart.isRespawning,
       respawnTimer: this.localPlayerKart.respawnTimer,
       isWrongWay: this.localPlayerKart.isWrongWay,
+      isSpinning: this.localPlayerKart.isSpinning,
       allKartPositions
     }, this.courseTrack.points);
 
@@ -696,8 +715,8 @@ export class Game {
         } else {
           for (const [id, p] of this.otherPlayers.entries()) {
             if (p.physics === kart) {
-              name = p.name || 'CPU';
-              colorHex = p.colorHex || '#e74c3c';
+              name = p.name || (p.isAI ? 'CPU' : 'ライバル');
+              colorHex = p.colorHex || (p.isAI ? '#e74c3c' : '#38bdf8');
               break;
             }
           }
@@ -743,6 +762,7 @@ export class Game {
 
     try {
       this.p2p.sendKartState({
+        name: this.currentGameConfig?.playerName || localStorage.getItem('kart_player_name') || 'プレイヤー',
         vehicleKey: this.currentGameConfig?.vehicleKey || 'standard_red',
         x: this.localPlayerKart.mesh.position.x,
         y: this.localPlayerKart.mesh.position.y,

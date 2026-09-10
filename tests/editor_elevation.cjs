@@ -72,6 +72,12 @@ const assert = require('node:assert/strict');
  assert(result.maxError<1e-6);assert(result.minUp>0.5);assert(result.aiMax>10);assert.equal(result.course,id);
  await page.evaluate(()=>gameInstance.quitRace());
  await page.click('#tab-solo');
+ const updateConfirmBtn = await page.$('#btn-update-confirm');
+ if (updateConfirmBtn) {
+   await updateConfirmBtn.click();
+   await page.waitForSelector('#update-modal', { state: 'hidden', timeout: 5000 });
+ }
+ await page.waitForSelector('[data-screen="solo"]:not([hidden])', { timeout: 5000 });
  assert(await page.evaluate(id=>gameInstance.lobbyModal.courseIds.includes(id),id));
  await page.click('#garage-back'); await page.click('#tab-editor');
  for(const size of [{width:390,height:844},{width:844,height:390}]){

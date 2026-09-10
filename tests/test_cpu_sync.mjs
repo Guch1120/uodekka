@@ -2,6 +2,7 @@ import { WebSocketManager } from '../backend/network/websocket_manager.js';
 import { Room } from '../worker/index.js';
 
 // Simple assert helper
+const print = console.log;
 function assert(cond, msg) {
   if (!cond) throw new Error('Assertion failed: ' + msg);
 }

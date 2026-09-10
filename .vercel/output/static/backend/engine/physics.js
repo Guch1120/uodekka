@@ -250,7 +250,6 @@ export class KartPhysics {
 
       if (distFromCenter <= halfWidth) {
         this.lastSafeT = nearestT;
-        this.updateLegitimateProgress(nearestT);
       } else {
         if (!this.isAirborne && this.invincibleTimer <= 0) {
           const dirtSpeedLimit = this.maxSpeed * this.offroadFriction;
@@ -265,6 +264,8 @@ export class KartPhysics {
           return;
         }
       }
+
+      this.updateLegitimateProgress(nearestT);
 
       // 逆走判定
       const courseTangent = courseSpline.getTangentAt(nearestT).normalize();
@@ -510,22 +511,34 @@ export class KartPhysics {
   }
 
   updateLegitimateProgress(t) {
-    // スプライン上の正当な前進チェック (ショートカット不正防止)
-    const delta = t - this.progress;
-    if ((delta > 0 && delta < 0.15) || (this.progress > 0.8 && t < 0.2)) {
+    const prev = this.progress;
+    let delta = t - prev;
+    if (delta < -0.5) {
+      delta += 1.0; // ゴールライン（0境界）をまたいだ場合の前進差分
+    }
+
+    // 正当な前進判定（ショートカットワープを除外）
+    const isForward = (delta >= 0 && delta < 0.25);
+    const isLapCrossing = (prev > 0.70 && t < 0.25) || (this.highestProgressThisLap > 0.70 && t < 0.25);
+
+    if (isForward || isLapCrossing) {
       this.progress = t;
-      if (t > this.highestProgressThisLap && t < 0.95) {
+      if (t > this.highestProgressThisLap) {
         this.highestProgressThisLap = t;
       }
     }
+
+    // 周回判定を呼び出し
+    this.updateLapProgress(t, prev);
   }
 
-  updateLapProgress(t) {
+  updateLapProgress(t, prevT = this.progress) {
     if (this.isFinished) return;
-    // 1周の後半(>0.7)を通過した状態でスタートライン(t < 0.15 または 0境界通過)を横切った場合
-    if ((this.progress > 0.8 || this.highestProgressThisLap > 0.7) && t < 0.15) {
+    // 1周の後半(>0.7)を通過した状態でスタート/ゴールライン(t < 0.20)を横切った場合
+    const crossedFinish = (prevT > 0.70 || this.progress > 0.70 || this.highestProgressThisLap > 0.70) && t < 0.20;
+    if (crossedFinish) {
       this.currentLap++;
-      this.highestProgressThisLap = 0;
+      this.highestProgressThisLap = t;
       this.progress = t;
       if (this.currentLap > this.totalLaps) {
         this.isFinished = true;

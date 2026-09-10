@@ -68,6 +68,9 @@ export class HUD {
       <!-- ダッシュキノコ／ブースト加速時の集中線Canvas -->
       <canvas id="hud-speedlines" class="speedlines-canvas hidden"></canvas>
 
+      <!-- アイテム被弾時の画面端フラッシュ（一発のみ、常時表示なし） -->
+      <div id="hud-hit-flash" class="hit-flash"></div>
+
       <!-- デウス・エクス・マキナ 復帰カウントダウン -->
       <div id="hud-respawn-banner" class="respawn-banner hidden">
         <div class="respawn-title">RESCUE & RESTORE</div>
@@ -107,6 +110,11 @@ export class HUD {
     this.minimapCanvas = hudDiv.querySelector('#hud-minimap');
     this.minimapCtx = this.minimapCanvas.getContext('2d');
     this.lastRecordedLap = 1;
+
+    this.hitFlashEl = hudDiv.querySelector('#hud-hit-flash');
+    this.posBadgeEl = hudDiv.querySelector('.position-badge');
+    this.lastPosition = null;
+    this.wasSpinning = false;
 
     this.speedlinesCanvas = hudDiv.querySelector('#hud-speedlines');
     if (this.speedlinesCanvas) {
@@ -157,6 +165,14 @@ export class HUD {
     }
   }
 
+  // クラス付与によるCSSアニメーションを、連続発火時も毎回頭から再生させる
+  _restartAnimation(el, className) {
+    if (!el) return;
+    el.classList.remove(className);
+    void el.offsetWidth; // reflow強制でアニメーションをリスタート
+    el.classList.add(className);
+  }
+
   showRespawnCountdown(remainingSeconds) {
     this.respawnBannerEl.classList.remove('hidden');
     this.respawnTimerNumEl.textContent = Math.ceil(remainingSeconds);
@@ -173,13 +189,31 @@ export class HUD {
     const suffixEl = this.element.querySelector('.pos-suffix');
     suffixEl.textContent = pos === 1 ? 'st' : (pos === 2 ? 'nd' : (pos === 3 ? 'rd' : 'th'));
 
-    const posBadge = this.element.querySelector('.position-badge');
+    const posBadge = this.posBadgeEl;
     if (posBadge) {
       posBadge.className = `hud-badge position-badge pos-${pos}`;
+      // 順位変動時のみ一瞬パルス（上昇=緑／下降=赤）。常時演出はしない。
+      if (this.lastPosition !== null && pos !== this.lastPosition) {
+        this._restartAnimation(posBadge, pos < this.lastPosition ? 'pulse-up' : 'pulse-down');
+      }
+      this.lastPosition = pos;
     }
+
+    // アイテム被弾（スピンアウト開始の瞬間）のみ画面端を一瞬フラッシュ
+    if (playerState.isSpinning && !this.wasSpinning) {
+      this._restartAnimation(this.hitFlashEl, 'active');
+    }
+    this.wasSpinning = !!playerState.isSpinning;
 
     const curLap = playerState.currentLap || 1;
     const totLaps = playerState.totalLaps || 3;
+
+    if (this.lapEl) {
+      this.lapEl.textContent = String(Math.min(curLap, totLaps));
+    }
+    if (this.lapTotalEl) {
+      this.lapTotalEl.textContent = String(totLaps);
+    }
 
     // ファイナルラップ突入演出
     if (curLap === totLaps && this.lastRecordedLap < totLaps) {
@@ -196,6 +230,10 @@ export class HUD {
       this.lastItemIcon = itemIcon;
       this.itemSlotEl.classList.toggle('empty', !itemIcon);
       this.itemIconEl.innerHTML = itemIcon ? Icons.getSvg(itemIcon) : '';
+      // 新規アイテム取得時だけ軽くポップさせる（相殺・使用による消失時は演出しない）
+      if (itemIcon) {
+        this._restartAnimation(this.itemSlotEl, 'item-pop');
+      }
     }
 
     if (playerState.isRespawning) {
@@ -225,6 +263,8 @@ export class HUD {
 
   resetLaps() {
     this.lastRecordedLap = 1;
+    if (this.lapEl) this.lapEl.textContent = '1';
+    if (this.lapTotalEl) this.lapTotalEl.textContent = '3';
   }
 
   showNotification(msg, durationMs = 2000) {

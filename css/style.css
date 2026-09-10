@@ -187,6 +187,27 @@ canvas {
   font-size: 14px;
 }
 
+/* 順位が変わった瞬間だけ一度だけ再生（常時演出はしない） */
+.position-badge.pulse-up {
+  animation: posPulseUp 0.5s ease-out;
+}
+
+.position-badge.pulse-down {
+  animation: posPulseDown 0.5s ease-out;
+}
+
+@keyframes posPulseUp {
+  0% { transform: scale(1); box-shadow: 0 0 0 rgba(34, 197, 94, 0); }
+  30% { transform: scale(1.18); box-shadow: 0 0 24px rgba(34, 197, 94, 0.9); }
+  100% { transform: scale(1); }
+}
+
+@keyframes posPulseDown {
+  0% { transform: scale(1); box-shadow: 0 0 0 rgba(239, 68, 68, 0); }
+  30% { transform: scale(1.12); box-shadow: 0 0 24px rgba(239, 68, 68, 0.9); }
+  100% { transform: scale(1); }
+}
+
 .lap-badge {
   display: flex;
   flex-direction: column;
@@ -271,6 +292,17 @@ canvas {
   height: 48px;
 }
 
+/* 新規アイテム取得時だけ一度だけポップ（常時演出はしない） */
+.item-slot-box.item-pop {
+  animation: itemPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes itemPop {
+  0% { transform: scale(0.7); }
+  60% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
 .icon-btn {
   width: 48px;
   height: 48px;
@@ -307,6 +339,28 @@ canvas {
 
 .speedlines-canvas.hidden {
   display: none !important;
+}
+
+/* アイテム被弾時に一瞬だけ画面端をフラッシュ（常時表示なし・カメラは動かさない） */
+.hit-flash {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 6;
+  opacity: 0;
+  background: radial-gradient(ellipse at center, rgba(220, 38, 38, 0) 55%, rgba(220, 38, 38, 0.55) 100%);
+}
+
+.hit-flash.active {
+  animation: hitFlashFade 0.45s ease-out;
+}
+
+@keyframes hitFlashFade {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 .hud-bottom-center-info {
