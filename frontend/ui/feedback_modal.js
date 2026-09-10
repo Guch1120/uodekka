@@ -1,16 +1,17 @@
 // frontend/ui/feedback_modal.js
 // ユーザーからのご意見・ご要望フォーム。
-// ローカル開発用フィードバックサーバー（tools/feedback-server.cjs）へPOSTし、
-// 開発者のローカルマシン上の needs.md にMarkdown形式で追記される。
-// サーバーが起動していない場合（本番公開時など）は送信できない旨をその場で表示する。
+// 本番公開時は同一オリジンのサーバーレス関数 /api/feedback.cjs へPOSTし、GitHub Issueとして登録される。
+// ローカルでは `/api/feedback` が存在しない（npx serve等の素の静的配信）ことが多いため、
+// window.FEEDBACK_SERVER_URL でローカル開発用フィードバックサーバー（tools/feedback-server.cjs、
+// needs.mdへMarkdown追記）を明示的に指定して動作確認できる。
+// どちらのエンドポイントも起動していない/失敗した場合は送信できない旨をその場で表示する。
 
 const CATEGORIES = ['不具合報告', '新機能の要望', '操作性・UI改善', 'その他'];
 const MESSAGE_MAX_LENGTH = 1000;
 
 function defaultFeedbackServerUrl() {
   if (typeof window !== 'undefined' && window.FEEDBACK_SERVER_URL) return window.FEEDBACK_SERVER_URL;
-  if (typeof location === 'undefined') return 'http://localhost:8787/feedback';
-  return `${location.protocol}//${location.hostname}:8787/feedback`;
+  return '/api/feedback';
 }
 
 export class FeedbackModal {

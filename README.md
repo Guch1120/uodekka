@@ -87,11 +87,18 @@
 
 静的ファイルとして動作するため、ローカルWebサーバー（例: `python3 -m http.server 8000` または `npx serve`）を起動し、ブラウザで `http://localhost:8000` にアクセスしてください。
 
-## ご意見・ご要望フォーム（ローカル開発専用）
+## ご意見・ご要望フォーム
 
-ホーム画面右上の「💬 ご意見・ご要望」から、不具合報告や新機能の要望を送信できます。送信内容はこのリポジトリ直下の `needs.md` にMarkdown形式で追記されます（`needs.md` はローカルデータのため `.gitignore` 対象、コミットされません）。
+ホーム画面右上の「💬 ご意見・ご要望」から、不具合報告や新機能の要望を送信できます。
 
-送信を受け取るには、別ターミナルで `npm run feedback:server`（`tools/feedback-server.cjs`）を起動しておく必要があります。未起動の場合はフォーム側にエラーメッセージが表示されるだけで、ゲーム自体は問題なく動作します。このフォームは本番公開（Vercel/Cloudflare Workers）には含まれないローカル専用機能です。同一LAN内のスマホなどから送信させたい場合は `window.FEEDBACK_SERVER_URL` をこのマシンのIPアドレスに向けて上書きしてください。
+**本番公開時**: 同一オリジンのVercelサーバーレス関数 `api/feedback.cjs` へ送信され、GitHub Issues API経由でこのリポジトリに `feedback` ラベル付きのIssueとして1件ずつ作成されます（単一ファイルへの追記ではなく、送信のたびに独立したIssueを作るため、同時送信による競合や本番の自動デプロイ発生を避けています）。動作させるには、Vercelの環境変数に以下を設定してください。
+
+- `GITHUB_TOKEN`（必須）: このリポジトリの Issues 書き込み権限のみを持つ Fine-grained Personal Access Token
+- `GITHUB_FEEDBACK_REPO`（任意）: `owner/repo` 形式。未設定時は `Guch1120/uodekka`
+
+`GITHUB_TOKEN` が未設定の場合、フォームはエラーメッセージを表示するだけでゲーム自体は問題なく動作します。
+
+**ローカル開発時**: `npx serve` 等の素の静的配信では `api/feedback.cjs` は動きません（`vercel dev` を使えば動作します）。手軽に動作確認したい場合は、別ターミナルで `npm run feedback:server`（`tools/feedback-server.cjs`）を起動し、`window.FEEDBACK_SERVER_URL` を `http://localhost:8787/feedback` に上書きしてください。送信内容はこのリポジトリ直下の `needs.md` にMarkdown形式で追記されます（`needs.md` はローカルデータのため `.gitignore` 対象、コミットされません）。同一LAN内のスマホなどから送信させたい場合は `window.FEEDBACK_SERVER_URL` をこのマシンのIPアドレスに向けて設定してください。
 
 ## ホーム・ルームUI
 
