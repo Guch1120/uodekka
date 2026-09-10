@@ -2,3 +2,6 @@ node_modules/
 dist/
 .wrangler/
 .pnpm-store/
+
+# ゲーム内フィードバックフォームの送信内容（tools/feedback-server.cjsが自動生成・追記するローカルデータ）
+needs.md

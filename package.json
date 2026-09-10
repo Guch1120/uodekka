@@ -6,7 +6,8 @@
     "check:release": "node scripts/check-release.mjs",
     "build": "node scripts/check-release.mjs && node scripts/build-static.mjs",
     "dev:worker": "wrangler dev",
-    "deploy:worker": "wrangler deploy"
+    "deploy:worker": "wrangler deploy",
+    "feedback:server": "node tools/feedback-server.cjs"
   },
   "devDependencies": {
     "wrangler": "^4.129.1"

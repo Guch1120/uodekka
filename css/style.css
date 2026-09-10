@@ -813,6 +813,70 @@ canvas {
   width: 100%;
 }
 
+/* ================= フィードバックフォーム ================= */
+.feedback-intro {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.feedback-select,
+.feedback-input,
+.feedback-textarea {
+  width: 100%;
+  background: #0f172a;
+  color: #f8fafc;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.feedback-textarea {
+  resize: vertical;
+  min-height: 110px;
+  line-height: 1.5;
+}
+
+.feedback-select:focus,
+.feedback-input:focus,
+.feedback-textarea:focus {
+  outline: none;
+  border-color: #38bdf8;
+}
+
+.feedback-char-count {
+  align-self: flex-end;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.feedback-status {
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.feedback-status.hidden {
+  display: none;
+}
+
+.feedback-status.success {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  border: 1px solid rgba(74, 222, 128, 0.35);
+}
+
+.feedback-status.error {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+}
+
 .lobby-tabs {
   display: flex;
   gap: 6px;
@@ -1774,6 +1838,70 @@ body.force-landscape .orientation-prompt {
   line-height: 1.6;
   color: #cbd5e1;
   margin: 0;
+}
+
+/* ================= 過去の更新履歴（トグル折りたたみ） ================= */
+.past-updates-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.past-updates-toggle:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+}
+
+.past-updates-toggle-arrow {
+  display: inline-block;
+  transition: transform 0.2s ease;
+  font-size: 11px;
+}
+
+.past-updates-toggle.expanded .past-updates-toggle-arrow {
+  transform: rotate(180deg);
+}
+
+.past-updates-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 14px;
+}
+
+.past-updates-body.hidden {
+  display: none;
+}
+
+.update-release-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.update-release-block:first-child {
+  padding-top: 0;
+  border-top: none;
+}
+
+.update-release-header {
+  font-size: 12px;
+  font-weight: 800;
+  color: #64748b;
+  letter-spacing: 0.5px;
 }
 
 .update-modal-footer {
