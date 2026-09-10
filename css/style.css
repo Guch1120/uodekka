@@ -236,6 +236,112 @@ canvas {
   color: #fff;
 }
 
+.coin-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  height: 56px;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 2px solid rgba(254, 240, 138, 0.4);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  font-size: 20px;
+  font-weight: 900;
+  color: #fef08a;
+  user-select: none;
+}
+
+.coin-badge .coin-icon {
+  font-size: 22px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4));
+}
+
+.coin-badge.coin-pop {
+  animation: coinPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes coinPop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.22); border-color: #facc15; }
+  100% { transform: scale(1); }
+}
+
+.hud-skill-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  height: 56px;
+  background: linear-gradient(135deg, rgba(30, 58, 138, 0.9), rgba(15, 23, 42, 0.95));
+  border: 2px solid rgba(96, 165, 250, 0.6);
+  border-radius: 16px;
+  color: #ffffff;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  transition: all 0.2s ease;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.hud-skill-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: #93c5fd;
+  box-shadow: 0 6px 18px rgba(59, 130, 246, 0.5);
+}
+
+.hud-skill-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.hud-skill-btn .skill-btn-icon {
+  font-size: 24px;
+}
+
+.hud-skill-btn .skill-btn-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.1;
+}
+
+.hud-skill-btn .skill-btn-name {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.hud-skill-btn .skill-btn-cd {
+  font-size: 11px;
+  font-weight: 700;
+  color: #38bdf8;
+}
+
+.hud-skill-btn.active {
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  border-color: #fef08a;
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.8);
+  animation: skillActivePulse 0.8s infinite alternate;
+}
+
+@keyframes skillActivePulse {
+  from { box-shadow: 0 0 14px rgba(245, 158, 11, 0.6); }
+  to { box-shadow: 0 0 26px rgba(239, 68, 68, 0.9); }
+}
+
+.hud-skill-btn.cooling-down {
+  opacity: 0.65;
+  filter: grayscale(0.4);
+}
+
+.hud-skill-btn.locked {
+  opacity: 0.5;
+  background: rgba(30, 41, 59, 0.7);
+  border-color: rgba(148, 163, 184, 0.3);
+  cursor: not-allowed;
+}
+
 .hud-top-center {
   position: absolute;
   top: 24px;
@@ -1604,6 +1710,31 @@ body.force-landscape .orientation-prompt {
   padding: 2px 6px;
   border-radius: 4px;
   margin-left: 6px;
+}
+
+.result-coin-summary {
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px 14px;
+  background: linear-gradient(135deg, rgba(254, 240, 138, 0.15), rgba(245, 158, 11, 0.15));
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: #fef08a;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.result-coin-summary strong {
+  font-size: 15px;
+  color: #fbbf24;
+}
+
+.result-coin-summary .coin-bank-text {
+  font-size: 11px;
+  color: #cbd5e1;
 }
 
 /* 12人順位リスト */

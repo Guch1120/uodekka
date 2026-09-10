@@ -7,7 +7,7 @@ import { FollowCamera } from './engine/camera.js';
 import { InputManager } from './input/input_manager.js';
 import { WebSocketManager } from './network/websocket_manager.js';
 
-import { Vehicles } from '../frontend/vehicles/vehicles.js';
+import { Vehicles, SkillsManager } from '../frontend/vehicles/vehicles.js';
 import { Courses } from '../frontend/courses/index.js';
 import { Items } from '../frontend/items/items.js';
 import { HUD } from '../frontend/ui/hud.js';
@@ -83,6 +83,13 @@ export class Game {
     this.otherPlayers = new Map();
     this.activeWorldItems = [];
     this.itemBoxes = [];
+    this.coins = [];
+    this.playerCoins = 0;
+    this.skillCooldown = 0;
+    this.skillActiveTimer = 0;
+    this.skillActiveType = null;
+    this.shieldMesh = null;
+    this._audioCtx = null;
     this.knowledgeBase = null;
     this._lastPlayerLap = 1;
 
@@ -141,6 +148,18 @@ export class Game {
       }
     };
 
+    // マシン固有スキルの発動トリガー（HUDボタンおよびPCの[F]キー）
+    if (this.hud) {
+      this.hud.onTriggerSkill = () => this.triggerPlayerSkill();
+    }
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'KeyF' && !e.repeat) {
+        if (this.isRunning && !this.isPaused) {
+          this.triggerPlayerSkill();
+        }
+      }
+    });
+
     // 画面強制横持ちボタン
     const btnForceLandscape = document.getElementById('btn-force-landscape');
     if (btnForceLandscape) {
@@ -170,11 +189,13 @@ export class Game {
 
   resumeRace() {
     this.isPaused = false;
+    if (this.pauseModal) this.pauseModal.hide();
     this.clock.getDelta(); // ポーズ中の経過時間をクリア
   }
 
   restartRace() {
     this.isPaused = false;
+    if (this.pauseModal) this.pauseModal.hide();
     if (this.activeResultModal) {
       this.activeResultModal.destroy();
       this.activeResultModal = null;
@@ -200,6 +221,7 @@ export class Game {
   quitRace() {
     this.isPaused = false;
     this.isRunning = false;
+    if (this.pauseModal) this.pauseModal.hide();
     if (this.activeResultModal) {
       this.activeResultModal.destroy();
       this.activeResultModal = null;
@@ -382,6 +404,7 @@ export class Game {
 
   startRace(config) {
     this.inputManager.resetState();
+    if (this.pauseModal) this.pauseModal.hide();
     if (this.activeResultModal) {
       this.activeResultModal.destroy();
       this.activeResultModal = null;
@@ -398,6 +421,13 @@ export class Game {
     this.otherPlayers.clear();
     this.activeWorldItems = [];
     this.itemBoxes = [];
+    this.coins = [];
+    this.playerCoins = 0;
+    this.skillCooldown = 0;
+    this.skillActiveTimer = 0;
+    this.skillActiveType = null;
+    this.shieldMesh = null;
+    this.hud.updateCoins(0);
     this.courseObstacles = [];
     this._finishedNotified = false;
     Items.lightningHeld = false;
@@ -426,6 +456,7 @@ export class Game {
     }
 
     this.spawnItemBoxes();
+    this.spawnCoins();
 
     // プレイヤー走行学習用知識ベースの初期化
     this.knowledgeBase = new CourseKnowledgeBase(config.courseId, this.courseTrack.curve, this.currentCourseConfig.trackWidth);
@@ -446,6 +477,9 @@ export class Game {
     this.localPlayerKart.totalLaps = this.currentCourseConfig.totalLaps;
     this.localPlayerKart.progress = gridInfo.progress;
     this.localPlayerKart.lastSafeT = gridInfo.progress;
+
+    const isSkillUnlocked = SkillsManager.isSkillUnlocked(config.vehicleKey);
+    this.hud.setupSkill(vehicleConfig.skill, isSkillUnlocked);
 
     this.followCamera.setTarget(localKartMesh);
 
@@ -561,6 +595,125 @@ export class Game {
         });
       });
     });
+  }
+
+  createCoinMesh() {
+    const group = new THREE.Group();
+    // 直径約 1.3m の回転ゴールドコイン
+    const coinGeo = new THREE.CylinderGeometry(0.65, 0.65, 0.14, 18);
+    coinGeo.rotateX(Math.PI / 2);
+    const coinMat = new THREE.MeshStandardMaterial({
+      color: 0xffd700,
+      emissive: 0xd4af37,
+      emissiveIntensity: 0.5,
+      metalness: 0.85,
+      roughness: 0.2
+    });
+    const coinMesh = new THREE.Mesh(coinGeo, coinMat);
+    coinMesh.castShadow = true;
+    group.add(coinMesh);
+
+    // コインの内側エッジ（星・立体リム風）
+    const innerGeo = new THREE.TorusGeometry(0.42, 0.045, 8, 16);
+    const innerMat = new THREE.MeshStandardMaterial({
+      color: 0xfff080,
+      emissive: 0xffd700,
+      emissiveIntensity: 0.8,
+      metalness: 0.9,
+      roughness: 0.1
+    });
+    const innerMesh = new THREE.Mesh(innerGeo, innerMat);
+    group.add(innerMesh);
+
+    return group;
+  }
+
+  spawnCoins() {
+    if (!this.courseTrack || !this.courseTrack.curve) return;
+    this.coins = [];
+    const locs = this.currentCourseConfig.coinLocations || [0.06, 0.14, 0.24, 0.36, 0.46, 0.58, 0.68, 0.82, 0.92];
+    const curve = this.courseTrack.curve;
+    const up = new THREE.Vector3(0, 1, 0);
+
+    locs.forEach(t => {
+      // コース上のレーシングライン沿いに3枚並びで配置
+      [-3.5, 0, 3.5].forEach((offset, idx) => {
+        const sampleT = (t + (idx - 1) * 0.0025 + 1) % 1;
+        const p = curve.getPointAt(sampleT);
+        const tangent = curve.getTangentAt(sampleT).normalize();
+        const normal = new THREE.Vector3().crossVectors(tangent, up).normalize();
+
+        const coinMesh = this.createCoinMesh();
+        coinMesh.position.copy(p).addScaledVector(normal, offset);
+        coinMesh.position.y += 0.9;
+        this.scene.add(coinMesh);
+
+        this.coins.push({
+          mesh: coinMesh,
+          baseY: coinMesh.position.y,
+          pos: coinMesh.position,
+          active: true,
+          respawnTimer: 0,
+          rotationSpeed: 3.5 + Math.random() * 0.6
+        });
+      });
+    });
+  }
+
+  playCoinSfx() {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      if (!this._audioCtx) this._audioCtx = new AudioCtx();
+      if (this._audioCtx.state === 'suspended') this._audioCtx.resume();
+      const now = this._audioCtx.currentTime;
+      const osc = this._audioCtx.createOscillator();
+      const gain = this._audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(987.77, now); // B5
+      osc.frequency.setValueAtTime(1318.51, now + 0.08); // E6
+      gain.gain.setValueAtTime(0.16, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+      osc.connect(gain);
+      gain.connect(this._audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.35);
+    } catch {}
+  }
+
+  playSkillSfx(type) {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      if (!this._audioCtx) this._audioCtx = new AudioCtx();
+      if (this._audioCtx.state === 'suspended') this._audioCtx.resume();
+      const now = this._audioCtx.currentTime;
+      const osc = this._audioCtx.createOscillator();
+      const gain = this._audioCtx.createGain();
+      if (type === 'rocket_charge') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(220, now);
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.4);
+      } else if (type === 'sky_glider') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.5);
+      } else if (type === 'magnet_barrier') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587.33, now);
+        osc.frequency.setValueAtTime(880, now + 0.1);
+      } else {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(150, now);
+        osc.frequency.linearRampToValueAtTime(300, now + 0.3);
+      }
+      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+      osc.connect(gain);
+      gain.connect(this._audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.5);
+    } catch {}
   }
 
   spawnAICarts(playerVehicleKey, count = 11, startGridIndex = 1) {
@@ -714,6 +867,12 @@ export class Game {
     // 6. アイテムボックス当たり判定
     this.updateItemBoxes(dt);
 
+    // 6-2. コイン更新・吸引・当たり判定
+    this.updateCoins(dt);
+
+    // 6-3. カート固有スキル更新
+    this.updateSkill(dt);
+
     // 7. 順位計算
     const ranking = this.calculateRankings();
     const myRank = ranking.findIndex(k => k === this.localPlayerKart) + 1;
@@ -735,24 +894,31 @@ export class Game {
       });
     });
 
+    const isNearRamp = this.jumpRamps?.some(ramp => {
+      if (!ramp || !ramp.position) return false;
+      return this.localPlayerKart.mesh.position.distanceTo(ramp.position) < (ramp.radius * 2.2);
+    }) || false;
+
     this.hud.update({
       position: myRank,
       currentLap: this.localPlayerKart.currentLap,
-      totalLaps: this.localPlayerKart.totalLaps,
+      totalLaps: this.currentCourseConfig.totalLaps,
       speed: this.localPlayerKart.speed,
-      boostTimer: this.localPlayerKart.boostTimer,
       holdingItem: this.localPlayerKart.holdingItem,
+      allKartPositions: allKartPositions,
       isRespawning: this.localPlayerKart.isRespawning,
       respawnTimer: this.localPlayerKart.respawnTimer,
       isWrongWay: this.localPlayerKart.isWrongWay,
       isSpinning: this.localPlayerKart.isSpinning,
-      allKartPositions
+      isBoosting: this.localPlayerKart.boostTimer > 0,
+      boostTimer: this.localPlayerKart.boostTimer
     }, this.courseTrack.points);
 
     // 9. マルチプレイ位置送信（自機 + ホスト主導のCPU位置、約20Hz制限・例外保護）
     this.updateNetworkSync(dt);
 
-    if (this.localPlayerKart.isFinished && !this._finishedNotified) {
+    // 9. ゴール判定（ファイナルラップ完了時）
+    if (this.localPlayerKart.currentLap > this.currentCourseConfig.totalLaps && !this._finishedNotified) {
       this._finishedNotified = true;
       if (this.knowledgeBase) {
         this.knowledgeBase.commitLap();
@@ -767,17 +933,20 @@ export class Game {
 
       // 12人の着順一覧を生成
       const racersList = ranking.map((kart, idx) => {
-        const isLocal = kart === this.localPlayerKart;
-        let name = isLocal ? (localStorage.getItem('kart_player_name') || 'あなた') : 'CPU';
-        let colorHex = isLocal ? '#38bdf8' : '#e74c3c';
-        let rTime = 0;
+        let name = 'CPU';
+        let isLocal = (kart === this.localPlayerKart);
+        let colorHex = '#e74c3c';
+        let rTime = totalTime;
+
         if (isLocal) {
+          name = this.currentGameConfig?.playerName || localStorage.getItem('kart_player_name') || 'あなた';
+          colorHex = '#38bdf8';
           rTime = totalTime;
         } else {
           for (const [id, p] of this.otherPlayers.entries()) {
             if (p.physics === kart) {
-              name = p.name || (p.isAI ? 'CPU' : 'ライバル');
-              colorHex = p.colorHex || (p.isAI ? '#e74c3c' : '#38bdf8');
+              name = p.name || 'ライバル';
+              colorHex = p.colorHex || '#e74c3c';
               break;
             }
           }
@@ -805,7 +974,9 @@ export class Game {
           totalTime: totalTime,
           lapTimes: [...this.lapTimes],
           courseName: this.currentCourseConfig.name,
-          racers: racersList
+          racers: racersList,
+          coinsEarned: this.playerCoins || 0,
+          bankCoins: SkillsManager.getBankCoins()
         }, {
           onHome: () => this.quitRace(),
           onChangeCourse: () => this.selectOtherCourse(),
@@ -912,6 +1083,7 @@ export class Game {
       version: UPDATE_NOTIFICATION?.version || 'unknown',
       timestamp: new Date().toISOString(),
       userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+      deviceInfo: typeof window !== 'undefined' ? window.deviceInfo || null : null,
       mode: this.currentGameConfig?.mode || 'idle',
       isHost: !!this.p2p?.isHost,
       courseId: this.currentCourseConfig?.id || this.currentGameConfig?.courseId || null,
@@ -1245,6 +1417,163 @@ export class Game {
         }
       }
     });
+  }
+
+  updateCoins(dt) {
+    if (!this.coins || this.coins.length === 0) return;
+    const playerKart = this.localPlayerKart;
+    const magnetActive = this.skillActiveType === 'magnet_barrier' && this.skillActiveTimer > 0;
+    const magnetRadius = 22.0;
+
+    const allKarts = [playerKart, ...Array.from(this.otherPlayers.values()).map(p => p.physics)];
+    const time = performance.now() * 0.003;
+
+    this.coins.forEach(coin => {
+      if (!coin.active) {
+        coin.respawnTimer -= dt;
+        if (coin.respawnTimer <= 0) {
+          coin.active = true;
+          coin.mesh.visible = true;
+          coin.mesh.position.y = coin.baseY;
+        }
+        return;
+      }
+
+      coin.mesh.rotation.y += dt * coin.rotationSpeed;
+      coin.mesh.position.y = coin.baseY + Math.sin(time + coin.mesh.position.x) * 0.18;
+
+      if (magnetActive && playerKart && !playerKart.isRespawning) {
+        const distToPlayer = coin.pos.distanceTo(playerKart.mesh.position);
+        if (distToPlayer < magnetRadius) {
+          const pullDir = new THREE.Vector3().subVectors(playerKart.mesh.position, coin.pos).normalize();
+          coin.pos.addScaledVector(pullDir, dt * 20.0);
+        }
+      }
+
+      for (const kart of allKarts) {
+        if (!kart || kart.isRespawning) continue;
+        if (coin.pos.distanceTo(kart.mesh.position) < 2.5) {
+          coin.active = false;
+          coin.mesh.visible = false;
+          coin.respawnTimer = 6.0;
+
+          if (kart === playerKart) {
+            this.playerCoins = (this.playerCoins || 0) + 1;
+            playerKart.coinBonusSpeed = Math.min(10, this.playerCoins) * 0.35;
+            SkillsManager.addBankCoins(1);
+            this.playCoinSfx();
+            this.hud?.updateCoins(this.playerCoins);
+            this.showItemNotification(`🪙 コイン獲得！ (所持: ${this.playerCoins}枚)`, 1200);
+          }
+          break;
+        }
+      }
+    });
+  }
+
+  triggerPlayerSkill() {
+    if (!this.isRunning || this.isPaused || !this.localPlayerKart || this.localPlayerKart.isRespawning) return;
+    const vKey = this.currentGameConfig?.vehicleKey || this.localPlayerKart.config.id || 'standard_red';
+    const vehicle = Vehicles.types[vKey] || Vehicles.types.standard_red;
+    const skill = vehicle.skill;
+    if (!skill) return;
+
+    if (!SkillsManager.isSkillUnlocked(vKey)) {
+      this.showItemNotification(`🔒 固有スキル【${skill.name}】は未解禁です (ガレージで解禁)`, 2000);
+      return;
+    }
+
+    if (this.skillCooldown > 0) {
+      this.showItemNotification(`⏳ クールダウン中 (あと ${Math.ceil(this.skillCooldown)}秒)`, 1000);
+      return;
+    }
+
+    const kart = this.localPlayerKart;
+    this.skillCooldown = skill.cooldown || 15.0;
+    this.skillActiveTimer = skill.duration || 3.0;
+    this.skillActiveType = skill.id;
+    this.playSkillSfx(skill.id);
+
+    if (skill.id === 'rocket_charge') {
+      kart.speed = Math.max(kart.speed * 1.5, kart.maxSpeed * 1.6);
+      kart.boostTimer = 3.0;
+      kart.boostMultiplier = 1.6;
+      this.showItemNotification(`🚀 ロケット・チャージ発動！ 爆発ダッシュ！`, 2500);
+    } else if (skill.id === 'sky_glider') {
+      kart.isAirborne = true;
+      kart.isGliding = true;
+      kart.velocityY = 18.0;
+      kart.speed = Math.max(kart.speed, kart.maxSpeed * 1.25);
+      const gMesh = kart.mesh.userData?.gliderMesh;
+      if (gMesh) gMesh.visible = true;
+      this.showItemNotification(`🪂 スカイ・グライダー展開！ 空中滑空！`, 2500);
+    } else if (skill.id === 'magnet_barrier') {
+      kart.hasShield = true;
+      if (!this.shieldMesh) {
+        const shieldGeo = new THREE.SphereGeometry(2.4, 16, 16);
+        const shieldMat = new THREE.MeshBasicMaterial({
+          color: 0x00ffff,
+          wireframe: true,
+          transparent: true,
+          opacity: 0.7
+        });
+        this.shieldMesh = new THREE.Mesh(shieldGeo, shieldMat);
+        kart.mesh.add(this.shieldMesh);
+      }
+      this.shieldMesh.visible = true;
+      this.showItemNotification(`🧲 マグネット・バリア展開！ コイン吸引＆シールド！`, 2500);
+    } else if (skill.id === 'giga_stampede') {
+      kart.invincibleTimer = 4.5;
+      kart.isGigaStampede = true;
+      kart.speed = Math.max(kart.speed * 1.25, kart.maxSpeed * 1.35);
+      kart.mesh.scale.set(1.45, 1.45, 1.45);
+      this.showItemNotification(`⚡ ギガ・スタンピード発動！ 巨大化＆無敵突進！`, 2500);
+    }
+  }
+
+  updateSkill(dt) {
+    if (this.skillCooldown > 0) {
+      this.skillCooldown = Math.max(0, this.skillCooldown - dt);
+    }
+
+    if (this.skillActiveTimer > 0) {
+      this.skillActiveTimer -= dt;
+
+      if (this.skillActiveType === 'giga_stampede' && this.localPlayerKart) {
+        const allRivals = Array.from(this.otherPlayers.values()).map(p => p.physics);
+        allRivals.forEach(rival => {
+          if (!rival || rival.isRespawning) return;
+          if (this.localPlayerKart.mesh.position.distanceTo(rival.mesh.position) < 4.0) {
+            rival.spinOut?.();
+          }
+        });
+      }
+
+      if (this.skillActiveType === 'magnet_barrier' && this.shieldMesh) {
+        this.shieldMesh.rotation.y += dt * 3.0;
+        if (!this.localPlayerKart?.hasShield) {
+          this.shieldMesh.visible = false;
+        }
+      }
+
+      if (this.skillActiveTimer <= 0) {
+        if (this.skillActiveType === 'giga_stampede' && this.localPlayerKart) {
+          this.localPlayerKart.mesh.scale.set(1.0, 1.0, 1.0);
+          this.localPlayerKart.isGigaStampede = false;
+        }
+        if (this.skillActiveType === 'magnet_barrier') {
+          if (this.shieldMesh) this.shieldMesh.visible = false;
+          if (this.localPlayerKart) this.localPlayerKart.hasShield = false;
+        }
+        this.skillActiveType = null;
+      }
+    }
+
+    const vKey = this.currentGameConfig?.vehicleKey || this.localPlayerKart?.config?.id || 'standard_red';
+    const vehicle = Vehicles.types[vKey];
+    const maxCd = vehicle?.skill?.cooldown || 15.0;
+    const isActive = this.skillActiveTimer > 0;
+    this.hud?.updateSkill(this.skillCooldown, maxCd, isActive);
   }
 
   updateWorldItems(dt) {

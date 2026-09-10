@@ -236,7 +236,8 @@ export class KartPhysics {
     const smallSpeedFactor = this.isSmall ? 0.55 : 1.0;
     // 異臭パワー時は最高速度と加速度が45%低下
     const stinkSpeedFactor = this.stinkTimer > 0 ? 0.55 : 1.0;
-    const currentMaxSpeed = this.maxSpeed * this.boostMultiplier * smallSpeedFactor * stinkSpeedFactor;
+    const baseSpeedWithCoins = this.maxSpeed + (this.coinBonusSpeed || 0);
+    const currentMaxSpeed = baseSpeedWithCoins * this.boostMultiplier * smallSpeedFactor * stinkSpeedFactor;
     const currentAccel = this.acceleration * smallSpeedFactor * stinkSpeedFactor;
 
     if (brakeInput > 0) {
@@ -612,6 +613,11 @@ export class KartPhysics {
   }
 
   spinOut() {
+    if (this.isGigaStampede) return;
+    if (this.hasShield) {
+      this.hasShield = false;
+      return; // 攻撃をバリアが身代わりで吸収！
+    }
     if (this.invincibleTimer > 0 || this.isSpinning || this.isRespawning) return;
     this.isSpinning = true;
     this.spinTimer = 1.2;

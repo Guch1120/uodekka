@@ -34,6 +34,9 @@ export class EditorModal {
       ],
       itemBoxLocations: [0.2, 0.5, 0.8],
       dashPanels: [0.35, 0.65],
+      jumpRamps: [
+        { t: 0.50, type: 'standard' }
+      ],
       tireWallSegments: [
         { start: 0.05, end: 0.38, side: 'both' },
         { start: 0.45, end: 0.72, side: 'both' },
@@ -87,6 +90,8 @@ export class EditorModal {
             <button id="tool-dash" class="editor-tool-btn" title="ダッシュボード（加速床）の追加">⚡ ダッシュ板配置</button>
             <button id="tool-item" class="editor-tool-btn" title="アイテムボックス地点の追加">🎁 アイテム箱配置</button>
             <button id="tool-wall" class="editor-tool-btn" title="コース上の区間をクリックしてタイヤ壁/切れ目(コースアウト)を切替">🛡️ タイヤ壁/切替</button>
+            <button id="tool-jump" class="editor-tool-btn" title="通常ジャンプ台の追加">⤹ ジャンプ台</button>
+            <button id="tool-glider" class="editor-tool-btn" title="滑走ジャンプ台（グライダー）の追加">🪂 滑走ジャンプ台</button>
           </div>
 
         </div>
@@ -191,7 +196,9 @@ export class EditorModal {
       del: modal.querySelector('#tool-del'),
       dash: modal.querySelector('#tool-dash'),
       item: modal.querySelector('#tool-item'),
-      wall: modal.querySelector('#tool-wall')
+      wall: modal.querySelector('#tool-wall'),
+      jump: modal.querySelector('#tool-jump'),
+      glider: modal.querySelector('#tool-glider')
     };
 
     const setTool = (toolName) => {
@@ -207,6 +214,8 @@ export class EditorModal {
     toolBtns.dash.onclick = () => setTool('dash');
     toolBtns.item.onclick = () => setTool('item');
     toolBtns.wall.onclick = () => setTool('wall');
+    toolBtns.jump.onclick = () => setTool('jump');
+    toolBtns.glider.onclick = () => setTool('glider');
 
     toolBtns.del.onclick = () => {
       if (this.selectedPointIdx >= 0 && this.courseData.points.length > 4) {
@@ -313,6 +322,24 @@ export class EditorModal {
         this.remember();
         const t = this.findNearestSplineT(world.x, world.z);
         this.toggleTireWallSegment(t);
+        this.render();
+        return;
+      }
+
+      if (this.currentTool === 'jump') {
+        this.remember();
+        const t = this.findNearestSplineT(world.x, world.z);
+        this.courseData.jumpRamps = this.courseData.jumpRamps || [];
+        this.courseData.jumpRamps.push({ t, type: 'standard' });
+        this.render();
+        return;
+      }
+
+      if (this.currentTool === 'glider') {
+        this.remember();
+        const t = this.findNearestSplineT(world.x, world.z);
+        this.courseData.jumpRamps = this.courseData.jumpRamps || [];
+        this.courseData.jumpRamps.push({ t, type: 'glider' });
         this.render();
         return;
       }
@@ -455,7 +482,7 @@ export class EditorModal {
           raw.points.some(p => !Number.isFinite(p.x) || !Number.isFinite(p.z))) throw new Error();
       this.remember();
       this.courseData = { ...raw, points: raw.points.map(p => ({ ...p, y: Number.isFinite(p.y) ? p.y : 0 })),
-        itemBoxLocations: raw.itemBoxLocations || [], dashPanels: raw.dashPanels || [], tireWallSegments: raw.tireWallSegments || [] };
+        itemBoxLocations: raw.itemBoxLocations || [], dashPanels: raw.dashPanels || [], jumpRamps: raw.jumpRamps || [], tireWallSegments: raw.tireWallSegments || [] };
       this.selectedPointIdx = 0; this.syncInputs(); this.fitView(); this.render();
       this.setStatus('保存コースを読み込みました。保存すると同じコースを更新します。');
     } catch { this.setStatus('このコースは読み込めませんでした。'); }
@@ -467,7 +494,7 @@ export class EditorModal {
       b.classList.toggle('active', b.dataset.view === mode);
       b.setAttribute('aria-pressed', String(b.dataset.view === mode));
     });
-    this.modalEl.querySelectorAll('#tool-move, #tool-add, #tool-del, #tool-dash, #tool-item, #tool-wall')
+    this.modalEl.querySelectorAll('#tool-move, #tool-add, #tool-del, #tool-dash, #tool-item, #tool-wall, #tool-jump, #tool-glider')
       .forEach(b => b.disabled = mode !== 'plan');
     this.modalEl.querySelector('.editor-toolbar').hidden = mode !== 'plan';
     this.canvas.hidden = mode === 'preview';
@@ -592,6 +619,9 @@ export class EditorModal {
     ];
     this.courseData.itemBoxLocations = [0.2, 0.5, 0.8];
     this.courseData.dashPanels = [0.35, 0.65];
+    this.courseData.jumpRamps = [
+      { t: 0.50, type: 'standard' }
+    ];
     this.courseData.tireWallSegments = [
       { start: 0.05, end: 0.38, side: 'both' },
       { start: 0.45, end: 0.72, side: 'both' },
@@ -895,6 +925,24 @@ export class EditorModal {
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 10px sans-serif';
       ctx.fillText('？', px - 4, py + 4);
+    });
+
+    // 5. ジャンプ台 & 滑走ジャンプ台アイコン
+    (this.courseData.jumpRamps || []).forEach(ramp => {
+      const p = curve.getPointAt(ramp.t);
+      const px = toScreenX(p.x);
+      const py = toScreenY(p.z);
+      const isGlider = ramp.type === 'glider';
+      ctx.fillStyle = isGlider ? '#0284c7' : '#ea580c';
+      ctx.beginPath();
+      ctx.rect(px - 10, py - 9, 20, 18);
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText(isGlider ? '🪂' : '⤹', px - 6, py + 4);
     });
 
     // 5. 頂点ハンドル

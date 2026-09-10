@@ -1,4 +1,4 @@
-import { Vehicles } from '../vehicles/vehicles.js';
+import { Vehicles, SkillsManager } from '../vehicles/vehicles.js';
 import { Courses } from '../courses/index.js';
 import { normalizeRoomId } from '../../backend/network/room_id.js';
 import { GaragePreview, courseArt } from './lobby_preview.js';
@@ -7,7 +7,7 @@ import { UpdateModal } from './update_modal.js';
 import { FeedbackModal } from './feedback_modal.js';
 
 const arrow = (id, direction, label) => `<button id="${id}" class="garage-arrow" aria-label="${label}">${direction === 'prev' ? '◀' : '▶'}</button>`;
-const stats = () => `<section class="garage-specs"><div class="garage-eyebrow">YOUR MACHINE</div><h2 class="vehicle-name"></h2><p class="vehicle-description"></p><div class="garage-stat-list">${[['topSpeed', 'スピード', 50], ['acceleration', '加速', 35], ['weight', '重さ', 1.5]].map(([key, label, max]) => `<label class="garage-stat"><span>${label}</span><meter data-stat="${key}" min="0" max="${max}" aria-label="${label}"></meter><span data-stat-value="${key}" class="garage-stat-value"></span></label>`).join('')}</div></section>`;
+const stats = () => `<section class="garage-specs"><div class="garage-eyebrow">YOUR MACHINE</div><h2 class="vehicle-name"></h2><p class="vehicle-description"></p><div class="garage-stat-list">${[['topSpeed', 'スピード', 50], ['acceleration', '加速', 35], ['weight', '重さ', 1.5]].map(([key, label, max]) => `<label class="garage-stat"><span>${label}</span><meter data-stat="${key}" min="0" max="${max}" aria-label="${label}"></meter><span data-stat-value="${key}" class="garage-stat-value"></span></label>`).join('')}</div><div class="garage-stat-skill"><span class="garage-skill-badge">固有スキル</span><strong class="spec-skill-name"></strong><span class="spec-skill-status"></span></div></section>`;
 
 export class LobbyModal {
   constructor(container, p2pManager, onStartGame, inputManager = null) {
@@ -41,6 +41,9 @@ export class LobbyModal {
           <div class="garage-brand"><span class="garage-brand-mark">U<span>•</span>D</span><div>UO:De Car<small>READY. SET. DRIVE.</small></div></div>
           <div class="garage-location"><span class="garage-live-dot"></span><span id="garage-location">ホーム / GARAGE</span></div>
           <div class="garage-header-actions">
+            <div class="garage-coin-badge" id="lobby-coin-display" title="コースで集めた累計所持コイン">
+              🪙 <strong id="lobby-coin-count">0</strong> <small>コイン</small>
+            </div>
             <button type="button" id="btn-show-updates" class="garage-subtle update-notice-btn">📢 更新情報</button>
             <button type="button" id="btn-show-feedback" class="garage-subtle feedback-notice-btn">💬 ご意見・ご要望</button>
             <button id="garage-back" class="garage-subtle" hidden>← ホームへ</button>
@@ -54,12 +57,30 @@ export class LobbyModal {
                 <div class="garage-showroom-top"><span class="garage-chip" id="vehicle-category"></span><span id="vehicle-counter" class="garage-counter"></span></div>
                 <div class="garage-vehicle-stage"><div id="garage-vehicle-preview"></div>${arrow('vehicle-prev', 'prev', '前の車体')}${arrow('vehicle-next', 'next', '次の車体')}</div>
                 <div class="garage-vehicle-caption"><div><span class="garage-eyebrow">YOUR MACHINE</span><h2 class="vehicle-name" aria-live="polite"></h2></div><div id="vehicle-dots" class="garage-dots" aria-hidden="true"></div></div>
+                <div class="garage-skill-card" id="garage-skill-card">
+                  <div class="garage-skill-head">
+                    <span class="garage-skill-badge">固有スキル</span>
+                    <strong id="garage-skill-title" class="garage-skill-title"></strong>
+                    <span id="garage-skill-status" class="garage-skill-status"></span>
+                  </div>
+                  <p id="garage-skill-desc" class="garage-skill-desc"></p>
+                  <button type="button" id="btn-unlock-skill" class="garage-skill-unlock-btn"></button>
+                </div>
               </div>
             </div>
             <div class="garage-mode-panel"><div class="garage-mode-heading"><span class="garage-eyebrow">02 / CHOOSE YOUR RACE</span><h2>さあ、走り出そう。</h2></div>
               <button id="tab-solo" class="garage-mode garage-mode-solo"><span class="garage-mode-icon">01</span><span><small>SOLO RACE</small><strong>ソロゲーム</strong><span class="garage-mode-description">CPUと競う、自分だけのレース。</span></span><span class="garage-mode-arrow">↗</span><span class="garage-mode-tag">CPU 対戦</span></button>
               <section class="garage-mode garage-mode-multi"><span class="garage-mode-icon">02</span><div><small>MULTIPLAYER</small><h2>マルチゲーム</h2><p>ルームに集まって、友だちと対戦。</p></div><div class="garage-multi-actions"><button id="tab-create">ホスト <span>ルームを作成 ↗</span></button><button id="tab-join">ゲスト <span>ルームに参加 ↗</span></button></div></section>
-              <button id="tab-editor" class="garage-editor-link">＋ コースを作る <span>COURSE EDITOR ↗</span></button>
+              <button id="tab-editor" class="garage-mode garage-mode-editor" type="button">
+                <span class="garage-mode-icon">03</span>
+                <span>
+                  <small>COURSE MAKER</small>
+                  <strong>コースを作る</strong>
+                  <span class="garage-mode-description">自分だけのオリジナルコースを自由に設計・テスト走行！</span>
+                </span>
+                <span class="garage-mode-arrow">↗</span>
+                <span class="garage-mode-tag garage-mode-tag-editor">コース自作</span>
+              </button>
             </div>
           </section>
           <section class="garage-screen garage-setup" data-screen="solo" hidden>
@@ -250,6 +271,63 @@ export class LobbyModal {
       const key = el.dataset.statValue;
       el.textContent = key === 'topSpeed' ? `${Math.round(vehicle.topSpeed * 3)}` : key === 'acceleration' ? `${vehicle.acceleration}` : `${vehicle.weight.toFixed(1)}`;
     });
+
+    // コイン残高の表示更新
+    const bankCoins = SkillsManager.getBankCoins();
+    const coinCountEl = this.el('#lobby-coin-count');
+    if (coinCountEl) coinCountEl.textContent = String(bankCoins);
+
+    // 固有スキルの表示・解禁ボタンの更新
+    const skill = vehicle.skill;
+    const isUnlocked = SkillsManager.isSkillUnlocked(this.vehicleKey);
+    const skillTitleEl = this.el('#garage-skill-title');
+    const skillStatusEl = this.el('#garage-skill-status');
+    const skillDescEl = this.el('#garage-skill-desc');
+    const unlockBtn = this.el('#btn-unlock-skill');
+
+    if (skill) {
+      if (skillTitleEl) skillTitleEl.textContent = `${skill.icon || '⚡'} ${skill.name}`;
+      if (skillDescEl) skillDescEl.textContent = skill.description;
+      if (skillStatusEl) {
+        skillStatusEl.textContent = isUnlocked ? '✨ 解禁済み' : '🔒 未解禁';
+        skillStatusEl.className = `garage-skill-status ${isUnlocked ? 'unlocked' : 'locked'}`;
+      }
+      if (unlockBtn) {
+        if (isUnlocked) {
+          unlockBtn.textContent = '✓ 解禁済み（レース中 [F] で発動）';
+          unlockBtn.disabled = true;
+          unlockBtn.className = 'garage-skill-unlock-btn unlocked';
+          unlockBtn.onclick = null;
+        } else {
+          const cost = skill.cost || 20;
+          if (bankCoins >= cost) {
+            unlockBtn.textContent = `🪙 ${cost} コインで解禁する！`;
+            unlockBtn.disabled = false;
+            unlockBtn.className = 'garage-skill-unlock-btn can-unlock';
+            unlockBtn.onclick = () => {
+              if (SkillsManager.unlockSkill(this.vehicleKey)) {
+                this.showToast('connected', `【${skill.name}】を解禁しました！`, 2500);
+                this.updateVehicle();
+              }
+            };
+          } else {
+            unlockBtn.textContent = `🪙 ${cost} コインで解禁（あと ${cost - bankCoins} 枚）`;
+            unlockBtn.disabled = true;
+            unlockBtn.className = 'garage-skill-unlock-btn locked';
+            unlockBtn.onclick = null;
+          }
+        }
+      }
+
+      this.modalEl.querySelectorAll('.spec-skill-name').forEach(el => {
+        el.textContent = `${skill.icon} ${skill.name}`;
+      });
+      this.modalEl.querySelectorAll('.spec-skill-status').forEach(el => {
+        el.textContent = isUnlocked ? '✨ 解禁済' : `🔒 🪙${skill.cost || 20}`;
+        el.className = `spec-skill-status ${isUnlocked ? 'unlocked' : 'locked'}`;
+      });
+    }
+
     this.preview.setVehicle(this.vehicleKey);
   }
 

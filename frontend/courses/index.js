@@ -36,6 +36,8 @@ export const Courses = {
               points: raw.points.map(p => new THREE.Vector3(p.x, Number.isFinite(p.y) ? p.y : 0, p.z)),
               itemBoxLocations: raw.itemBoxLocations || [0.2, 0.5, 0.8],
               dashPanels: raw.dashPanels || [0.35, 0.65],
+              jumpRamps: raw.jumpRamps || [],
+              coinLocations: raw.coinLocations || [0.08, 0.22, 0.42, 0.62, 0.82],
               tireWallSegments: raw.tireWallSegments || [
                 { start: 0.05, end: 0.35, side: 'both' },
                 { start: 0.45, end: 0.72, side: 'both' },

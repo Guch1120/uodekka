@@ -72,6 +72,39 @@
     const btnForceLandscape = document.getElementById('btn-force-landscape');
     const btnDismissOrientation = document.getElementById('btn-dismiss-orientation');
 
+    function detectDeviceInfo() {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const dpr = window.devicePixelRatio || 1;
+      const screenW = window.screen ? window.screen.width : w;
+      const screenH = window.screen ? window.screen.height : h;
+      const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b));
+      const divisor = gcd(Math.round(w), Math.round(h)) || 1;
+      const aspect = `${Math.round(w / divisor)}:${Math.round(h / divisor)}`;
+      const ratio = (w / Math.max(1, h)).toFixed(2);
+      const info = {
+        viewportWidth: w,
+        viewportHeight: h,
+        screenWidth: screenW,
+        screenHeight: screenH,
+        dpr,
+        aspectRatio: aspect,
+        ratioVal: Number(ratio),
+        isLandscape: w >= h,
+        isCompact: h <= 500
+      };
+      window.deviceInfo = info;
+      document.documentElement.dataset.aspectRatio = aspect;
+      document.documentElement.dataset.isCompact = String(h <= 500);
+      if (document.body) {
+        document.body.dataset.aspectRatio = aspect;
+        document.body.dataset.isCompact = String(h <= 500);
+      }
+      return info;
+    }
+    detectDeviceInfo();
+    window.addEventListener('resize', detectDeviceInfo);
+
     function enableForcedLandscape() {
       if (orientationPrompt) {
         orientationPrompt.classList.add('dismissed');

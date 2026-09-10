@@ -98,6 +98,12 @@ export class ResultModal {
                 ${lapsHtml}
               </div>
             </div>
+
+            <!-- コイン獲得サマリー -->
+            <div class="result-coin-summary">
+              <span class="coin-gain-text">🪙 今回獲得コイン: <strong>+${this.data.coinsEarned || 0}</strong> 枚</span>
+              <span class="coin-bank-text">（累計所持: 🪙 <strong>${this.data.bankCoins || 0}</strong> 枚）</span>
+            </div>
           </div>
 
           <div class="result-standings-panel">

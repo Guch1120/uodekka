@@ -34,6 +34,10 @@ export class HUD {
             <span class="lap-label">LAP</span>
             <span class="lap-numbers"><span id="hud-lap-current">1</span>/<span id="hud-lap-total">3</span></span>
           </div>
+          <div class="hud-badge coin-badge">
+            <span class="coin-icon">🪙</span>
+            <span id="hud-coin-count">0</span>
+          </div>
         </div>
         <!-- 拡大された大型ミニマップ -->
         <div class="hud-minimap-wrapper">
@@ -54,6 +58,15 @@ export class HUD {
       </div>
 
       <div class="hud-top-right">
+        <!-- マシン固有スキル発動ボタン -->
+        <button id="btn-hud-skill" class="hud-skill-btn locked" title="マシン固有スキル [F]">
+          <span class="skill-btn-icon" id="hud-skill-icon">⚡</span>
+          <span class="skill-btn-info">
+            <strong class="skill-btn-name" id="hud-skill-name">スキル</strong>
+            <small class="skill-btn-cd" id="hud-skill-cd">READY</small>
+          </span>
+        </button>
+
         <div id="hud-item-slot" class="item-slot-box empty">
           <div class="item-icon-wrapper" id="hud-item-icon"></div>
         </div>
@@ -86,6 +99,7 @@ export class HUD {
           <span>[W/A/S/D] 運転</span>
           <span>[Space] ドリフト</span>
           <span>[E] アイテム</span>
+          <span>[F] スキル</span>
           <span>[Esc] 一時停止</span>
         </div>
       </div>
@@ -103,6 +117,22 @@ export class HUD {
     this.notificationEl = hudDiv.querySelector('#hud-notification');
     this.finalLapEl = hudDiv.querySelector('#hud-final-lap');
     this.wrongWayEl = hudDiv.querySelector('#hud-wrong-way');
+
+    this.coinCountEl = hudDiv.querySelector('#hud-coin-count');
+    this.skillBtnEl = hudDiv.querySelector('#btn-hud-skill');
+    this.skillIconEl = hudDiv.querySelector('#hud-skill-icon');
+    this.skillNameEl = hudDiv.querySelector('#hud-skill-name');
+    this.skillCdEl = hudDiv.querySelector('#hud-skill-cd');
+
+    if (this.skillBtnEl) {
+      const trigger = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.onTriggerSkill?.();
+      };
+      this.skillBtnEl.addEventListener('pointerdown', trigger);
+      this.skillBtnEl.addEventListener('click', trigger);
+    }
 
     this.respawnBannerEl = hudDiv.querySelector('#hud-respawn-banner');
     this.respawnTimerNumEl = hudDiv.querySelector('#hud-respawn-timer');
@@ -383,6 +413,55 @@ export class HUD {
         ctx.stroke();
       }
     });
+  }
+
+  updateCoins(count) {
+    if (this.coinCountEl) {
+      this.coinCountEl.textContent = String(count || 0);
+      this._restartAnimation(this.coinCountEl.parentElement, 'coin-pop');
+    }
+  }
+
+  setupSkill(skillInfo, isUnlocked) {
+    this.currentSkill = skillInfo;
+    this.isSkillUnlocked = !!isUnlocked;
+    if (!this.skillBtnEl) return;
+    if (!skillInfo) {
+      this.skillBtnEl.classList.add('hidden');
+      return;
+    }
+    this.skillBtnEl.classList.remove('hidden');
+    if (!isUnlocked) {
+      this.skillBtnEl.classList.add('locked');
+      this.skillBtnEl.disabled = true;
+      if (this.skillIconEl) this.skillIconEl.textContent = '🔒';
+      if (this.skillNameEl) this.skillNameEl.textContent = '未解禁';
+      if (this.skillCdEl) this.skillCdEl.textContent = `🪙${skillInfo.cost || 0}`;
+      this.skillBtnEl.title = `固有スキル未解禁 (${skillInfo.name} - コイン${skillInfo.cost}枚で解禁可能)`;
+    } else {
+      this.skillBtnEl.classList.remove('locked');
+      this.skillBtnEl.disabled = false;
+      if (this.skillIconEl) this.skillIconEl.textContent = skillInfo.icon || '⚡';
+      if (this.skillNameEl) this.skillNameEl.textContent = skillInfo.name || 'スキル';
+      if (this.skillCdEl) this.skillCdEl.textContent = 'READY';
+      this.skillBtnEl.title = `固有スキル: ${skillInfo.name} [Fキー]`;
+    }
+  }
+
+  updateSkill(cooldown, maxCooldown, isActive) {
+    if (!this.skillBtnEl || !this.isSkillUnlocked) return;
+    if (isActive) {
+      this.skillBtnEl.classList.add('active');
+      this.skillBtnEl.classList.remove('cooling-down');
+      if (this.skillCdEl) this.skillCdEl.textContent = '発動中!';
+    } else if (cooldown > 0) {
+      this.skillBtnEl.classList.remove('active');
+      this.skillBtnEl.classList.add('cooling-down');
+      if (this.skillCdEl) this.skillCdEl.textContent = `${Math.ceil(cooldown)}s`;
+    } else {
+      this.skillBtnEl.classList.remove('active', 'cooling-down');
+      if (this.skillCdEl) this.skillCdEl.textContent = 'READY';
+    }
   }
 
   show() {

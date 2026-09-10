@@ -19,7 +19,16 @@ export const Vehicles = {
       offroadFriction: 0.35, // コース外ダートでの最高速・加速度制限 (35%に大幅低下)
       handling: 1.5,         // ステアリング旋回力
       weight: 1.0,
-      driftMultiplier: 1.25
+      driftMultiplier: 1.25,
+      skill: {
+        id: 'rocket_charge',
+        name: 'ロケット・チャージ',
+        icon: '🚀',
+        cost: 20,
+        cooldown: 14.0,
+        duration: 3.0,
+        description: '爆発的なロケット推進で一気に最高速超えの超加速！（3秒間）'
+      }
     },
     speed_blue: {
       id: 'speed_blue',
@@ -36,7 +45,16 @@ export const Vehicles = {
       offroadFriction: 0.30,
       handling: 1.25,
       weight: 1.2,
-      driftMultiplier: 1.3
+      driftMultiplier: 1.3,
+      skill: {
+        id: 'sky_glider',
+        name: 'スカイ・グライダー',
+        icon: '🪂',
+        cost: 35,
+        cooldown: 16.0,
+        duration: 5.0,
+        description: '地上走行中からどこでもグライダーを即座に展開し空中滑空へ移行！'
+      }
     },
     handling_green: {
       id: 'handling_green',
@@ -53,7 +71,42 @@ export const Vehicles = {
       offroadFriction: 0.40, // ダートでも比較的粘る
       handling: 1.8,
       weight: 0.8,
-      driftMultiplier: 1.2
+      driftMultiplier: 1.2,
+      skill: {
+        id: 'magnet_barrier',
+        name: 'マグネット・バリア',
+        icon: '🧲',
+        cost: 50,
+        cooldown: 18.0,
+        duration: 6.0,
+        description: '周囲のコインを強力自動吸引＆被弾攻撃を1回完全ガードする電磁シールド！'
+      }
+    },
+    heavy_yellow: {
+      id: 'heavy_yellow',
+      name: 'イエロー・ビースト',
+      image: null,
+      category: '重量型',
+      description: '重厚なボディと圧倒的パワーでライバルを圧倒するヘビーマシン。',
+      color: 0xf39c12,
+      accentColor: 0x2c3e50,
+      topSpeed: 45.0,
+      acceleration: 18.0,
+      brakeForce: 30.0,
+      inertiaDamping: 1.0,
+      offroadFriction: 0.32,
+      handling: 1.15,
+      weight: 1.5,
+      driftMultiplier: 1.35,
+      skill: {
+        id: 'giga_stampede',
+        name: 'ギガ・スタンピード',
+        icon: '⚡',
+        cost: 65,
+        cooldown: 20.0,
+        duration: 4.5,
+        description: '車体が黄金に輝き巨大化！接触したライバルを弾き飛ばす無敵突進！'
+      }
     }
   },
 
@@ -218,6 +271,69 @@ export const Vehicles = {
     gliderGroup.add(stay);
 
     return gliderGroup;
+  }
+};
+
+export const SkillsManager = {
+  getBankCoins() {
+    try {
+      const val = localStorage.getItem('kart_coin_bank');
+      return val ? Math.max(0, parseInt(val, 10) || 0) : 0;
+    } catch {
+      return 0;
+    }
+  },
+
+  addBankCoins(amount) {
+    if (!amount || amount <= 0) return this.getBankCoins();
+    try {
+      const current = this.getBankCoins();
+      const next = current + Math.floor(amount);
+      localStorage.setItem('kart_coin_bank', next.toString());
+      return next;
+    } catch {
+      return this.getBankCoins();
+    }
+  },
+
+  getUnlockedSkills() {
+    try {
+      const raw = localStorage.getItem('kart_unlocked_skills');
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  },
+
+  isSkillUnlocked(vehicleKey) {
+    const unlocked = this.getUnlockedSkills();
+    return !!unlocked[vehicleKey];
+  },
+
+  canUnlock(vehicleKey) {
+    const vehicle = Vehicles.types[vehicleKey];
+    if (!vehicle || !vehicle.skill) return false;
+    if (this.isSkillUnlocked(vehicleKey)) return false;
+    return this.getBankCoins() >= (vehicle.skill.cost || 0);
+  },
+
+  unlockSkill(vehicleKey) {
+    const vehicle = Vehicles.types[vehicleKey];
+    if (!vehicle || !vehicle.skill) return false;
+    if (this.isSkillUnlocked(vehicleKey)) return true;
+    const cost = vehicle.skill.cost || 0;
+    const bank = this.getBankCoins();
+    if (bank < cost) return false;
+
+    try {
+      localStorage.setItem('kart_coin_bank', (bank - cost).toString());
+      const unlocked = this.getUnlockedSkills();
+      unlocked[vehicleKey] = true;
+      localStorage.setItem('kart_unlocked_skills', JSON.stringify(unlocked));
+      return true;
+    } catch {
+      return false;
+    }
   }
 };
 
