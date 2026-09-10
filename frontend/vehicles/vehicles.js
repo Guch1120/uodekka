@@ -290,6 +290,9 @@ export const SkillsManager = {
       const current = this.getBankCoins();
       const next = current + Math.floor(amount);
       localStorage.setItem('kart_coin_bank', next.toString());
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('kart-coins-updated', { detail: { coins: next } }));
+      }
       return next;
     } catch {
       return this.getBankCoins();
@@ -326,14 +329,115 @@ export const SkillsManager = {
     if (bank < cost) return false;
 
     try {
-      localStorage.setItem('kart_coin_bank', (bank - cost).toString());
+      const next = bank - cost;
+      localStorage.setItem('kart_coin_bank', next.toString());
       const unlocked = this.getUnlockedSkills();
       unlocked[vehicleKey] = true;
       localStorage.setItem('kart_unlocked_skills', JSON.stringify(unlocked));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('kart-coins-updated', { detail: { coins: next } }));
+      }
       return true;
     } catch {
       return false;
     }
   }
 };
+
+/**
+ * レース内ローグライク強化スキル（Perks）の定義と抽選ロジック
+ */
+export const InRacePerks = {
+  definitions: {
+    top_speed: {
+      id: 'top_speed',
+      name: 'トップスピード+',
+      icon: '🏎️',
+      description: '最高速度が 8% 向上します。（重複可能）',
+      rarity: 'common',
+      apply(kart) {
+        kart.perkTopSpeedBoost = (kart.perkTopSpeedBoost || 0) + 0.08;
+      }
+    },
+    rapid_accel: {
+      id: 'rapid_accel',
+      name: 'クイック加速',
+      icon: '⚡',
+      description: '加速性能が 20% 向上します。（重複可能）',
+      rarity: 'common',
+      apply(kart) {
+        kart.perkAccelBoost = (kart.perkAccelBoost || 0) + 0.20;
+      }
+    },
+    coin_vacuum: {
+      id: 'coin_vacuum',
+      name: 'マグネット拡張',
+      icon: '🧲',
+      description: 'コイン吸引範囲が大幅拡大（+12m）。',
+      rarity: 'rare',
+      apply(kart) {
+        kart.perkMagnetRadius = (kart.perkMagnetRadius || 0) + 12;
+      }
+    },
+    drift_surge: {
+      id: 'drift_surge',
+      name: 'ドリフトブースト',
+      icon: '💨',
+      description: 'ミニターボの持続時間が 1.5倍 に延長。',
+      rarity: 'rare',
+      apply(kart) {
+        kart.perkDriftBoost = (kart.perkDriftBoost || 1.0) * 1.5;
+      }
+    },
+    iron_bumper: {
+      id: 'iron_bumper',
+      name: 'バンパーアーマー',
+      icon: '🛡️',
+      description: '被弾スピン時間を半減＆壁衝突減速を軽減。',
+      rarity: 'rare',
+      apply(kart) {
+        kart.perkIronBumper = true;
+      }
+    },
+    skill_accelerator: {
+      id: 'skill_accelerator',
+      name: 'スキル短縮',
+      icon: '🚀',
+      description: 'マシン固有スキルのクールダウンが 25% 短縮。',
+      rarity: 'epic',
+      apply(kart) {
+        kart.perkCooldownReduction = (kart.perkCooldownReduction || 0) + 0.25;
+      }
+    },
+    trap_guard: {
+      id: 'trap_guard',
+      name: 'トラップシールド',
+      icon: '🍌',
+      description: 'バナナやうんちのスピンを1度完全に防ぎます。',
+      rarity: 'epic',
+      apply(kart) {
+        kart.perkTrapShieldCount = (kart.perkTrapShieldCount || 0) + 1;
+      }
+    },
+    lucky_coin: {
+      id: 'lucky_coin',
+      name: 'ラッキーコイン',
+      icon: '🪙',
+      description: 'コインを拾うたびにミニダッシュが発生！',
+      rarity: 'common',
+      apply(kart) {
+        kart.perkLuckyCoin = true;
+      }
+    }
+  },
+
+  getRandomPerks(count = 3, excludeIds = []) {
+    const all = Object.values(this.definitions);
+    const available = all.filter(p => !excludeIds.includes(p.id));
+    const pool = available.length >= count ? available : all;
+    const shuffled = [...pool].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, count);
+  }
+};
+
 

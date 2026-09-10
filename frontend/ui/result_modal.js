@@ -1,5 +1,6 @@
 // frontend/ui/result_modal.js
 // レース終了リザルト画面（順位、ラップタイム、トータルタイム、3つのアクション選択）
+import { InRacePerks } from '../vehicles/vehicles.js';
 
 export class ResultModal {
   static formatTime(ms) {
@@ -71,6 +72,21 @@ export class ResultModal {
       `;
     }).join('');
 
+    const perks = this.data.inRacePerks || {};
+    const perkEntries = Object.entries(perks);
+    const perksHtml = perkEntries.length > 0 ? `
+      <div class="result-perks-summary">
+        <span class="perks-summary-title">⚡ 獲得強化スキル:</span>
+        <div class="result-perks-chips">
+          ${perkEntries.map(([id, count]) => {
+            const def = InRacePerks.definitions[id];
+            if (!def) return '';
+            return `<span class="result-perk-chip" title="${def.description}">${def.icon} ${def.name} <small>Lv.${count}</small></span>`;
+          }).join('')}
+        </div>
+      </div>
+    ` : '';
+
     const rankBadgeClass = rank === 1 ? 'rank-gold' : (rank === 2 ? 'rank-silver' : (rank === 3 ? 'rank-bronze' : 'rank-other'));
 
     this.modalEl.innerHTML = `
@@ -104,6 +120,7 @@ export class ResultModal {
               <span class="coin-gain-text">🪙 今回獲得コイン: <strong>+${this.data.coinsEarned || 0}</strong> 枚</span>
               <span class="coin-bank-text">（累計所持: 🪙 <strong>${this.data.bankCoins || 0}</strong> 枚）</span>
             </div>
+            ${perksHtml}
           </div>
 
           <div class="result-standings-panel">

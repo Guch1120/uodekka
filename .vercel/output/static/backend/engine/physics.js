@@ -236,9 +236,11 @@ export class KartPhysics {
     const smallSpeedFactor = this.isSmall ? 0.55 : 1.0;
     // 異臭パワー時は最高速度と加速度が45%低下
     const stinkSpeedFactor = this.stinkTimer > 0 ? 0.55 : 1.0;
-    const baseSpeedWithCoins = this.maxSpeed + (this.coinBonusSpeed || 0);
+    const perkSpeedFactor = 1 + (this.perkTopSpeedBoost || 0);
+    const perkAccelFactor = 1 + (this.perkAccelBoost || 0);
+    const baseSpeedWithCoins = (this.maxSpeed + (this.coinBonusSpeed || 0)) * perkSpeedFactor;
     const currentMaxSpeed = baseSpeedWithCoins * this.boostMultiplier * smallSpeedFactor * stinkSpeedFactor;
-    const currentAccel = this.acceleration * smallSpeedFactor * stinkSpeedFactor;
+    const currentAccel = this.acceleration * perkAccelFactor * smallSpeedFactor * stinkSpeedFactor;
 
     if (brakeInput > 0) {
       if (this.speed > 0) {
@@ -320,13 +322,14 @@ export class KartPhysics {
     } else {
       if (this.isDrifting) {
         // ドリフト終了時にスパークに応じた急加速
+        const durationMult = this.perkDriftBoost || 1.0;
         if (this.driftSparkLevel === 2) {
-          this.applyBoost(1.5, 1.8);
+          this.applyBoost(1.5, 1.8 * durationMult);
           if (this.isLocalPlayer && gameState) {
             gameState.showItemNotification('🔥 スーパーミニターボ発動！', 1500);
           }
         } else if (this.driftSparkLevel === 1) {
-          this.applyBoost(1.3, 1.0);
+          this.applyBoost(1.3, 1.0 * durationMult);
           if (this.isLocalPlayer && gameState) {
             gameState.showItemNotification('⚡ ミニターボ発動！', 1200);
           }
@@ -612,16 +615,24 @@ export class KartPhysics {
     this.applyBoost(1.35, duration);
   }
 
-  spinOut() {
+  spinOut(gameState = null) {
     if (this.isGigaStampede) return;
     if (this.hasShield) {
       this.hasShield = false;
       return; // 攻撃をバリアが身代わりで吸収！
     }
+    if (this.perkTrapShieldCount && this.perkTrapShieldCount > 0) {
+      this.perkTrapShieldCount--;
+      const gs = gameState || this.gameState;
+      if (gs && this.isLocalPlayer) {
+        gs.showItemNotification('🛡️ トラップシールドが身代わり発動！スピンを無効化！', 2000);
+      }
+      return;
+    }
     if (this.invincibleTimer > 0 || this.isSpinning || this.isRespawning) return;
     this.isSpinning = true;
-    this.spinTimer = 1.2;
-    this.speed = this.speed * 0.2;
+    this.spinTimer = this.perkIronBumper ? 0.6 : 1.2;
+    this.speed = this.speed * (this.perkIronBumper ? 0.45 : 0.2);
   }
 
   applySmall(duration) {

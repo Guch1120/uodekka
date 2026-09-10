@@ -2080,3 +2080,449 @@ body.force-landscape .orientation-prompt {
   border-color: #38bdf8;
   color: #38bdf8;
 }
+
+/* ================= レース内ローグライクスキル（In-Race Perks） ================= */
+.hud-perks-tray {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  max-width: 240px;
+}
+
+.hud-perk-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 13px;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.hud-perk-badge small {
+  font-size: 10px;
+  font-weight: 800;
+  color: #38bdf8;
+}
+
+.hud-perk-badge.rarity-rare {
+  border-color: #38bdf8;
+  background: rgba(14, 116, 144, 0.85);
+}
+
+.hud-perk-badge.rarity-epic {
+  border-color: #ec4899;
+  background: rgba(131, 24, 67, 0.85);
+}
+
+.hud-perk-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  animation: fadeIn 0.2s ease-out;
+}
+
+.hud-perk-modal.hidden {
+  display: none !important;
+}
+
+.perk-modal-card {
+  width: min(840px, 94vw);
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border: 2px solid rgba(56, 189, 248, 0.4);
+  border-radius: 20px;
+  padding: 20px 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 40px rgba(56, 189, 248, 0.25);
+  text-align: center;
+  color: #fff;
+}
+
+.perk-modal-header {
+  margin-bottom: 16px;
+}
+
+.perk-modal-kicker {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 900;
+  color: #fbbf24;
+  letter-spacing: 2px;
+}
+
+.perk-modal-title {
+  font-size: clamp(20px, 3.5vw, 26px);
+  font-weight: 900;
+  margin: 4px 0 8px;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+.perk-timer-container {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.perk-timer-bar {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #38bdf8, #22c55e);
+}
+
+.perk-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.perk-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  padding: 16px 14px;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  position: relative;
+}
+
+.perk-card:hover, .perk-card:focus {
+  transform: translateY(-4px) scale(1.03);
+  border-color: #38bdf8;
+  box-shadow: 0 10px 30px rgba(56, 189, 248, 0.3);
+  outline: none;
+}
+
+.perk-card:active {
+  transform: translateY(-1px) scale(0.98);
+}
+
+.perk-card.rarity-common {
+  border-color: rgba(148, 163, 184, 0.4);
+}
+.perk-card.rarity-rare {
+  border-color: rgba(56, 189, 248, 0.6);
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.1) 0%, rgba(15, 23, 42, 0.6) 100%);
+}
+.perk-card.rarity-epic {
+  border-color: rgba(236, 72, 153, 0.7);
+  background: linear-gradient(180deg, rgba(236, 72, 153, 0.15) 0%, rgba(15, 23, 42, 0.6) 100%);
+}
+
+.perk-card-top {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.perk-hotkey {
+  font-size: 11px;
+  font-weight: 800;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.15);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.perk-rarity-badge {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #cbd5e1;
+}
+
+.rarity-epic .perk-rarity-badge {
+  background: #ec4899;
+  color: #fff;
+}
+
+.rarity-rare .perk-rarity-badge {
+  background: #38bdf8;
+  color: #0f172a;
+}
+
+.perk-icon {
+  font-size: 36px;
+  margin-bottom: 8px;
+}
+
+.perk-name {
+  font-size: 16px;
+  font-weight: 800;
+  margin: 0 0 6px;
+  color: #f8fafc;
+}
+
+.perk-desc {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.perk-modal-hint {
+  font-size: 12px;
+  color: #64748b;
+  margin: 4px 0 0;
+}
+
+/* リザルト画面でのペルク表示 */
+.result-perks-summary {
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 10px;
+  text-align: left;
+}
+
+.perks-summary-title {
+  font-size: 11px;
+  font-weight: 800;
+  color: #38bdf8;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.result-perks-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.result-perk-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 11px;
+  color: #e2e8f0;
+}
+
+.result-perk-chip small {
+  color: #38bdf8;
+  font-weight: 800;
+}
+
+/* ================= Issue #13: 横画面（高さ<=520px）スクロールフリーUI ================= */
+@media (max-height: 520px), (max-width: 900px) and (orientation: landscape) {
+  /* フィードバックモーダル: 2カラム化 & スクロール不要化 */
+  #feedback-modal .modal-dialog {
+    max-width: min(740px, 96vw);
+    max-height: 94dvh;
+    border-radius: 14px;
+  }
+  #feedback-modal .modal-header {
+    padding: 8px 16px;
+  }
+  #feedback-modal .modal-header h2 {
+    font-size: 16px;
+  }
+  #feedback-modal .btn-close {
+    font-size: 20px;
+  }
+  #feedback-modal .modal-body {
+    padding: 8px 16px;
+    gap: 8px;
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    align-items: start;
+    overflow-y: hidden;
+  }
+  #feedback-modal .feedback-intro {
+    grid-column: 1 / -1;
+    font-size: 11px;
+    line-height: 1.3;
+  }
+  #feedback-modal .modal-footer {
+    padding: 6px 16px;
+  }
+  #feedback-modal .setting-row {
+    gap: 4px;
+    padding-bottom: 4px;
+    margin: 0;
+    border-bottom: none;
+  }
+  #feedback-modal .setting-label {
+    font-size: 11px;
+  }
+  #feedback-modal .feedback-select,
+  #feedback-modal .feedback-input {
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+  #feedback-modal .feedback-textarea {
+    min-height: 65px;
+    height: 70px;
+    padding: 6px 8px;
+    font-size: 12px;
+    resize: none;
+  }
+  #feedback-modal .primary-btn {
+    padding: 8px 18px;
+    font-size: 12px;
+    border-radius: 8px;
+  }
+
+  /* レースリザルトモーダル: スクロール不要化 */
+  .result-modal-card {
+    padding: 6px 14px;
+    max-height: 95dvh;
+    width: min(840px, 96vw);
+    overflow-y: hidden;
+  }
+  .result-header {
+    margin-bottom: 2px;
+  }
+  .result-kicker {
+    font-size: 9px;
+    margin-bottom: 0;
+  }
+  .result-course-title {
+    font-size: 16px;
+    margin: 0;
+  }
+  .result-main-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .result-player-summary {
+    padding: 6px 10px;
+    border-radius: 10px;
+  }
+  .result-rank-badge {
+    padding: 2px 12px;
+    margin-bottom: 2px;
+  }
+  .result-rank-num {
+    font-size: 26px;
+  }
+  .result-rank-suffix {
+    font-size: 14px;
+  }
+  .result-rank-text {
+    font-size: 10px;
+    margin-bottom: 2px;
+  }
+  .result-times-card {
+    padding: 4px 8px;
+    border-radius: 6px;
+  }
+  .result-total-time {
+    padding-bottom: 2px;
+    margin-bottom: 2px;
+  }
+  .result-total-time .time-label {
+    font-size: 9px;
+  }
+  .result-total-time .time-value {
+    font-size: 15px;
+  }
+  .result-laps-list {
+    gap: 2px;
+  }
+  .result-lap-row {
+    font-size: 10px;
+    padding: 1px 4px;
+  }
+  .result-coin-summary {
+    margin-top: 3px;
+    padding: 2px 6px;
+    font-size: 10px;
+  }
+  .result-coin-summary strong {
+    font-size: 11px;
+  }
+  .result-perks-summary {
+    margin-top: 3px;
+    padding: 2px 6px;
+  }
+  .perks-summary-title {
+    font-size: 9px;
+    margin-bottom: 1px;
+  }
+  .result-perk-chip {
+    padding: 1px 5px;
+    font-size: 9px;
+  }
+  .result-standings-panel {
+    padding: 6px 10px;
+    border-radius: 10px;
+  }
+  .standings-heading {
+    font-size: 10px;
+    margin: 0 0 4px 2px;
+  }
+  .result-standings-list {
+    max-height: 90px;
+    gap: 2px;
+  }
+  .result-standing-item {
+    padding: 2px 5px;
+    font-size: 10px;
+  }
+  .result-actions {
+    gap: 6px;
+  }
+  .result-btn {
+    padding: 5px 12px;
+    font-size: 11px;
+    border-radius: 6px;
+  }
+
+  /* ローグライク選択カード: コンパクト横画面 */
+  .perk-modal-card {
+    padding: 10px 16px;
+    max-height: 94dvh;
+  }
+  .perk-modal-title {
+    font-size: 18px;
+    margin: 2px 0 4px;
+  }
+  .perk-cards-grid {
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+  .perk-card {
+    padding: 8px 10px;
+  }
+  .perk-icon {
+    font-size: 24px;
+    margin-bottom: 4px;
+  }
+  .perk-name {
+    font-size: 13px;
+    margin-bottom: 2px;
+  }
+  .perk-desc {
+    font-size: 10px;
+  }
+}
+

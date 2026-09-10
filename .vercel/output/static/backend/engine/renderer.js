@@ -72,8 +72,22 @@ export class GameRenderer {
       this.onContextRestored?.();
     }, false);
 
-    // リサイズイベント
+    // リサイズおよび画面復帰イベント（他アプリ・ホーム画面からの復帰時の比率崩れ防止）
+    const triggerResize = () => {
+      this.onResize();
+      setTimeout(() => this.onResize(), 80);
+      setTimeout(() => this.onResize(), 250);
+      setTimeout(() => this.onResize(), 600);
+    };
     window.addEventListener('resize', () => this.onResize());
+    window.addEventListener('orientationchange', triggerResize);
+    window.addEventListener('pageshow', triggerResize);
+    window.addEventListener('focus', triggerResize);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        triggerResize();
+      }
+    });
   }
 
   setGraphicQuality(quality) {
@@ -116,10 +130,16 @@ export class GameRenderer {
   }
 
   onResize() {
-    const w = this.container.clientWidth || window.innerWidth;
-    const h = this.container.clientHeight || window.innerHeight;
-    this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
+    let w = this.container.clientWidth || window.innerWidth;
+    let h = this.container.clientHeight || window.innerHeight;
+    w = Math.max(1, Math.round(w));
+    h = Math.max(1, Math.round(h));
+
+    const aspect = w / h;
+    if (Number.isFinite(aspect) && aspect > 0) {
+      this.camera.aspect = aspect;
+      this.camera.updateProjectionMatrix();
+    }
     this.renderer.setSize(w, h);
   }
 

@@ -102,8 +102,31 @@
       }
       return info;
     }
+    function handleAppResumeAndResize() {
+      detectDeviceInfo();
+      if (window.gameInstance && window.gameInstance.renderer) {
+        window.gameInstance.renderer.onResize();
+      }
+      window.dispatchEvent(new Event('resize'));
+    }
+
+    function stagedResumeSync() {
+      handleAppResumeAndResize();
+      setTimeout(handleAppResumeAndResize, 80);
+      setTimeout(handleAppResumeAndResize, 250);
+      setTimeout(handleAppResumeAndResize, 600);
+    }
+
     detectDeviceInfo();
     window.addEventListener('resize', detectDeviceInfo);
+    window.addEventListener('orientationchange', stagedResumeSync);
+    window.addEventListener('pageshow', stagedResumeSync);
+    window.addEventListener('focus', stagedResumeSync);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        stagedResumeSync();
+      }
+    });
 
     function enableForcedLandscape() {
       if (orientationPrompt) {

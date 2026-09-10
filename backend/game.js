@@ -7,7 +7,7 @@ import { FollowCamera } from './engine/camera.js';
 import { InputManager } from './input/input_manager.js';
 import { WebSocketManager } from './network/websocket_manager.js';
 
-import { Vehicles, SkillsManager } from '../frontend/vehicles/vehicles.js';
+import { Vehicles, SkillsManager, InRacePerks } from '../frontend/vehicles/vehicles.js';
 import { Courses } from '../frontend/courses/index.js';
 import { Items } from '../frontend/items/items.js';
 import { HUD } from '../frontend/ui/hud.js';
@@ -16,6 +16,7 @@ import { LobbyModal } from '../frontend/ui/lobby_modal.js';
 import { PauseModal } from '../frontend/ui/pause_modal.js';
 import { EditorModal } from '../frontend/ui/editor_modal.js';
 import { ResultModal } from '../frontend/ui/result_modal.js';
+if (typeof window !== 'undefined') window.ResultModal = ResultModal;
 import { UPDATE_NOTIFICATION } from '../frontend/data/updates.js';
 import { CourseKnowledgeBase } from './ai/learning_ai.js';
 import { CPUDriver, CPU_ROSTER } from './ai/cpu_driver.js';
@@ -85,6 +86,10 @@ export class Game {
     this.itemBoxes = [];
     this.coins = [];
     this.playerCoins = 0;
+    this.inRacePerks = {};
+    this.nextPerkThreshold = 3;
+    this.isPerkSelecting = false;
+    this.perkSlowMo = false;
     this.skillCooldown = 0;
     this.skillActiveTimer = 0;
     this.skillActiveType = null;
@@ -423,11 +428,17 @@ export class Game {
     this.itemBoxes = [];
     this.coins = [];
     this.playerCoins = 0;
+    this.inRacePerks = {};
+    this.nextPerkThreshold = 3;
+    this.isPerkSelecting = false;
+    this.perkSlowMo = false;
     this.skillCooldown = 0;
     this.skillActiveTimer = 0;
     this.skillActiveType = null;
     this.shieldMesh = null;
     this.hud.updateCoins(0);
+    this.hud.updateActivePerks({});
+    this.hud.hidePerkSelection?.();
     this.courseObstacles = [];
     this._finishedNotified = false;
     Items.lightningHeld = false;
@@ -754,7 +765,8 @@ export class Game {
   animate() {
     requestAnimationFrame(this.animate);
 
-    const dt = Math.min(this.clock.getDelta(), 0.1);
+    const rawDelta = this.clock.getDelta();
+    const dt = Math.min(rawDelta, 0.1) * (this.perkSlowMo ? 0.15 : 1.0);
 
     if (this.isRunning && this.localPlayerKart && !this.isPaused) {
       try {
@@ -976,7 +988,8 @@ export class Game {
           courseName: this.currentCourseConfig.name,
           racers: racersList,
           coinsEarned: this.playerCoins || 0,
-          bankCoins: SkillsManager.getBankCoins()
+          bankCoins: SkillsManager.getBankCoins(),
+          inRacePerks: { ...this.inRacePerks }
         }, {
           onHome: () => this.quitRace(),
           onChangeCourse: () => this.selectOtherCourse(),
@@ -1442,11 +1455,13 @@ export class Game {
       coin.mesh.rotation.y += dt * coin.rotationSpeed;
       coin.mesh.position.y = coin.baseY + Math.sin(time + coin.mesh.position.x) * 0.18;
 
-      if (magnetActive && playerKart && !playerKart.isRespawning) {
+      const extraMagnet = playerKart ? (playerKart.perkMagnetRadius || 0) : 0;
+      const effectiveMagnetDist = (magnetActive ? 14.0 : 0) + extraMagnet;
+      if (effectiveMagnetDist > 0 && playerKart && !playerKart.isRespawning) {
         const distToPlayer = coin.pos.distanceTo(playerKart.mesh.position);
-        if (distToPlayer < magnetRadius) {
+        if (distToPlayer < effectiveMagnetDist) {
           const pullDir = new THREE.Vector3().subVectors(playerKart.mesh.position, coin.pos).normalize();
-          coin.pos.addScaledVector(pullDir, dt * 20.0);
+          coin.pos.addScaledVector(pullDir, dt * (magnetActive ? 20.0 : 14.0));
         }
       }
 
@@ -1464,11 +1479,68 @@ export class Game {
             this.playCoinSfx();
             this.hud?.updateCoins(this.playerCoins);
             this.showItemNotification(`🪙 コイン獲得！ (所持: ${this.playerCoins}枚)`, 1200);
+
+            if (playerKart.perkLuckyCoin) {
+              playerKart.applyBoost(1.2, 0.6);
+            }
+
+            if (this.playerCoins >= (this.nextPerkThreshold || 3)) {
+              this.nextPerkThreshold = (this.nextPerkThreshold || 3) + 3;
+              this.triggerInRacePerkSelection();
+            }
           }
           break;
         }
       }
     });
+  }
+
+  triggerInRacePerkSelection() {
+    if (!this.isRunning || !this.localPlayerKart || this.activeResultModal) return;
+    const choices = InRacePerks.getRandomPerks(3);
+    const isSolo = this.currentGameConfig?.mode === 'solo';
+
+    if (isSolo) {
+      this.isPerkSelecting = true;
+      this.perkSlowMo = true;
+    }
+
+    this.hud?.showPerkSelection(choices, (selectedPerk) => {
+      this.isPerkSelecting = false;
+      this.perkSlowMo = false;
+      if (!selectedPerk) return;
+
+      this.inRacePerks = this.inRacePerks || {};
+      this.inRacePerks[selectedPerk.id] = (this.inRacePerks[selectedPerk.id] || 0) + 1;
+      selectedPerk.apply(this.localPlayerKart);
+
+      this.hud?.updateActivePerks(this.inRacePerks);
+      this.playPerkSelectSfx();
+      this.showItemNotification(`✨ 強化解禁: 【${selectedPerk.name}】Lv.${this.inRacePerks[selectedPerk.id]}!`, 2500);
+    }, isSolo ? 0 : 6);
+  }
+
+  playPerkSelectSfx() {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      if (!this._audioCtx) this._audioCtx = new AudioCtx();
+      if (this._audioCtx.state === 'suspended') this._audioCtx.resume();
+      const now = this._audioCtx.currentTime;
+      const osc = this._audioCtx.createOscillator();
+      const gain = this._audioCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(523.25, now);
+      osc.frequency.setValueAtTime(659.25, now + 0.08);
+      osc.frequency.setValueAtTime(783.99, now + 0.16);
+      osc.frequency.setValueAtTime(1046.50, now + 0.24);
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+      osc.connect(gain);
+      gain.connect(this._audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.6);
+    } catch {}
   }
 
   triggerPlayerSkill() {
@@ -1489,7 +1561,8 @@ export class Game {
     }
 
     const kart = this.localPlayerKart;
-    this.skillCooldown = skill.cooldown || 15.0;
+    const cdReduction = kart.perkCooldownReduction || 0;
+    this.skillCooldown = (skill.cooldown || 15.0) * Math.max(0.3, 1.0 - cdReduction);
     this.skillActiveTimer = skill.duration || 3.0;
     this.skillActiveType = skill.id;
     this.playSkillSfx(skill.id);

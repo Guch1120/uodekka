@@ -245,6 +245,15 @@ export class LobbyModal {
     });
     this.el('#input-room-id').addEventListener('input', () => this.updateInvite());
     this.el('#room-form').addEventListener('submit', event => { event.preventDefault(); this.connectRoom(); });
+
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'kart_coin_bank' || e.key === 'kart_unlocked_skills') {
+        this.updateVehicle();
+      }
+    });
+    window.addEventListener('kart-coins-updated', () => {
+      this.updateVehicle();
+    });
   }
 
   saveProfile() {
@@ -623,11 +632,12 @@ export class LobbyModal {
     this.busy = false;
     this.el('#race-countdown').hidden = true;
     this.showScreen('home');
+    this.updateVehicle();
     this.setStatus('好きな車体で、好きな走りを。');
   }
 
   setStatus(text) { this.el('#garage-status').textContent = text; }
   populateCourseSelects() { this.refreshCourses(); }
-  show() { this.modalEl.hidden = false; this.returnHome(); this.refreshCourses(); }
+  show() { this.modalEl.hidden = false; this.returnHome(); this.refreshCourses(); this.updateVehicle(); }
   hide() { this.modalEl.hidden = true; }
 }

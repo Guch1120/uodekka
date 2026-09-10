@@ -1,6 +1,7 @@
 // frontend/ui/hud.js
 // レース中のHUD（順位、ラップ、速度メーター、アイテムスロット、ミニマップ、復帰カウントダウン、逆走警告）
 import { Icons } from '../icons/icons.js';
+import { InRacePerks } from '../vehicles/vehicles.js';
 
 export class HUD {
   constructor(container) {
@@ -38,6 +39,8 @@ export class HUD {
             <span class="coin-icon">🪙</span>
             <span id="hud-coin-count">0</span>
           </div>
+          <!-- 獲得したレース内強化スキル一覧トレイ -->
+          <div class="hud-perks-tray" id="hud-perks-tray"></div>
         </div>
         <!-- 拡大された大型ミニマップ -->
         <div class="hud-minimap-wrapper">
@@ -103,10 +106,36 @@ export class HUD {
           <span>[Esc] 一時停止</span>
         </div>
       </div>
+
+      <!-- レース内ローグライクスキル選択オーバーレイ -->
+      <div id="hud-perk-modal" class="hud-perk-modal hidden" role="dialog" aria-modal="true" aria-labelledby="perk-modal-title">
+        <div class="perk-modal-card">
+          <div class="perk-modal-header">
+            <span class="perk-modal-kicker">LEVEL UP!</span>
+            <h2 id="perk-modal-title" class="perk-modal-title">強化スキルを選択</h2>
+            <div class="perk-timer-container" id="perk-timer-container">
+              <div class="perk-timer-bar" id="perk-timer-bar"></div>
+            </div>
+          </div>
+          <div class="perk-cards-grid" id="perk-cards-grid"></div>
+          <p class="perk-modal-hint">カードをタップ、または [1] [2] [3] キーで選択</p>
+        </div>
+      </div>
     `;
 
     this.container.appendChild(hudDiv);
     this.element = hudDiv;
+
+    this.perksTrayEl = hudDiv.querySelector('#hud-perks-tray');
+    this.perkModalEl = hudDiv.querySelector('#hud-perk-modal');
+    this.perkCardsGridEl = this.perkModalEl?.querySelector('#perk-cards-grid');
+    this.perkTimerBarEl = this.perkModalEl?.querySelector('#perk-timer-bar');
+    this.perkTimerContainerEl = this.perkModalEl?.querySelector('#perk-timer-container');
+    if (this.perkModalEl) {
+      this.container.appendChild(this.perkModalEl);
+    }
+    this.perkTimerId = null;
+    this.perkKeyHandler = null;
 
     this.itemSlotEl = hudDiv.querySelector('#hud-item-slot');
     this.itemIconEl = hudDiv.querySelector('#hud-item-icon');
@@ -464,6 +493,95 @@ export class HUD {
     }
   }
 
+  updateActivePerks(perksMap) {
+    if (!this.perksTrayEl) return;
+    if (!perksMap || Object.keys(perksMap).length === 0) {
+      this.perksTrayEl.innerHTML = '';
+      return;
+    }
+    const html = Object.entries(perksMap).map(([id, count]) => {
+      const def = InRacePerks.definitions[id];
+      if (!def) return '';
+      return `<span class="hud-perk-badge rarity-${def.rarity}" title="${def.name} Lv.${count} (${def.description})">${def.icon}<small>${count}</small></span>`;
+    }).join('');
+    this.perksTrayEl.innerHTML = html;
+  }
+
+  showPerkSelection(choices, onSelect, durationSec = 0) {
+    if (!this.perkModalEl || !this.perkCardsGridEl) return;
+    this.hidePerkSelection();
+
+    this.perkCardsGridEl.innerHTML = choices.map((perk, index) => {
+      const hotkey = index + 1;
+      return `
+        <button type="button" class="perk-card rarity-${perk.rarity}" data-index="${index}">
+          <div class="perk-card-top">
+            <span class="perk-hotkey">[${hotkey}]</span>
+            <span class="perk-rarity-badge">${perk.rarity.toUpperCase()}</span>
+          </div>
+          <div class="perk-icon">${perk.icon}</div>
+          <h3 class="perk-name">${perk.name}</h3>
+          <p class="perk-desc">${perk.description}</p>
+        </button>
+      `;
+    }).join('');
+
+    const selectChoice = (index) => {
+      const chosen = choices[index];
+      this.hidePerkSelection();
+      if (onSelect) onSelect(chosen);
+    };
+
+    // クリック・タップリスナー
+    this.perkCardsGridEl.querySelectorAll('.perk-card').forEach(btn => {
+      const idx = parseInt(btn.dataset.index, 10);
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectChoice(idx);
+      });
+    });
+
+    // キーボードリスナー [1], [2], [3]
+    this.perkKeyHandler = (e) => {
+      if (e.key === '1' && choices[0]) { e.preventDefault(); selectChoice(0); }
+      else if (e.key === '2' && choices[1]) { e.preventDefault(); selectChoice(1); }
+      else if (e.key === '3' && choices[2]) { e.preventDefault(); selectChoice(2); }
+    };
+    window.addEventListener('keydown', this.perkKeyHandler);
+
+    // タイマー（マルチプレイ時）
+    if (durationSec > 0 && this.perkTimerBarEl && this.perkTimerContainerEl) {
+      this.perkTimerContainerEl.hidden = false;
+      this.perkTimerBarEl.style.transition = 'none';
+      this.perkTimerBarEl.style.width = '100%';
+      requestAnimationFrame(() => {
+        this.perkTimerBarEl.style.transition = `width ${durationSec}s linear`;
+        this.perkTimerBarEl.style.width = '0%';
+      });
+      this.perkTimerId = setTimeout(() => {
+        selectChoice(0);
+      }, durationSec * 1000);
+    } else if (this.perkTimerContainerEl) {
+      this.perkTimerContainerEl.hidden = true;
+    }
+
+    this.perkModalEl.classList.remove('hidden');
+  }
+
+  hidePerkSelection() {
+    if (this.perkTimerId) {
+      clearTimeout(this.perkTimerId);
+      this.perkTimerId = null;
+    }
+    if (this.perkKeyHandler) {
+      window.removeEventListener('keydown', this.perkKeyHandler);
+      this.perkKeyHandler = null;
+    }
+    if (this.perkModalEl) {
+      this.perkModalEl.classList.add('hidden');
+    }
+  }
+
   show() {
     if (this.element) {
       this.element.classList.remove('hidden');
@@ -471,6 +589,7 @@ export class HUD {
   }
 
   hide() {
+    this.hidePerkSelection();
     if (this.element) {
       this.element.classList.add('hidden');
     }
