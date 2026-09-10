@@ -3,11 +3,12 @@
 import { Icons } from '../icons/icons.js';
 
 export class PauseModal {
-  constructor(container, onResume, onRestart, onQuit) {
+  constructor(container, onResume, onRestart, onQuit, getDiagnostics = null) {
     this.container = container;
     this.onResume = onResume;
     this.onRestart = onRestart;
     this.onQuit = onQuit;
+    this.getDiagnostics = getDiagnostics;
     this.modalEl = null;
     this.mode = 'solo';
     this.init();
@@ -31,9 +32,13 @@ export class PauseModal {
             <button id="btn-pause-restart" class="action-btn pause-action-btn restart-btn">
               🔄 最初からやり直す
             </button>
+            <button id="btn-pause-diagnostics" class="btn-secondary pause-action-btn" style="background: #1e293b; color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4);">
+              📋 描画・通信診断をコピー
+            </button>
             <button id="btn-pause-quit" class="btn-secondary pause-action-btn quit-btn">
               🚪 レースをやめる (ロビーへ)
             </button>
+            <pre id="pause-diagnostic-output" class="hidden" style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:160px;overflow-y:auto;font-size:11px;line-height:1.4;background:#0f172a;color:#94a3b8;padding:10px;border-radius:8px;margin-top:10px;border:1px solid #334155;text-align:left;"></pre>
           </div>
 
           <!-- 確認パネル（ブラウザのネイティブダイアログを使わずモーダル内で完結） -->
@@ -92,6 +97,26 @@ export class PauseModal {
       this.hide();
       if (this.onQuit) this.onQuit();
     };
+
+    const btnDiag = this.modalEl.querySelector('#btn-pause-diagnostics');
+    const diagOutput = this.modalEl.querySelector('#pause-diagnostic-output');
+
+    if (btnDiag) {
+      btnDiag.onclick = async () => {
+        const text = this.getDiagnostics ? this.getDiagnostics() : '診断情報は取得できませんでした。';
+        diagOutput.classList.remove('hidden');
+        diagOutput.textContent = text;
+        try {
+          await navigator.clipboard.writeText(text);
+          btnDiag.textContent = '✓ 診断をコピーしました！';
+          setTimeout(() => {
+            if (btnDiag) btnDiag.textContent = '📋 描画・通信診断をコピー';
+          }, 3000);
+        } catch (_) {
+          btnDiag.textContent = '⚠️ 下のテキストを長押しコピーしてください';
+        }
+      };
+    }
   }
 
   show(mode = 'solo') {
@@ -101,6 +126,11 @@ export class PauseModal {
       // マルチプレイ時は「やり直す」を非表示にする
       btnRestart.style.display = (mode === 'solo') ? 'block' : 'none';
     }
+    const diagOutput = this.modalEl.querySelector('#pause-diagnostic-output');
+    if (diagOutput) diagOutput.classList.add('hidden');
+    const btnDiag = this.modalEl.querySelector('#btn-pause-diagnostics');
+    if (btnDiag) btnDiag.textContent = '📋 描画・通信診断をコピー';
+
     this.modalEl.classList.remove('hidden');
   }
 

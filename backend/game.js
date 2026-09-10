@@ -16,6 +16,7 @@ import { LobbyModal } from '../frontend/ui/lobby_modal.js';
 import { PauseModal } from '../frontend/ui/pause_modal.js';
 import { EditorModal } from '../frontend/ui/editor_modal.js';
 import { ResultModal } from '../frontend/ui/result_modal.js';
+import { UPDATE_NOTIFICATION } from '../frontend/data/updates.js';
 import { CourseKnowledgeBase } from './ai/learning_ai.js';
 import { CPUDriver, CPU_ROSTER } from './ai/cpu_driver.js';
 
@@ -23,10 +24,30 @@ export class Game {
   constructor() {
     this.appContainer = document.getElementById('app');
 
+    // 診断追跡カウンター・例外記録
+    this.updateCount = 0;
+    this.renderCount = 0;
+    this.firstException = null;
+    this.lastException = null;
+    this.firstRenderException = null;
+    this.lastRenderException = null;
+
     // レンダラー
     this.renderer = new GameRenderer(this.appContainer);
     this.scene = this.renderer.scene;
     this.camera = this.renderer.camera;
+
+    this.renderer.onContextLost = (event) => {
+      console.warn('[Game] WebGL context lost detected!');
+      this.p2p?.record?.('webgl-context-lost', { count: this.renderer.contextLostCount });
+      this.hud?.showNotification('⚠️ 3D描画機能が停止しました（WebGLメモリ負荷等）。復帰試行中…（ポーズで診断コピー可）', 6000);
+    };
+
+    this.renderer.onContextRestored = () => {
+      console.info('[Game] WebGL context restored detected!');
+      this.p2p?.record?.('webgl-context-restored', { count: this.renderer.contextRestoredCount });
+      this.hud?.showNotification('✓ 3D描画機能が復帰しました。', 3000);
+    };
 
     // 入力管理 & 追従カメラ
     this.inputManager = new InputManager(this.appContainer);
@@ -37,12 +58,17 @@ export class Game {
 
     // UI
     this.hud = new HUD(this.appContainer);
-    this.settingsModal = new SettingsModal(this.appContainer, this.inputManager);
+    this.settingsModal = new SettingsModal(
+      this.appContainer,
+      this.inputManager,
+      (quality) => this.renderer.setGraphicQuality(quality)
+    );
     this.pauseModal = new PauseModal(
       this.appContainer,
       () => this.resumeRace(),
       () => this.restartRace(),
-      () => this.quitRace()
+      () => this.quitRace(),
+      () => this.getRenderDiagnostics()
     );
 
     // レース状態
@@ -561,16 +587,31 @@ export class Game {
 
     if (this.isRunning && this.localPlayerKart && !this.isPaused) {
       try {
+        this.updateCount++;
         this.updateGame(dt);
       } catch (err) {
+        if (!this.firstException) {
+          this.firstException = { message: err?.message, stack: err?.stack, time: performance.now(), type: 'update' };
+        }
+        this.lastException = { message: err?.message, stack: err?.stack, time: performance.now(), type: 'update' };
         this.handleGameLoopError(err);
       }
     }
 
     try {
+      this.renderCount++;
       this.renderer.render();
     } catch (err) {
+      if (!this.firstRenderException) {
+        this.firstRenderException = { message: err?.message, stack: err?.stack, time: performance.now() };
+      }
+      this.lastRenderException = { message: err?.message, stack: err?.stack, time: performance.now() };
       console.error('[Game] Render error:', err);
+      this.p2p?.record?.('render-exception', { message: err?.message, stack: err?.stack });
+      if (!this._lastRenderErrorNotifTime || performance.now() - this._lastRenderErrorNotifTime > 4000) {
+        this._lastRenderErrorNotifTime = performance.now();
+        this.hud?.showNotification(`描画処理例外: ${err?.message || 'エラー'}（診断記録済）`, 3500);
+      }
     }
   }
 
@@ -625,7 +666,8 @@ export class Game {
       dt,
       this.localPlayerKart.isSpinning,
       this.courseTrack.curve,
-      this.localPlayerKart.progress
+      this.localPlayerKart.progress,
+      this.localPlayerKart.speed
     );
 
     // 3. 他プレイヤー (AIまたはWebSocket) 更新
@@ -826,6 +868,78 @@ export class Game {
       this._lastGameErrorNotifTime = now;
       this.hud?.showNotification(`処理例外発生: ${error?.message || 'エラー'}`, 3500);
     }
+  }
+
+  getRenderDiagnostics() {
+    const now = performance.now();
+    const elapsedSeconds = this.raceStartTime ? Number(((now - this.raceStartTime) / 1000).toFixed(1)) : 0;
+    const kart = this.localPlayerKart;
+    const kPos = kart?.mesh?.position;
+    const camDiag = this.followCamera?.getDiagnostics() || {};
+    const rendererDiag = this.renderer?.getDiagnostics() || {};
+
+    let memberCount = 0;
+    if (this.p2p?.members) memberCount = this.p2p.members.length;
+
+    let cpuCount = 0;
+    this.otherPlayers.forEach(p => { if (p.isAI) cpuCount++; });
+
+    const isValidNumber = (n) => typeof n === 'number' && !isNaN(n) && isFinite(n);
+    const kartHasNaN = kPos ? (!isValidNumber(kPos.x) || !isValidNumber(kPos.y) || !isValidNumber(kPos.z)) : false;
+
+    return JSON.stringify({
+      version: UPDATE_NOTIFICATION?.version || 'unknown',
+      timestamp: new Date().toISOString(),
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+      mode: this.currentGameConfig?.mode || 'idle',
+      isHost: !!this.p2p?.isHost,
+      courseId: this.currentCourseConfig?.id || this.currentGameConfig?.courseId || null,
+      elapsedSeconds,
+      loop: {
+        updateCount: this.updateCount,
+        renderCount: this.renderCount,
+        ratio: this.updateCount > 0 ? Number((this.renderCount / this.updateCount).toFixed(3)) : 1.0,
+        isRunning: this.isRunning,
+        isPaused: this.isPaused
+      },
+      kart: {
+        exists: !!kart,
+        position: kPos ? { x: Number(kPos.x.toFixed(2)), y: Number(kPos.y.toFixed(2)), z: Number(kPos.z.toFixed(2)) } : null,
+        speed: kart ? Number(kart.speed.toFixed(1)) : 0,
+        progress: kart ? Number(kart.progress.toFixed(4)) : 0,
+        currentLap: kart ? kart.currentLap : 0,
+        isFinished: !!kart?.isFinished,
+        isRespawning: !!kart?.isRespawning,
+        hasNaN: kartHasNaN
+      },
+      camera: camDiag,
+      webgl: rendererDiag,
+      screen: {
+        windowWidth: typeof window !== 'undefined' ? window.innerWidth : 0,
+        windowHeight: typeof window !== 'undefined' ? window.innerHeight : 0,
+        screenWidth: typeof screen !== 'undefined' ? screen.width : 0,
+        screenHeight: typeof screen !== 'undefined' ? screen.height : 0,
+        orientation: typeof screen !== 'undefined' ? screen.orientation?.type : 'unknown'
+      },
+      participants: {
+        memberCount,
+        cpuCount,
+        otherPlayersCount: this.otherPlayers.size
+      },
+      network: {
+        transport: 'websocket',
+        roomId: this.p2p?.roomId || null,
+        stage: this.p2p?.connectionStage || 'idle',
+        bufferedAmount: this.p2p?.socket?.bufferedAmount || 0,
+        recentEvents: this.p2p?.diagnostics ? this.p2p.diagnostics.slice(-10) : []
+      },
+      exceptions: {
+        firstException: this.firstException,
+        lastException: this.lastException,
+        firstRenderException: this.firstRenderException,
+        lastRenderException: this.lastRenderException
+      }
+    }, null, 2);
   }
 
   checkObstacleCollisions() {

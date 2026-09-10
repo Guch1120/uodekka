@@ -3,9 +3,10 @@
 import { Icons } from '../icons/icons.js';
 
 export class SettingsModal {
-  constructor(container, inputManager) {
+  constructor(container, inputManager, onGraphicQualityChange = null) {
     this.container = container;
     this.inputManager = inputManager;
+    this.onGraphicQualityChange = onGraphicQualityChange;
     this.modalEl = null;
     this.isEditLayoutMode = false;
     this.init();
@@ -22,6 +23,18 @@ export class SettingsModal {
           <button class="btn-close" id="btn-close-settings">×</button>
         </div>
         <div class="modal-body">
+          <div class="setting-row" id="graphic-quality-setting-row">
+            <div class="setting-label">
+              <strong>画質・グラフィック負荷</strong>
+              <div class="subtext">高画質（Retina/高解像度）、標準（推奨/安定動作）、軽量（影OFF/低負荷）</div>
+            </div>
+            <div class="toggle-group">
+              <button id="btn-quality-high" class="toggle-btn">高画質</button>
+              <button id="btn-quality-normal" class="toggle-btn active">標準</button>
+              <button id="btn-quality-low" class="toggle-btn">軽量 (影OFF)</button>
+            </div>
+          </div>
+
           <div class="setting-row">
             <div class="setting-label">
               <strong>ステアリング操作モード</strong>
@@ -135,6 +148,22 @@ export class SettingsModal {
     const inputSens = modal.querySelector('#input-gyro-sens');
     const btnEditLayout = modal.querySelector('#btn-edit-layout');
     const btnResetLayout = modal.querySelector('#btn-reset-layout');
+
+    const btnQualityHigh = modal.querySelector('#btn-quality-high');
+    const btnQualityNormal = modal.querySelector('#btn-quality-normal');
+    const btnQualityLow = modal.querySelector('#btn-quality-low');
+
+    const updateQualityUI = (q) => {
+      [btnQualityHigh, btnQualityNormal, btnQualityLow].forEach(b => b?.classList.remove('active'));
+      if (q === 'high') btnQualityHigh?.classList.add('active');
+      else if (q === 'low') btnQualityLow?.classList.add('active');
+      else btnQualityNormal?.classList.add('active');
+      this.onGraphicQualityChange?.(q);
+    };
+
+    if (btnQualityHigh) btnQualityHigh.onclick = () => updateQualityUI('high');
+    if (btnQualityNormal) btnQualityNormal.onclick = () => updateQualityUI('normal');
+    if (btnQualityLow) btnQualityLow.onclick = () => updateQualityUI('low');
 
     const inputStickSize = modal.querySelector('#input-stick-size');
     const labelStickSizeVal = modal.querySelector('#label-stick-size-val');
@@ -277,6 +306,15 @@ export class SettingsModal {
       btnAutoAccelOff.classList.add('active');
       btnAutoAccelOn.classList.remove('active');
     }
+
+    const currentQuality = (typeof localStorage !== 'undefined' && localStorage.getItem('kart_graphic_quality')) || 'normal';
+    const btnQualityHigh = this.modalEl.querySelector('#btn-quality-high');
+    const btnQualityNormal = this.modalEl.querySelector('#btn-quality-normal');
+    const btnQualityLow = this.modalEl.querySelector('#btn-quality-low');
+    [btnQualityHigh, btnQualityNormal, btnQualityLow].forEach(b => b?.classList.remove('active'));
+    if (currentQuality === 'high') btnQualityHigh?.classList.add('active');
+    else if (currentQuality === 'low') btnQualityLow?.classList.add('active');
+    else btnQualityNormal?.classList.add('active');
   }
 
   hide() {

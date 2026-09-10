@@ -19,6 +19,11 @@ export class FollowCamera {
     this.savedBackward = new THREE.Vector3(0, 0, 1);
     this.savedForward = new THREE.Vector3(0, 0, -1);
     this.wasSpinning = false;
+
+    // 診断用
+    this.lastPosition = new THREE.Vector3();
+    this.frozenFrameCount = 0;
+    this.isFrozen = false;
   }
 
   setTarget(mesh) {
@@ -30,24 +35,45 @@ export class FollowCamera {
 
   resetImmediate() {
     if (!this.target) return;
+    const tPos = this.target.position;
+    if (!this.isValidVector3(tPos)) return;
+
     const backward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.target.quaternion);
     backward.y = 0;
-    backward.normalize();
+    if (backward.lengthSq() > 0.0001) backward.normalize();
+    else backward.set(0, 0, 1);
 
-    this.currentPosition.copy(this.target.position).addScaledVector(backward, this.distance);
+    this.currentPosition.copy(tPos).addScaledVector(backward, this.distance);
     this.currentPosition.y += this.height;
 
-    this.currentLookAt.copy(this.target.position);
+    this.currentLookAt.copy(tPos);
     this.currentLookAt.y += this.lookAheadHeight;
 
     this.camera.position.copy(this.currentPosition);
     this.camera.lookAt(this.currentLookAt);
 
     this.savedBackward.copy(backward);
+    this.lastPosition.copy(this.currentPosition);
+    this.frozenFrameCount = 0;
+    this.isFrozen = false;
   }
 
-  update(dt, isSpinning = false, courseSpline = null, progressT = 0) {
+  isValidNumber(n) {
+    return typeof n === 'number' && !isNaN(n) && isFinite(n);
+  }
+
+  isValidVector3(v) {
+    return v && this.isValidNumber(v.x) && this.isValidNumber(v.y) && this.isValidNumber(v.z);
+  }
+
+  update(dt, isSpinning = false, courseSpline = null, progressT = 0, kartSpeed = 0) {
     if (!this.target) return;
+
+    const targetPos = this.target.position;
+    if (!this.isValidVector3(targetPos)) {
+      console.warn('[FollowCamera] Target position contains NaN/Infinity, skipping camera update');
+      return;
+    }
 
     let backwardDir = new THREE.Vector3();
     let forwardDir = new THREE.Vector3();
@@ -68,11 +94,13 @@ export class FollowCamera {
         // 通常時: カートの向いている方向
         backwardDir.set(0, 0, 1).applyQuaternion(this.target.quaternion);
         backwardDir.y = 0;
-        backwardDir.normalize();
+        if (backwardDir.lengthSq() > 0.0001) backwardDir.normalize();
+        else backwardDir.set(0, 0, 1);
 
         forwardDir.set(0, 0, -1).applyQuaternion(this.target.quaternion);
         forwardDir.y = 0;
-        forwardDir.normalize();
+        if (forwardDir.lengthSq() > 0.0001) forwardDir.normalize();
+        else forwardDir.set(0, 0, -1);
       }
 
       this.savedBackward.copy(backwardDir);
@@ -81,21 +109,75 @@ export class FollowCamera {
 
     // カメラ目標位置
     const desiredPos = new THREE.Vector3()
-      .copy(this.target.position)
+      .copy(targetPos)
       .addScaledVector(backwardDir, this.distance);
     desiredPos.y += this.height;
 
+    // NaNチェック
+    if (!this.isValidVector3(desiredPos)) {
+      console.warn('[FollowCamera] Desired position invalid, resetting');
+      this.resetImmediate();
+      return;
+    }
+
     // カメラ位置補間
     this.currentPosition.lerp(desiredPos, Math.min(1.0, dt * this.lerpSpeed));
+    if (!this.isValidVector3(this.currentPosition)) {
+      this.currentPosition.copy(desiredPos);
+    }
     this.camera.position.copy(this.currentPosition);
 
     // カメラ注視点
     const desiredLookAt = new THREE.Vector3()
-      .copy(this.target.position)
+      .copy(targetPos)
       .addScaledVector(forwardDir, 2.5);
     desiredLookAt.y += this.lookAheadHeight;
 
-    this.currentLookAt.lerp(desiredLookAt, Math.min(1.0, dt * (this.lerpSpeed + 2)));
-    this.camera.lookAt(this.currentLookAt);
+    if (this.isValidVector3(desiredLookAt)) {
+      this.currentLookAt.lerp(desiredLookAt, Math.min(1.0, dt * (this.lerpSpeed + 2)));
+      if (!this.isValidVector3(this.currentLookAt)) {
+        this.currentLookAt.copy(desiredLookAt);
+      }
+      this.camera.lookAt(this.currentLookAt);
+    }
+
+    // カメラ停止（フリーズ）検知: カートが動いているのにカメラが動いていない
+    if (Math.abs(kartSpeed) > 1.0) {
+      const movedDist = this.lastPosition.distanceTo(this.currentPosition);
+      if (movedDist < 0.01) {
+        this.frozenFrameCount++;
+        if (this.frozenFrameCount > 60) {
+          this.isFrozen = true;
+        }
+      } else {
+        this.frozenFrameCount = 0;
+        this.isFrozen = false;
+      }
+    } else {
+      this.frozenFrameCount = 0;
+      this.isFrozen = false;
+    }
+    this.lastPosition.copy(this.currentPosition);
+  }
+
+  getDiagnostics() {
+    const hasTarget = !!this.target;
+    const targetPos = this.target?.position;
+    const camPos = this.camera?.position;
+    const lookAt = this.currentLookAt;
+    const dist = (targetPos && camPos && this.isValidVector3(targetPos) && this.isValidVector3(camPos))
+      ? targetPos.distanceTo(camPos)
+      : null;
+    return {
+      hasTarget,
+      position: camPos ? { x: Number(camPos.x.toFixed(2)), y: Number(camPos.y.toFixed(2)), z: Number(camPos.z.toFixed(2)) } : null,
+      lookAt: lookAt ? { x: Number(lookAt.x.toFixed(2)), y: Number(lookAt.y.toFixed(2)), z: Number(lookAt.z.toFixed(2)) } : null,
+      distanceToTarget: dist !== null ? Number(dist.toFixed(2)) : null,
+      hasNaN: !this.isValidVector3(camPos) || !this.isValidVector3(lookAt),
+      isFrozen: this.isFrozen,
+      frozenFrameCount: this.frozenFrameCount,
+      fov: this.camera?.fov,
+      aspect: this.camera?.aspect
+    };
   }
 }
