@@ -1,6 +1,7 @@
 // frontend/ui/settings_modal.js
-// 操作方法設定（ジャイロ vs スティック）、左右ハンドル反転、ボタン配置カスタマイズ
+// 操作方法設定（ジャイロ vs スティック）、左右ハンドル反転、ボタン配置カスタマイズ、BGM/SE音量
 import { Icons } from '../icons/icons.js';
+import { AudioManager } from '../audio/audio_manager.js';
 
 export class SettingsModal {
   constructor(container, inputManager, onGraphicQualityChange = null) {
@@ -32,6 +33,36 @@ export class SettingsModal {
               <button id="btn-quality-high" class="toggle-btn">高画質</button>
               <button id="btn-quality-normal" class="toggle-btn active">標準</button>
               <button id="btn-quality-low" class="toggle-btn">軽量 (影OFF)</button>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-label">
+              <strong>BGM音量</strong>
+              <div class="subtext">メニュー・レース中の音楽の大きさ</div>
+            </div>
+            <div class="slider-group">
+              <input type="range" id="input-bgm-volume" min="0" max="100" step="5" value="45">
+              <span id="label-bgm-volume-val" class="slider-value-badge">45%</span>
+            </div>
+            <div class="toggle-group">
+              <button id="btn-bgm-mute-off" class="toggle-btn active">ON</button>
+              <button id="btn-bgm-mute-on" class="toggle-btn">ミュート</button>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-label">
+              <strong>SE音量</strong>
+              <div class="subtext">コイン取得・スター発動などの効果音の大きさ</div>
+            </div>
+            <div class="slider-group">
+              <input type="range" id="input-sfx-volume" min="0" max="100" step="5" value="70">
+              <span id="label-sfx-volume-val" class="slider-value-badge">70%</span>
+            </div>
+            <div class="toggle-group">
+              <button id="btn-sfx-mute-off" class="toggle-btn active">ON</button>
+              <button id="btn-sfx-mute-on" class="toggle-btn">ミュート</button>
             </div>
           </div>
 
@@ -176,6 +207,47 @@ export class SettingsModal {
     btnClose.onclick = () => this.hide();
     btnSave.onclick = () => this.hide();
 
+    const inputBgmVolume = modal.querySelector('#input-bgm-volume');
+    const labelBgmVolumeVal = modal.querySelector('#label-bgm-volume-val');
+    const btnBgmMuteOn = modal.querySelector('#btn-bgm-mute-on');
+    const btnBgmMuteOff = modal.querySelector('#btn-bgm-mute-off');
+    const inputSfxVolume = modal.querySelector('#input-sfx-volume');
+    const labelSfxVolumeVal = modal.querySelector('#label-sfx-volume-val');
+    const btnSfxMuteOn = modal.querySelector('#btn-sfx-mute-on');
+    const btnSfxMuteOff = modal.querySelector('#btn-sfx-mute-off');
+
+    inputBgmVolume.oninput = (e) => {
+      const val = parseInt(e.target.value, 10);
+      labelBgmVolumeVal.textContent = `${val}%`;
+      AudioManager.setBgmVolume(val / 100);
+    };
+    btnBgmMuteOn.onclick = () => {
+      btnBgmMuteOn.classList.add('active');
+      btnBgmMuteOff.classList.remove('active');
+      AudioManager.setBgmMuted(true);
+    };
+    btnBgmMuteOff.onclick = () => {
+      btnBgmMuteOff.classList.add('active');
+      btnBgmMuteOn.classList.remove('active');
+      AudioManager.setBgmMuted(false);
+    };
+
+    inputSfxVolume.oninput = (e) => {
+      const val = parseInt(e.target.value, 10);
+      labelSfxVolumeVal.textContent = `${val}%`;
+      AudioManager.setSfxVolume(val / 100);
+    };
+    btnSfxMuteOn.onclick = () => {
+      btnSfxMuteOn.classList.add('active');
+      btnSfxMuteOff.classList.remove('active');
+      AudioManager.setSfxMuted(true);
+    };
+    btnSfxMuteOff.onclick = () => {
+      btnSfxMuteOff.classList.add('active');
+      btnSfxMuteOn.classList.remove('active');
+      AudioManager.setSfxMuted(false);
+    };
+
     inputStickSize.oninput = (e) => {
       const val = parseInt(e.target.value, 10);
       labelStickSizeVal.textContent = `${val}px`;
@@ -255,6 +327,36 @@ export class SettingsModal {
 
   show() {
     this.modalEl.classList.remove('hidden');
+
+    const audioSettings = AudioManager.getSettings();
+    const inputBgmVolume = this.modalEl.querySelector('#input-bgm-volume');
+    const labelBgmVolumeVal = this.modalEl.querySelector('#label-bgm-volume-val');
+    const btnBgmMuteOn = this.modalEl.querySelector('#btn-bgm-mute-on');
+    const btnBgmMuteOff = this.modalEl.querySelector('#btn-bgm-mute-off');
+    if (inputBgmVolume) {
+      const pct = Math.round(audioSettings.bgmVolume * 100);
+      inputBgmVolume.value = pct;
+      if (labelBgmVolumeVal) labelBgmVolumeVal.textContent = `${pct}%`;
+    }
+    if (btnBgmMuteOn && btnBgmMuteOff) {
+      btnBgmMuteOn.classList.toggle('active', audioSettings.bgmMuted);
+      btnBgmMuteOff.classList.toggle('active', !audioSettings.bgmMuted);
+    }
+
+    const inputSfxVolume = this.modalEl.querySelector('#input-sfx-volume');
+    const labelSfxVolumeVal = this.modalEl.querySelector('#label-sfx-volume-val');
+    const btnSfxMuteOn = this.modalEl.querySelector('#btn-sfx-mute-on');
+    const btnSfxMuteOff = this.modalEl.querySelector('#btn-sfx-mute-off');
+    if (inputSfxVolume) {
+      const pct = Math.round(audioSettings.sfxVolume * 100);
+      inputSfxVolume.value = pct;
+      if (labelSfxVolumeVal) labelSfxVolumeVal.textContent = `${pct}%`;
+    }
+    if (btnSfxMuteOn && btnSfxMuteOff) {
+      btnSfxMuteOn.classList.toggle('active', audioSettings.sfxMuted);
+      btnSfxMuteOff.classList.toggle('active', !audioSettings.sfxMuted);
+    }
+
     const mode = this.inputManager.controlMode;
     const btnGyro = this.modalEl.querySelector('#btn-mode-gyro');
     const btnStick = this.modalEl.querySelector('#btn-mode-stick');

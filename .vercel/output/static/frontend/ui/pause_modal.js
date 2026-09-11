@@ -3,12 +3,13 @@
 import { Icons } from '../icons/icons.js';
 
 export class PauseModal {
-  constructor(container, onResume, onRestart, onQuit, getDiagnostics = null) {
+  constructor(container, onResume, onRestart, onQuit, getDiagnostics = null, onChangeCourse = null) {
     this.container = container;
     this.onResume = onResume;
     this.onRestart = onRestart;
     this.onQuit = onQuit;
     this.getDiagnostics = getDiagnostics;
+    this.onChangeCourse = onChangeCourse;
     this.modalEl = null;
     this.mode = 'solo';
     this.init();
@@ -32,6 +33,9 @@ export class PauseModal {
             </button>
             <button id="btn-pause-restart" class="action-btn pause-action-btn restart-btn" type="button">
               🔄 最初からやり直す
+            </button>
+            <button id="btn-pause-changecourse" class="action-btn pause-action-btn" type="button">
+              🗺️ コースを選び直す
             </button>
             <button id="btn-pause-diagnostics" class="btn-secondary pause-action-btn" type="button" style="background: #1e293b; color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4);">
               📋 描画・通信診断をコピー
@@ -111,6 +115,12 @@ export class PauseModal {
       if (this.mode !== 'solo') return;
       this.hide();
       if (this.onRestart) this.onRestart();
+    });
+
+    const btnChangeCourse = this.modalEl.querySelector('#btn-pause-changecourse');
+    bindTap(btnChangeCourse, () => {
+      this.hide();
+      if (this.onChangeCourse) this.onChangeCourse();
     });
 
     bindTap(btnQuit, () => {

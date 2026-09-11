@@ -542,6 +542,10 @@
   width: 100%;
 }
 
+.pause-actions.hidden {
+  display: none;
+}
+
 .pause-action-btn {
   width: 100%;
   font-size: 16px;

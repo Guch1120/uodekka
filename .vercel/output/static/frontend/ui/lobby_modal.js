@@ -47,6 +47,7 @@ export class LobbyModal {
             </div>
             <button type="button" id="btn-show-updates" class="garage-subtle update-notice-btn">📢 更新情報</button>
             <button type="button" id="btn-show-feedback" class="garage-subtle feedback-notice-btn">💬 ご意見・ご要望</button>
+            <button type="button" id="btn-open-lobby-settings" class="garage-subtle settings-notice-btn" aria-label="設定" title="設定（音量・操作方法など）">⚙️</button>
             <button id="garage-back" class="garage-subtle" hidden>← ホームへ</button>
           </div>
         </header>
@@ -201,6 +202,7 @@ export class LobbyModal {
       this.updateModal.show();
     });
     on('#btn-show-feedback', () => this.feedbackModal.show(this.playerName));
+    on('#btn-open-lobby-settings', () => this.onOpenSettings?.());
     on('#tab-solo', () => { this.saveProfile(); this.refreshCourses(); this.confirmedCourse = null; this.showScreen('solo'); this.updateCourse(); });
     on('#tab-create', () => this.openDialog('host'));
     on('#tab-join', () => this.openDialog('guest'));

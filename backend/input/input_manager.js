@@ -11,6 +11,11 @@ export class InputManager {
     this.autoAccelerate = savedAutoAccel !== null ? savedAutoAccel === 'true' : true;
     this._rawAccelerating = false;
 
+    // アイテム長押しを開始した入力ソースの集合（'keyboard' / 'pointer'）。
+    // キーボードとマウス/タッチが同時にアイテムを保持できるよう、
+    // どちらか一方が離れただけでは発射させず、全ソースが離れたときだけ発射判定する。
+    this._itemHeldSources = new Set();
+
     // 入力状態
     this.state = {
       steering: 0,        // -1.0 (左) 〜 +1.0 (右)
@@ -270,11 +275,37 @@ export class InputManager {
       !document.querySelector('.modal-backdrop:not(.hidden)');
   }
 
+  // アイテム長押しの開始をソースごとに記録する。既に他ソースが保持中なら
+  // 持続時間の基準時刻(itemPressStartTime)は上書きしない（同時押しで最初の保持を優先）。
+  _beginItemHold(source) {
+    const wasHeld = this._itemHeldSources.size > 0;
+    this._itemHeldSources.add(source);
+    if (!wasHeld) {
+      this.state.itemHeld = true;
+      this.state.itemPressStartTime = performance.now();
+    }
+  }
+
+  // アイテム長押しの終了をソースごとに記録する。このソースが保持していなかった場合は
+  // 何もしない（＝他ソースの保持中に無関係な入力で誤発射させないための要）。
+  // 全ソースが離れたときだけ実際に発射判定を行う。
+  _endItemHold(source) {
+    if (!this._itemHeldSources.has(source)) return;
+    this._itemHeldSources.delete(source);
+    if (this._itemHeldSources.size === 0) {
+      const duration = performance.now() - this.state.itemPressStartTime;
+      this.state.isForwardThrow = duration >= 250; // 250ms以上押し続けて離したら前方投げ
+      this.state.itemHeld = false;
+      this.state.useItemTrigger = true; // 離した瞬間に使用
+    }
+  }
+
   resetState() {
     // キー解放を受け取れない中断でも、入力と発射予約を持ち越さない。
     this.keyboardKeys = {};
     this.keyboardSteering = false;
     this._stickY = 0;
+    this._itemHeldSources.clear();
     Object.assign(this.state, {
       steering: 0, accelerating: 0, braking: 0, drift: false,
       itemHeld: false, useItemTrigger: false, isForwardThrow: false,
@@ -353,15 +384,12 @@ export class InputManager {
     this.state.drift = !!keys['ShiftLeft'] || !!keys['ShiftRight'] || !!keys['Space'];
 
     // キーボードのアイテム長押し判定 (E/Q/Enter)
+    // マウス/タッチによる保持と独立管理し、片方の入力で他方の保持を誤って発射させない。
     const itemKey = keys['KeyE'] || keys['KeyQ'] || keys['Enter'];
-    if (itemKey && !this.state.itemHeld) {
-      this.state.itemHeld = true;
-      this.state.itemPressStartTime = performance.now();
-    } else if (!itemKey && this.state.itemHeld) {
-      const duration = performance.now() - this.state.itemPressStartTime;
-      this.state.isForwardThrow = duration >= 250; // 250ms以上押し続けて離したら前方投げ
-      this.state.itemHeld = false;
-      this.state.useItemTrigger = true; // 離した瞬間に使用
+    if (itemKey) {
+      this._beginItemHold('keyboard');
+    } else {
+      this._endItemHold('keyboard');
     }
   }
 
@@ -481,19 +509,14 @@ export class InputManager {
     );
 
     // アイテム（長押しで後方保持、離した瞬間に使用。単押し=後方、長押し保持後リリース=前方投げ）
+    // キーボードによる保持と独立管理し、片方の入力で他方の保持を誤って発射させない。
     bindPress(btnItem,
       () => {
-        this.state.itemHeld = true;
-        this.state.itemPressStartTime = performance.now();
+        this._beginItemHold('pointer');
         btnItem.classList.add('pressed');
       },
       () => {
-        if (this.state.itemHeld) {
-          const duration = performance.now() - this.state.itemPressStartTime;
-          this.state.isForwardThrow = duration >= 250; // 250ms以上保持して離したら前方投げ、短ければ後方
-          this.state.itemHeld = false;
-          this.state.useItemTrigger = true;
-        }
+        this._endItemHold('pointer');
         btnItem.classList.remove('pressed');
       }
     );
@@ -750,6 +773,10 @@ export class InputManager {
 
   startLayoutCustomization() {
     this.resetState();
+    // ロビー/コース選択画面など、レース外から開いた場合はボタン群が非表示のままなので、
+    // 編集中だけ強制的に表示し、終了時に元の表示状態へ戻す。
+    this._layoutEditWasHidden = this.controlsRoot.classList.contains('hidden');
+    this.showControls();
     this.isEditingLayout = true;
     this.controlsRoot.classList.add('customizing-layout');
     this.updateStickVisibility();
@@ -851,8 +878,12 @@ export class InputManager {
       this.controlsRoot.classList.remove('customizing-layout');
       bar.remove();
       cleanupFns.forEach(fn => fn());
-      this.updateStickVisibility();
-      this.updateAccelButtonVisibility();
+      if (this._layoutEditWasHidden) {
+        this.hideControls();
+      } else {
+        this.updateStickVisibility();
+        this.updateAccelButtonVisibility();
+      }
     };
   }
 

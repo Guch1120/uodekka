@@ -71,7 +71,8 @@ export class Game {
       () => this.resumeRace(),
       () => this.restartRace(),
       () => this.quitRace(),
-      () => this.getRenderDiagnostics()
+      () => this.getRenderDiagnostics(),
+      () => this.selectOtherCourse()
     );
 
     // レース状態
@@ -121,6 +122,9 @@ export class Game {
     this.lobbyModal.onSessionEnded = () => { if (this.isRunning) this.quitRace(); };
     this.lobbyModal.onOpenEditor = () => {
       this.editorModal.show();
+    };
+    this.lobbyModal.onOpenSettings = () => {
+      this.settingsModal.show();
     };
 
     this.setupNetworkEvents();
