@@ -1167,3 +1167,48 @@ body.force-landscape .garage-dialog .garage-button-start {
   margin-top: 3px;
   min-height: 32px;
 }
+
+/* コースを一覧で選び、実際の距離と高低差を比較できるようにする。 */
+.garage-course-picker { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; color: #c1d1dc; font-size: 12px; }
+.garage-course-picker > span { flex-shrink: 0; }
+.garage-course-picker select { min-width: 0; flex: 1; min-height: 44px; padding: 8px 12px; border: 1px solid #68869a; border-radius: 9px; background: #203e55; color: white; font: inherit; cursor: pointer; }
+.garage-course-picker select:focus-visible { outline: 3px solid #ffad68; outline-offset: 3px; }
+.garage-course-metrics { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; padding: 10px 12px; border: 1px solid #537187; border-radius: 10px; background: #203e55; color: #b4c8d4; font-size: 11px; }
+.garage-course-metrics strong { display: block; margin-top: 3px; color: #fff; font-size: 16px; font-variant-numeric: tabular-nums; }
+.garage-course-panel .garage-course-caption { flex-wrap: wrap; margin-top: 12px; }
+@media (max-height: 520px) {
+  .garage-course-picker { margin-bottom: 4px; gap: 8px; font-size: 11px; }
+  .garage-course-picker select { min-height: 32px; padding: 4px 8px; }
+  .garage-course-metrics { margin-top: 4px; padding: 4px 8px; font-size: 10px; }
+  .garage-course-metrics strong { display: inline; font-size: 11px; }
+  .garage-course-panel .garage-course-caption { margin-top: 4px; gap: 4px; }
+}
+body[data-is-compact="true"] .garage-course-picker { margin-bottom: 4px; font-size: 11px; }
+body[data-is-compact="true"] .garage-course-picker select { min-height: 32px; padding: 4px 8px; }
+body[data-is-compact="true"] .garage-course-metrics { margin-top: 4px; padding: 4px 8px; font-size: 10px; }
+body[data-is-compact="true"] .garage-course-metrics strong { display: inline; font-size: 11px; }
+body[data-is-compact="true"] .garage-course-panel .garage-course-caption { margin-top: 4px; gap: 4px; }
+
+@media (min-width: 901px) and (min-height: 521px) {
+  .garage-course-panel .garage-map-card { height: clamp(220px, 34vh, 340px); min-height: 220px; }
+}
+/* 縦画面では補助ボタンの文字を分断せず、行単位で折り返す。 */
+@media (max-width: 650px) and (orientation: portrait) {
+  body:not(.force-landscape) .garage-header-actions { flex-wrap: wrap; gap: 6px; width: 100%; }
+  body:not(.force-landscape) .garage-header-actions > * { flex-shrink: 0; white-space: nowrap; }
+  body:not(.force-landscape) .garage-header-actions button { min-height: 36px; padding: 6px 8px; font-size: 11px; }
+  body:not(.force-landscape) .garage-course-panel .garage-section-heading { flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  body:not(.force-landscape) .garage-course-panel .garage-map-card { min-height: 160px; height: 180px; padding: 12px 28px; }
+}
+
+/* 小さい横画面では補助ナビを圧縮し、コース情報の表示領域を確保する。 */
+@media (max-width: 740px) and (orientation: landscape) {
+  .garage .garage-header { gap: 8px; }
+  .garage .garage-location { display: none; }
+  .garage .garage-header-actions { margin-left: auto; gap: 4px; }
+  .garage .garage-header-actions > * { flex-shrink: 0; white-space: nowrap; }
+  .garage .garage-header-actions button { padding: 4px 6px; font-size: 10px; min-height: 32px; }
+  .garage .garage-coin-badge { padding: 4px 6px; font-size: 11px; }
+  .garage .garage-course-panel .garage-section-heading h1 { font-size: 16px; }
+  .garage .garage-course-panel .garage-section-heading > .garage-chip { font-size: 9px; padding: 5px; }
+}

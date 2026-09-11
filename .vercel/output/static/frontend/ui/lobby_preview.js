@@ -68,8 +68,23 @@ export class GaragePreview {
   }
 }
 
+// 実際の路面曲線を使い、カスタムコースも同じ基準で比較する。
+export function courseMetrics(course) {
+  const curve = courseCurve(course);
+  const heights = curve.getPoints(720).map(point => point.y);
+  return {
+    length: Math.round(curve.getLength()),
+    elevation: Math.round(Math.max(...heights) - Math.min(...heights)),
+    ramps: (course.jumpRamps || []).length
+  };
+}
+
+let courseArtSequence = 0;
+
 export function courseArt(course) {
-  const points = courseCurve(course).getPoints(180);
+  const clipId = `course-map-clip-${++courseArtSequence}`;
+  const curve = courseCurve(course);
+  const points = curve.getPoints(180);
   const xs = points.map(p => p.x), zs = points.map(p => p.z);
   const minX = Math.min(...xs), maxX = Math.max(...xs), minZ = Math.min(...zs), maxZ = Math.max(...zs);
   const scale = Math.min(410 / (maxX - minX || 1), 230 / (maxZ - minZ || 1));
@@ -83,7 +98,17 @@ export function courseArt(course) {
   };
   const colors = palettes[course.theme] || palettes.grassland;
   const [x, y] = coords[0];
-  return `<svg viewBox="0 0 600 350" role="img" aria-label="選択コースの俯瞰図" xmlns="http://www.w3.org/2000/svg">
+  // 頂点順と同じ向きに矢印を置き、コースの進行方向を示す。
+  const arrows = [0.16, 0.49, 0.82].map(t => {
+    const p = curve.getPoint(t), tangent = curve.getTangent(t);
+    const ax = 300 + (p.x - (minX + maxX) / 2) * scale;
+    const ay = 175 + (p.z - (minZ + maxZ) / 2) * scale;
+    const angle = Math.atan2(tangent.z, tangent.x) * 180 / Math.PI;
+    return '<path data-course-direction transform="translate(' + ax + ' ' + ay + ') rotate(' + angle + ')" d="M-5 -5 L1 0 L-5 5" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>';
+  }).join('');
+  return `<svg viewBox="0 0 600 350" role="img" aria-label="コースの俯瞰図。白い矢印は走行方向、オレンジの点はスタート地点" style="overflow:hidden;border-radius:12px" xmlns="http://www.w3.org/2000/svg">
+    <defs><clipPath id="${clipId}"><rect width="600" height="350" rx="12"/></clipPath></defs>
+    <g clip-path="url(#${clipId})">
     <rect width="600" height="350" rx="12" fill="${colors[0]}"/>
     <path d="M-20 75 Q100 5 220 62 T620 35 M-10 110 Q100 40 220 97 T620 70 M-10 145 Q100 75 220 132 T620 105 M-10 280 Q150 200 300 270 T630 255 M-10 315 Q150 235 300 305 T630 290" fill="none" stroke="${colors[1]}" stroke-width="2" opacity=".65"/>
     <path d="${path}" transform="translate(0 5)" fill="none" stroke="#14263b" stroke-opacity=".12" stroke-width="30" stroke-linejoin="round"/>
@@ -91,11 +116,13 @@ export function courseArt(course) {
     <path d="${path}" fill="none" stroke="${colors[2]}" stroke-width="26" stroke-dasharray="7 9"/>
     <path d="${path}" fill="none" stroke="#304050" stroke-width="19" stroke-linejoin="round"/>
     <path d="${path}" fill="none" stroke="#f4e4a4" stroke-width="1.4" stroke-dasharray="5 7"/>
+    ${arrows}
     <circle cx="${x}" cy="${y}" r="7" fill="#fa733c" stroke="white" stroke-width="3"/>
     <rect x="${x - 18}" y="${y + 17}" width="82" height="22" rx="5" fill="#14263b"/>
     <text x="${x + 23}" y="${y + 32}" text-anchor="middle" font-family="sans-serif" font-size="10" font-weight="700" fill="white">START / FINISH</text>
     <text x="30" y="32" font-family="sans-serif" font-size="10" letter-spacing="2" fill="${colors[2]}">CIRCUIT MAP</text>
     <path d="M556 45v-20m-5 6 5-6 5 6" stroke="${colors[2]}" fill="none" stroke-width="2"/>
     <text x="556" y="60" text-anchor="middle" font-family="sans-serif" font-size="10" fill="${colors[2]}">N</text>
+    </g>
   </svg>`;
 }

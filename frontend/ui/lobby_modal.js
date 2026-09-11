@@ -1,7 +1,7 @@
 import { Vehicles, SkillsManager } from '../vehicles/vehicles.js';
 import { Courses } from '../courses/index.js';
 import { normalizeRoomId } from '../../backend/network/room_id.js';
-import { GaragePreview, courseArt } from './lobby_preview.js';
+import { GaragePreview, courseArt, courseMetrics } from './lobby_preview.js';
 import { CPU_ROSTER } from '../../backend/ai/cpu_driver.js';
 import { UpdateModal } from './update_modal.js';
 import { FeedbackModal } from './feedback_modal.js';
@@ -87,7 +87,9 @@ export class LobbyModal {
           </section>
           <section class="garage-screen garage-setup" data-screen="solo" hidden>
             <div class="garage-course-panel"><div class="garage-section-heading"><div><span class="garage-eyebrow">SOLO / SELECT YOUR COURSE</span><h1>次の舞台を選ぼう。</h1></div><span class="garage-chip">CPU 11台と対戦（合計12人）</span></div>
+              <label class="garage-course-picker" for="course-select"><span>コース一覧</span><select id="course-select"></select></label>
               <div class="garage-map-card"><div class="garage-map" id="solo-map"></div>${arrow('course-prev', 'prev', '前のコース')}${arrow('course-next', 'next', '次のコース')}<span id="course-counter" class="garage-counter"></span></div>
+              <div id="course-metrics" class="garage-course-metrics" aria-live="polite"></div>
               <div class="garage-course-caption"><div><span class="garage-eyebrow" id="solo-course-theme">CIRCUIT</span><h2 id="solo-course-name" aria-live="polite"></h2><p id="solo-course-description" class="garage-course-description"></p></div><div class="garage-course-badges"><span id="solo-course-laps" class="garage-chip"></span><span id="solo-ai-level" class="garage-chip garage-chip-ai">🧠 CPU学習 Lv.1</span><button type="button" id="btn-reset-ai" class="garage-ai-reset-btn" title="このコースの学習データを初期化">↺ 学習リセット</button></div></div>
             </div>
             <div class="garage-setup-side"><div class="garage-course-actions"><button id="course-confirm" class="garage-button garage-button-green">✓ コース決定</button><button id="course-random" class="garage-button garage-button-light">⤨ ランダム決定</button></div><p id="course-confirmation" class="garage-note" aria-live="polite">コースを選んで確定してください。</p>${stats()}<button id="btn-start-solo" class="garage-button garage-button-start" disabled>ゲームスタート <span>→</span></button></div>
@@ -208,6 +210,10 @@ export class LobbyModal {
     on('#tab-join', () => this.openDialog('guest'));
     on('#tab-editor', () => this.onOpenEditor?.());
     on('#garage-back', () => this.returnHome());
+    this.el('#course-select').onchange = () => {
+      this.courseIndex = this.courseIds.indexOf(this.el('#course-select').value);
+      this.updateCourse();
+    };
     on('#course-prev', () => this.changeCourse(-1));
     on('#course-next', () => this.changeCourse(1));
     on('#course-confirm', () => this.confirmCourse());
@@ -356,6 +362,12 @@ export class LobbyModal {
       Object.keys(saved).filter(id => id.startsWith('custom_') && Array.isArray(saved[id].points) && saved[id].points.length >= 4).forEach(id => this.courseIds.push(id));
     } catch { /* Default circuits remain available if a saved course cannot be read. */ }
     this.courseIndex = Math.min(this.courseIndex, this.courseIds.length - 1);
+    this.el('#course-select').replaceChildren(...this.courseIds.map(id => {
+      const option = document.createElement('option');
+      option.value = id;
+      option.textContent = Courses.getCourse(id).name;
+      return option;
+    }));
   }
 
   changeCourse(step) {
@@ -365,6 +377,19 @@ export class LobbyModal {
 
   updateCourse() {
     const course = Courses.getCourse(this.courseIds[this.courseIndex]);
+    this.el('#course-select').value = this.courseIds[this.courseIndex];
+    const metrics = courseMetrics(course);
+    this.el('#course-metrics').replaceChildren(...[
+      ['1周（約）', `${metrics.length.toLocaleString('ja-JP')} m`],
+      ['高低差（約）', `${metrics.elevation} m`],
+      ['ジャンプ台', `${metrics.ramps} か所`]
+    ].map(([label, value]) => {
+      const item = document.createElement('span');
+      const strong = document.createElement('strong');
+      strong.textContent = value;
+      item.append(`${label} `, strong);
+      return item;
+    }));
     const map = this.el('#solo-map');
     map.innerHTML = courseArt(course);
     if (course.previewImage) {
