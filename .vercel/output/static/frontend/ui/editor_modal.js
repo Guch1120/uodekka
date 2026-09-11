@@ -5,6 +5,7 @@ import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 
 import { courseCurve, elevationProfile } from '../courses/course_curve.js';
 import { EditorPreview } from './editor_preview.js';
+import { AudioManager } from '../audio/audio_manager.js';
 
 export class EditorModal {
   constructor(container, onTestPlay) {
@@ -738,6 +739,7 @@ export class EditorModal {
   show() {
     this.modalEl.classList.remove('hidden');
     this.refreshSaved();
+    AudioManager.playBgm('editor');
     // コンテナの実際の寸法に合わせて描画バッファ解像度をフィット
     requestAnimationFrame(() => {
       this.resizeCanvas();
@@ -748,6 +750,7 @@ export class EditorModal {
 
   hide() {
     this.modalEl.classList.add('hidden');
+    AudioManager.playBgm('menu');
   }
 
   render() {

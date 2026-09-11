@@ -1,0 +1,111 @@
+/* ================= 起動時のタイトル画面 ================= */
+.title-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: #000;
+  color: #fff;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.title-screen img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.title-screen:focus-visible {
+  outline: 3px solid #00c8f8;
+  outline-offset: -3px;
+}
+
+.title-screen:disabled {
+  cursor: wait;
+}
+
+.title-screen-status {
+  position: absolute;
+  right: 16px;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  left: 16px;
+  width: fit-content;
+  max-width: calc(100% - 32px);
+  margin: 0 auto;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.85);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  text-align: center;
+  pointer-events: none;
+}
+
+.title-screen-status:empty {
+  display: none;
+}
+
+/* CSSによる横持ち強制モード（端末の縦画面ロック有効時のみ適用） */
+@media (orientation: portrait) {
+  body.force-landscape {
+    overflow: hidden;
+    position: fixed;
+    width: 100vw;
+    height: 100vh;
+  }
+
+  body.force-landscape #app {
+    position: fixed;
+    top: 0;
+    left: 100vw;
+    width: 100vh;
+    height: 100vw;
+    transform-origin: 0 0;
+    transform: rotate(90deg);
+    overflow: hidden;
+  }
+
+  body.force-landscape.rotate-reverse #app {
+    top: 100vh;
+    left: 0;
+    transform: rotate(-90deg);
+  }
+}
+
+@media (orientation: landscape) {
+  body.force-landscape {
+    position: static !important;
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  body.force-landscape #app {
+    position: relative !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    transform: none !important;
+  }
+
+  /* 横向き時に上下逆さ（逆向き横持ち）になった場合の180度反転 */
+  body.rotate-reverse #app {
+    transform: rotate(180deg) !important;
+  }
+}
+
+body.force-landscape .result-main-grid {
+  grid-template-columns: 1.1fr 1fr !important;
+  gap: 16px !important;
+}
+

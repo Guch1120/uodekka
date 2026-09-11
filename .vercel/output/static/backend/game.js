@@ -20,6 +20,7 @@ if (typeof window !== 'undefined') window.ResultModal = ResultModal;
 import { UPDATE_NOTIFICATION } from '../frontend/data/updates.js';
 import { CourseKnowledgeBase } from './ai/learning_ai.js';
 import { CPUDriver, CPU_ROSTER } from './ai/cpu_driver.js';
+import { AudioManager } from '../frontend/audio/audio_manager.js';
 
 export class Game {
   constructor() {
@@ -59,6 +60,7 @@ export class Game {
 
     // UI
     this.hud = new HUD(this.appContainer);
+    this.hud.onFinalLap = () => AudioManager.playBgm('final_lap');
     this.settingsModal = new SettingsModal(
       this.appContainer,
       this.inputManager,
@@ -88,8 +90,6 @@ export class Game {
     this.playerCoins = 0;
     this.inRacePerks = {};
     this.nextPerkThreshold = 3;
-    this.isPerkSelecting = false;
-    this.perkSlowMo = false;
     this.skillCooldown = 0;
     this.skillActiveTimer = 0;
     this.skillActiveType = null;
@@ -431,15 +431,13 @@ export class Game {
     this.playerCoins = 0;
     this.inRacePerks = {};
     this.nextPerkThreshold = 3;
-    this.isPerkSelecting = false;
-    this.perkSlowMo = false;
     this.skillCooldown = 0;
     this.skillActiveTimer = 0;
     this.skillActiveType = null;
     this.shieldMesh = null;
-    this.hud.updateCoins(0);
+    this.hud.updateCoins(0, this.nextPerkThreshold);
     this.hud.updateActivePerks({});
-    this.hud.hidePerkSelection?.();
+    this.hud.hidePerkReveal?.();
     this.courseObstacles = [];
     this._finishedNotified = false;
     Items.lightningHeld = false;
@@ -447,6 +445,14 @@ export class Game {
 
     this.currentCourseConfig = Courses.getCourse(config.courseId);
     this.renderer.setSkyAndTheme(this.currentCourseConfig.skyColor, this.currentCourseConfig.ambientColor);
+
+    // コースBGM: 現時点では1stコース「ピーチサーキット」用の音源のみ用意されているため、
+    // それ以外のコースは無音（ファイナルラップ/リザルトのBGMは別途切り替わる）。
+    if (config.courseId === 'course1') {
+      AudioManager.playBgm('course1');
+    } else {
+      AudioManager.stopBgm();
+    }
 
     this.courseTrack = Courses.buildTrack(this.currentCourseConfig);
     this.scene.add(this.courseTrack.group);
@@ -672,27 +678,6 @@ export class Game {
     });
   }
 
-  playCoinSfx() {
-    try {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtx) return;
-      if (!this._audioCtx) this._audioCtx = new AudioCtx();
-      if (this._audioCtx.state === 'suspended') this._audioCtx.resume();
-      const now = this._audioCtx.currentTime;
-      const osc = this._audioCtx.createOscillator();
-      const gain = this._audioCtx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(987.77, now); // B5
-      osc.frequency.setValueAtTime(1318.51, now + 0.08); // E6
-      gain.gain.setValueAtTime(0.16, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
-      osc.connect(gain);
-      gain.connect(this._audioCtx.destination);
-      osc.start(now);
-      osc.stop(now + 0.35);
-    } catch {}
-  }
-
   playSkillSfx(type) {
     try {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -767,7 +752,7 @@ export class Game {
     requestAnimationFrame(this.animate);
 
     const rawDelta = this.clock.getDelta();
-    const dt = Math.min(rawDelta, 0.1) * (this.perkSlowMo ? 0.15 : 1.0);
+    const dt = Math.min(rawDelta, 0.1);
 
     if (this.isRunning && this.localPlayerKart && !this.isPaused) {
       try {
@@ -983,6 +968,7 @@ export class Game {
 
       setTimeout(() => {
         if (!this.isRunning || this.activeResultModal) return;
+        AudioManager.playBgm('goal_finish');
         this.activeResultModal = new ResultModal(this.appContainer, {
           rank: myRank,
           totalTime: totalTime,
@@ -1498,9 +1484,10 @@ export class Game {
             playerKart.coins = this.playerCoins;
             playerKart.coinBonusSpeed = Math.min(10, this.playerCoins) * 0.35;
             SkillsManager.addBankCoins(1);
-            this.playCoinSfx();
-            this.hud?.updateCoins(this.playerCoins);
-            this.showItemNotification(`🪙 コイン獲得！ (所持: ${this.playerCoins}枚)`, 1200);
+            AudioManager.playSfx('coin');
+            this.hud?.updateCoins(this.playerCoins, this.nextPerkThreshold);
+            const tierProgress = 3 - Math.max(0, Math.min(3, this.nextPerkThreshold - this.playerCoins));
+            this.showItemNotification(`🪙 コイン獲得！ (${tierProgress}/3 - 3枚で強化スキル解禁！)`, 1200);
 
             if (playerKart.perkLuckyCoin) {
               playerKart.applyBoost(1.2, 0.6);
@@ -1508,7 +1495,7 @@ export class Game {
 
             if (this.playerCoins >= (this.nextPerkThreshold || 3)) {
               this.nextPerkThreshold = (this.nextPerkThreshold || 3) + 3;
-              this.triggerInRacePerkSelection();
+              this.grantPlayerPerk();
             }
           } else {
             // CPUまたはホストシミュレーション配下の他プレイヤー
@@ -1560,29 +1547,25 @@ export class Game {
     }
   }
 
-  triggerInRacePerkSelection() {
+  // コイン3枚ごとにローグライク強化パークを1つランダム抽選し、選択操作なしで即座に自動適用する。
+  // （以前はソロ=スローモーション+カード選択、マルチ=6秒タイマー選択だったが、
+  // マルチプレイでの選択操作のユーザビリティが悪いとのフィードバックを受けて、
+  // grantAIPerk()と同じ完全自動抽選方式に統一。毎レース開始時にinRacePerksはリセットされるため、
+  // 抽選も「マシン選択時の固定ビルド」ではなく毎レースその場で行われる。）
+  grantPlayerPerk() {
     if (!this.isRunning || !this.localPlayerKart || this.activeResultModal) return;
     const choices = InRacePerks.getRandomPerks(3);
-    const isSolo = this.currentGameConfig?.mode === 'solo';
+    if (!choices || choices.length === 0) return;
+    const chosen = choices[Math.floor(Math.random() * choices.length)];
 
-    if (isSolo) {
-      this.isPerkSelecting = true;
-      this.perkSlowMo = true;
-    }
+    this.inRacePerks = this.inRacePerks || {};
+    this.inRacePerks[chosen.id] = (this.inRacePerks[chosen.id] || 0) + 1;
+    chosen.apply(this.localPlayerKart);
 
-    this.hud?.showPerkSelection(choices, (selectedPerk) => {
-      this.isPerkSelecting = false;
-      this.perkSlowMo = false;
-      if (!selectedPerk) return;
-
-      this.inRacePerks = this.inRacePerks || {};
-      this.inRacePerks[selectedPerk.id] = (this.inRacePerks[selectedPerk.id] || 0) + 1;
-      selectedPerk.apply(this.localPlayerKart);
-
-      this.hud?.updateActivePerks(this.inRacePerks);
-      this.playPerkSelectSfx();
-      this.showItemNotification(`✨ 強化解禁: 【${selectedPerk.name}】Lv.${this.inRacePerks[selectedPerk.id]}!`, 2500);
-    }, isSolo ? 0 : 6);
+    this.hud?.updateActivePerks(this.inRacePerks);
+    this.hud?.showPerkReveal(chosen, this.inRacePerks[chosen.id]);
+    this.playPerkSelectSfx();
+    this.showItemNotification(`✨ 強化解禁: 【${chosen.name}】Lv.${this.inRacePerks[chosen.id]}!`, 2500);
   }
 
   playPerkSelectSfx() {

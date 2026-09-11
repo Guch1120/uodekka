@@ -1,0 +1,635 @@
+/* ================= コースメーカー (コース作成エディタ) ================= */
+.editor-backdrop {
+  z-index: 60;
+  padding: 8px;
+}
+
+.editor-dialog {
+  max-width: 950px;
+  width: 96vw;
+  height: 94vh;
+  max-height: 94vh;
+}
+
+.editor-header {
+  padding: 10px 18px;
+}
+
+.editor-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.editor-play-btn {
+  background: linear-gradient(135deg, #16a34a, #22c55e);
+  font-size: 15px;
+  font-weight: 800;
+  padding: 8px 18px;
+}
+
+.editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 8px 16px;
+  background: #0f172a;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  align-items: center;
+}
+
+.editor-tool-btn {
+  background: #1e293b;
+  color: #94a3b8;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.editor-tool-btn:hover {
+  background: #334155;
+  color: #f8fafc;
+}
+
+.editor-tool-btn.active {
+  background: #0284c7;
+  border-color: #38bdf8;
+  color: #fff;
+}
+
+.info-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.editor-text-input {
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #fff;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+.editor-select {
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #fff;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+.editor-canvas-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: #0a0f1d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+}
+
+#editor-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.editor-help-text {
+  position: absolute;
+  bottom: 10px;
+  left: 12px;
+  font-size: 11px;
+  color: #64748b;
+  background: rgba(15, 23, 42, 0.85);
+  padding: 4px 10px;
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+/* Three synchronized course editor views. */
+.editor-dialog { max-width: 1200px; min-height: 0; }
+.editor-views, .editor-inspector { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 9px 16px; background: #152438; }
+.editor-inspector { color: #c6d5e5; font-size: 12px; }
+.editor-inspector label { display: flex; align-items: center; gap: 6px; }
+#editor-height { width: 66px; padding: 7px; background: #1e293b; color: white; border: 1px solid #64748b; border-radius: 6px; }
+#editor-status { padding: 4px 16px; min-height: 24px; font-size: 12px; color: #ffca95; background: #152438; }
+#editor-preview { position: absolute; inset: 0; }
+#editor-preview canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+#editor-preview[hidden], #editor-canvas[hidden] { display: none; }
+.editor-canvas-container { min-height: 240px; }
+.editor-tool-btn:disabled { opacity: .4; cursor: not-allowed; }
+.editor-tool-btn:focus-visible, .editor-inspector input:focus-visible, .editor-inspector select:focus-visible { outline: 2px solid #ff773e; outline-offset: 2px; }
+.editor-header h2 { font-size: 18px; }
+.editor-help-text { color: #a8bfd0; right: 10px; }
+@media (max-width: 700px), (max-height: 550px) {
+  .editor-dialog { width: 100%; height: 96dvh; max-height: 96dvh; overflow-y: auto; }
+  .editor-header { flex-wrap: wrap; gap: 8px; padding: 10px; }
+  .editor-header-actions { gap: 6px; }
+  .editor-toolbar, .editor-views, .editor-inspector { padding: 7px 10px; gap: 6px; }
+  .editor-toolbar .info-group { margin-left: 0; flex-wrap: wrap; gap: 8px; }
+  .editor-tool-btn { padding: 9px; font-size: 12px; }
+  .editor-canvas-container { flex: 1 0 300px; }
+  .editor-text-input { max-width: 180px; }
+  #editor-saved { max-width: 160px; }
+}
+
+.editor-toolbar[hidden] { display: none; }
+.editor-options { padding: 8px 16px; background: #101e30; color: #bdcfde; font-size: 12px; }
+.editor-options summary { cursor: pointer; padding: 4px 0; }
+.editor-options .info-group { margin: 8px 0; flex-wrap: wrap; }
+.editor-options > label { display: inline-flex; gap: 6px; align-items: center; margin: 4px 6px 4px 0; }
+.editor-options input { user-select: text; -webkit-user-select: text; }
+.editor-header, .editor-views, .editor-toolbar, .editor-options, .editor-inspector, #editor-status { flex-shrink: 0; }
+@media (orientation: landscape) and (max-height: 550px) {
+  .editor-header h2 { display: none; }
+  .editor-header { padding: 5px 10px; justify-content: flex-end; }
+  .editor-header-actions button { padding: 5px 10px; font-size: 12px; }
+  .editor-views, .editor-inspector { padding: 5px 10px; }
+  .editor-views .editor-tool-btn { padding: 6px 9px; }
+  .editor-options { padding: 3px 10px; }
+  .editor-canvas-container { min-height: 160px; flex: 1 1 auto; }
+  .editor-help-text { font-size: 10px; }
+}
+
+/* --- レース終了リザルト画面 (ResultModal) --- */
+.result-modal-backdrop {
+  z-index: 100;
+  background: rgba(10, 18, 30, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.result-modal-card {
+  width: min(900px, 94vw);
+  max-height: 92dvh;
+  overflow-y: auto;
+  background: linear-gradient(145deg, #162438 0%, #0d1726 100%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  padding: 24px 28px;
+  color: #fff;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 40px rgba(56, 189, 248, 0.15);
+}
+
+.result-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.result-kicker {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: #38bdf8;
+  margin-bottom: 4px;
+}
+
+.result-course-title {
+  font-size: clamp(22px, 3vw, 32px);
+  font-weight: 900;
+  margin: 0;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+}
+
+.result-main-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 650px) {
+  .result-main-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
+.result-player-summary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.result-rank-badge {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  padding: 10px 24px;
+  border-radius: 14px;
+  font-weight: 900;
+  margin-bottom: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.result-rank-num {
+  font-size: clamp(48px, 6vw, 68px);
+  line-height: 1;
+}
+
+.result-rank-suffix {
+  font-size: clamp(22px, 3vw, 30px);
+  margin-left: 2px;
+}
+
+.rank-gold {
+  background: linear-gradient(135deg, #ffd700 0%, #b8860b 100%);
+  color: #1a1200;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.4);
+  box-shadow: 0 0 30px rgba(255, 215, 0, 0.4);
+}
+
+.rank-silver {
+  background: linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%);
+  color: #0f172a;
+  box-shadow: 0 0 25px rgba(226, 232, 240, 0.3);
+}
+
+.rank-bronze {
+  background: linear-gradient(135deg, #f97316 0%, #c2410c 100%);
+  color: #fff;
+  box-shadow: 0 0 25px rgba(249, 115, 22, 0.3);
+}
+
+.rank-other {
+  background: linear-gradient(135deg, #334155 0%, #1e293b 100%);
+  color: #cbd5e1;
+}
+
+.result-rank-text {
+  font-size: 15px;
+  font-weight: 700;
+  color: #94a3b8;
+  margin-bottom: 16px;
+}
+
+.result-times-card {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.result-total-time {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+}
+
+.result-total-time .time-label {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #38bdf8;
+}
+
+.result-total-time .time-value {
+  font-size: 24px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+
+.result-laps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.result-lap-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: #cbd5e1;
+  font-variant-numeric: tabular-nums;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.result-lap-row.best-lap {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  font-weight: 700;
+}
+
+.best-badge {
+  font-size: 10px;
+  background: #22c55e;
+  color: #052e16;
+  font-weight: 900;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+}
+
+.result-coin-summary {
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px 14px;
+  background: linear-gradient(135deg, rgba(254, 240, 138, 0.15), rgba(245, 158, 11, 0.15));
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: #fef08a;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.result-coin-summary strong {
+  font-size: 15px;
+  color: #fbbf24;
+}
+
+.result-coin-summary .coin-bank-text {
+  font-size: 11px;
+  color: #cbd5e1;
+}
+
+/* 12人順位リスト */
+.result-standings-panel {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.standings-heading {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #94a3b8;
+  margin: 0 0 12px 4px;
+}
+
+.result-standings-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.result-standing-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.result-standing-item.current-player {
+  background: rgba(56, 189, 248, 0.18);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  font-weight: bold;
+}
+
+.standing-rank {
+  font-weight: 800;
+  width: 20px;
+  text-align: right;
+  color: #94a3b8;
+}
+
+.result-standing-item.current-player .standing-rank {
+  color: #38bdf8;
+}
+
+.standing-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.standing-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.standing-perks {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+}
+
+.racer-perk-badge {
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0 3px;
+  border-radius: 4px;
+}
+
+.racer-perk-badge small {
+  font-size: 8px;
+  font-weight: 800;
+  color: #f59e0b;
+  margin-left: 1px;
+}
+
+.standing-time {
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+/* 3つのアクションボタン */
+.result-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.result-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.btn-retry {
+  background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
+  color: #0f172a;
+}
+
+.btn-retry:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(56, 189, 248, 0.4);
+}
+
+.btn-change-course {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #fff;
+}
+
+.btn-change-course:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.4);
+}
+
+.btn-home {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.btn-home:hover {
+  background: rgba(255, 255, 255, 0.18);
+  transform: translateY(-2px);
+}
+
+/* --- アップデート通知モーダル (UpdateModal) --- */
+.update-modal-backdrop {
+  z-index: 90;
+  background: rgba(10, 20, 32, 0.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.update-modal-card {
+  width: min(650px, 94vw);
+  max-height: 88dvh;
+  overflow-y: auto;
+  background: #142436;
+  border: 1px solid #2d4561;
+  border-radius: 20px;
+  padding: 24px 28px;
+  color: #fff;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+}
+
+.update-modal-header {
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.update-version-tag {
+  display: inline-block;
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.update-modal-title {
+  font-size: 24px;
+  font-weight: 900;
+  margin: 0 0 6px;
+}
+
+.update-modal-subtitle {
+  font-size: 13px;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.update-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.update-item {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.update-item-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.update-badge {
+  font-size: 10px;
+  font-weight: 900;
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.badge-new {
+  background: #f59e0b;
+  color: #1a1000;
+}
+
+.badge-update {
+  background: #38bdf8;
+  color: #0c2033;
+}
+
+.update-item-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.update-item-desc {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #cbd5e1;
+  margin: 0;
+}
+

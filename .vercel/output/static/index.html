@@ -11,7 +11,19 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/frontend/images/icons/icon-32.png">
   <link rel="icon" type="image/png" sizes="192x192" href="/frontend/images/icons/icon-192.png">
   <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="stylesheet" href="css/style.css">
+  <!-- style.css を機能単位に分割（順序はカスケード優先度を保つため元のファイルの並び順と厳密に一致） -->
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/hud.css">
+  <link rel="stylesheet" href="css/touch-controls.css">
+  <link rel="stylesheet" href="css/modals.css">
+  <link rel="stylesheet" href="css/feedback-form.css">
+  <link rel="stylesheet" href="css/orientation-prompt.css">
+  <link rel="stylesheet" href="css/title-screen.css">
+  <link rel="stylesheet" href="css/hud-banners.css">
+  <link rel="stylesheet" href="css/course-editor.css">
+  <link rel="stylesheet" href="css/update-history.css">
+  <link rel="stylesheet" href="css/perks.css">
+  <link rel="stylesheet" href="css/responsive-scrollfree.css">
   <link rel="stylesheet" href="css/lobby.css">
 
   <!-- Three.js CDN -->

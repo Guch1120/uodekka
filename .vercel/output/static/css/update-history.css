@@ -1,0 +1,110 @@
+/* ================= 過去の更新履歴（トグル折りたたみ） ================= */
+.past-updates-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.past-updates-toggle:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+}
+
+.past-updates-toggle-arrow {
+  display: inline-block;
+  transition: transform 0.2s ease;
+  font-size: 11px;
+}
+
+.past-updates-toggle.expanded .past-updates-toggle-arrow {
+  transform: rotate(180deg);
+}
+
+.past-updates-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 14px;
+}
+
+.past-updates-body.hidden {
+  display: none;
+}
+
+.update-release-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.update-release-block:first-child {
+  padding-top: 0;
+  border-top: none;
+}
+
+.update-release-header {
+  font-size: 12px;
+  font-weight: 800;
+  color: #64748b;
+  letter-spacing: 0.5px;
+}
+
+.update-modal-footer {
+  text-align: center;
+}
+
+.update-confirm-btn {
+  padding: 12px 36px;
+  font-size: 15px;
+  font-weight: 800;
+  border-radius: 12px;
+  background: #38bdf8;
+  color: #0f172a;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 4px 16px rgba(56, 189, 248, 0.35);
+}
+
+.update-confirm-btn:hover {
+  background: #7dd3fc;
+  transform: translateY(-2px);
+}
+
+.garage-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.update-notice-btn {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.update-notice-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: #38bdf8;
+  color: #38bdf8;
+}
+

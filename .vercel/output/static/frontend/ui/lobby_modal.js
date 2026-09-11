@@ -5,6 +5,7 @@ import { GaragePreview, courseArt } from './lobby_preview.js';
 import { CPU_ROSTER } from '../../backend/ai/cpu_driver.js';
 import { UpdateModal } from './update_modal.js';
 import { FeedbackModal } from './feedback_modal.js';
+import { AudioManager } from '../audio/audio_manager.js';
 
 const arrow = (id, direction, label) => `<button id="${id}" class="garage-arrow" aria-label="${label}">${direction === 'prev' ? '◀' : '▶'}</button>`;
 const stats = () => `<section class="garage-specs"><div class="garage-eyebrow">YOUR MACHINE</div><h2 class="vehicle-name"></h2><p class="vehicle-description"></p><div class="garage-stat-list">${[['topSpeed', 'スピード', 50], ['acceleration', '加速', 35], ['weight', '重さ', 1.5]].map(([key, label, max]) => `<label class="garage-stat"><span>${label}</span><meter data-stat="${key}" min="0" max="${max}" aria-label="${label}"></meter><span data-stat-value="${key}" class="garage-stat-value"></span></label>`).join('')}</div><div class="garage-stat-skill"><span class="garage-skill-badge">固有スキル</span><strong class="spec-skill-name"></strong><span class="spec-skill-status"></span></div></section>`;
@@ -162,6 +163,10 @@ export class LobbyModal {
     this.p2pManager.onConnectionError = disconnected;
     const room = new URLSearchParams(window.location.search).get('room');
     if (room) queueMicrotask(() => this.openDialog('guest', room));
+
+    // ロビー要素はinit()の時点で既に表示状態のため、初回表示時もここでメニューBGMを開始する
+    // （show()経由の再表示だけでなく最初の1回もカバーする）。
+    AudioManager.playBgm('menu');
   }
 
   bindEvents() {
@@ -642,6 +647,6 @@ export class LobbyModal {
 
   setStatus(text) { this.el('#garage-status').textContent = text; }
   populateCourseSelects() { this.refreshCourses(); }
-  show() { this.modalEl.hidden = false; this.returnHome(); this.refreshCourses(); this.updateVehicle(); }
+  show() { this.modalEl.hidden = false; this.returnHome(); this.refreshCourses(); this.updateVehicle(); AudioManager.playBgm('menu'); }
   hide() { this.modalEl.hidden = true; }
 }

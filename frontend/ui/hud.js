@@ -38,6 +38,10 @@ export class HUD {
           <div class="hud-badge coin-badge">
             <span class="coin-icon">🪙</span>
             <span id="hud-coin-count">0</span>
+            <!-- 次の強化スキル解禁までの進捗ピップ（初見でもコイン=強化解禁と気づけるように） -->
+            <span class="coin-perk-pips" id="hud-coin-pips" title="3枚集めるごとに強化スキルを自動解禁！">
+              <span class="coin-pip"></span><span class="coin-pip"></span><span class="coin-pip"></span>
+            </span>
           </div>
           <!-- 獲得したレース内強化スキル一覧トレイ -->
           <div class="hud-perks-tray" id="hud-perks-tray"></div>
@@ -107,18 +111,14 @@ export class HUD {
         </div>
       </div>
 
-      <!-- レース内ローグライクスキル選択オーバーレイ -->
-      <div id="hud-perk-modal" class="hud-perk-modal hidden" role="dialog" aria-modal="true" aria-labelledby="perk-modal-title">
+      <!-- レース内ローグライクスキル自動解禁の演出（選択操作なし・自動で消える） -->
+      <div id="hud-perk-modal" class="hud-perk-modal hidden" aria-live="polite">
         <div class="perk-modal-card">
           <div class="perk-modal-header">
             <span class="perk-modal-kicker">LEVEL UP!</span>
-            <h2 id="perk-modal-title" class="perk-modal-title">強化スキルを選択</h2>
-            <div class="perk-timer-container" id="perk-timer-container">
-              <div class="perk-timer-bar" id="perk-timer-bar"></div>
-            </div>
+            <h2 id="perk-modal-title" class="perk-modal-title">強化スキル解禁！</h2>
           </div>
-          <div class="perk-cards-grid" id="perk-cards-grid"></div>
-          <p class="perk-modal-hint">カードをタップ、または [1] [2] [3] キーで選択</p>
+          <div class="perk-cards-grid single" id="perk-cards-grid"></div>
         </div>
       </div>
     `;
@@ -129,13 +129,10 @@ export class HUD {
     this.perksTrayEl = hudDiv.querySelector('#hud-perks-tray');
     this.perkModalEl = hudDiv.querySelector('#hud-perk-modal');
     this.perkCardsGridEl = this.perkModalEl?.querySelector('#perk-cards-grid');
-    this.perkTimerBarEl = this.perkModalEl?.querySelector('#perk-timer-bar');
-    this.perkTimerContainerEl = this.perkModalEl?.querySelector('#perk-timer-container');
     if (this.perkModalEl) {
       this.container.appendChild(this.perkModalEl);
     }
-    this.perkTimerId = null;
-    this.perkKeyHandler = null;
+    this._perkRevealTimer = null;
 
     this.itemSlotEl = hudDiv.querySelector('#hud-item-slot');
     this.itemIconEl = hudDiv.querySelector('#hud-item-icon');
@@ -148,6 +145,7 @@ export class HUD {
     this.wrongWayEl = hudDiv.querySelector('#hud-wrong-way');
 
     this.coinCountEl = hudDiv.querySelector('#hud-coin-count');
+    this.coinPipEls = Array.from(hudDiv.querySelectorAll('#hud-coin-pips .coin-pip'));
     this.skillBtnEl = hudDiv.querySelector('#btn-hud-skill');
     this.skillIconEl = hudDiv.querySelector('#hud-skill-icon');
     this.skillNameEl = hudDiv.querySelector('#hud-skill-name');
@@ -325,6 +323,7 @@ export class HUD {
 
   showFinalLapBanner() {
     if (!this.finalLapEl) return;
+    this.onFinalLap?.();
     this.finalLapEl.classList.remove('hidden');
     setTimeout(() => {
       this.finalLapEl.classList.add('hidden');
@@ -444,10 +443,15 @@ export class HUD {
     });
   }
 
-  updateCoins(count) {
+  updateCoins(count, nextThreshold = 3) {
     if (this.coinCountEl) {
       this.coinCountEl.textContent = String(count || 0);
       this._restartAnimation(this.coinCountEl.parentElement, 'coin-pop');
+    }
+    if (this.coinPipEls && this.coinPipEls.length) {
+      const remaining = Math.max(0, Math.min(3, nextThreshold - (count || 0)));
+      const filled = 3 - remaining;
+      this.coinPipEls.forEach((pip, i) => pip.classList.toggle('filled', i < filled));
     }
   }
 
@@ -507,76 +511,29 @@ export class HUD {
     this.perksTrayEl.innerHTML = html;
   }
 
-  showPerkSelection(choices, onSelect, durationSec = 0) {
-    if (!this.perkModalEl || !this.perkCardsGridEl) return;
-    this.hidePerkSelection();
+  // コイン閾値到達で自動抽選された強化パークを1枚だけ一時的に表示する（操作不要、約1.8秒で自動的に消える）。
+  showPerkReveal(perk, level = 1) {
+    if (!this.perkModalEl || !this.perkCardsGridEl || !perk) return;
+    clearTimeout(this._perkRevealTimer);
 
-    this.perkCardsGridEl.innerHTML = choices.map((perk, index) => {
-      const hotkey = index + 1;
-      return `
-        <button type="button" class="perk-card rarity-${perk.rarity}" data-index="${index}">
-          <div class="perk-card-top">
-            <span class="perk-hotkey">[${hotkey}]</span>
-            <span class="perk-rarity-badge">${perk.rarity.toUpperCase()}</span>
-          </div>
-          <div class="perk-icon">${perk.icon}</div>
-          <h3 class="perk-name">${perk.name}</h3>
-          <p class="perk-desc">${perk.description}</p>
-        </button>
-      `;
-    }).join('');
-
-    const selectChoice = (index) => {
-      const chosen = choices[index];
-      this.hidePerkSelection();
-      if (onSelect) onSelect(chosen);
-    };
-
-    // クリック・タップリスナー
-    this.perkCardsGridEl.querySelectorAll('.perk-card').forEach(btn => {
-      const idx = parseInt(btn.dataset.index, 10);
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        selectChoice(idx);
-      });
-    });
-
-    // キーボードリスナー [1], [2], [3]
-    this.perkKeyHandler = (e) => {
-      if (e.key === '1' && choices[0]) { e.preventDefault(); selectChoice(0); }
-      else if (e.key === '2' && choices[1]) { e.preventDefault(); selectChoice(1); }
-      else if (e.key === '3' && choices[2]) { e.preventDefault(); selectChoice(2); }
-    };
-    window.addEventListener('keydown', this.perkKeyHandler);
-
-    // タイマー（マルチプレイ時）
-    if (durationSec > 0 && this.perkTimerBarEl && this.perkTimerContainerEl) {
-      this.perkTimerContainerEl.hidden = false;
-      this.perkTimerBarEl.style.transition = 'none';
-      this.perkTimerBarEl.style.width = '100%';
-      requestAnimationFrame(() => {
-        this.perkTimerBarEl.style.transition = `width ${durationSec}s linear`;
-        this.perkTimerBarEl.style.width = '0%';
-      });
-      this.perkTimerId = setTimeout(() => {
-        selectChoice(0);
-      }, durationSec * 1000);
-    } else if (this.perkTimerContainerEl) {
-      this.perkTimerContainerEl.hidden = true;
-    }
+    this.perkCardsGridEl.innerHTML = `
+      <div class="perk-card rarity-${perk.rarity}">
+        <div class="perk-card-top">
+          <span class="perk-rarity-badge">${perk.rarity.toUpperCase()}</span>
+        </div>
+        <div class="perk-icon">${perk.icon}</div>
+        <h3 class="perk-name">${perk.name}${level > 1 ? ` Lv.${level}` : ''}</h3>
+        <p class="perk-desc">${perk.description}</p>
+      </div>
+    `;
 
     this.perkModalEl.classList.remove('hidden');
+    this._perkRevealTimer = setTimeout(() => this.hidePerkReveal(), 1800);
   }
 
-  hidePerkSelection() {
-    if (this.perkTimerId) {
-      clearTimeout(this.perkTimerId);
-      this.perkTimerId = null;
-    }
-    if (this.perkKeyHandler) {
-      window.removeEventListener('keydown', this.perkKeyHandler);
-      this.perkKeyHandler = null;
-    }
+  hidePerkReveal() {
+    clearTimeout(this._perkRevealTimer);
+    this._perkRevealTimer = null;
     if (this.perkModalEl) {
       this.perkModalEl.classList.add('hidden');
     }
@@ -589,7 +546,7 @@ export class HUD {
   }
 
   hide() {
-    this.hidePerkSelection();
+    this.hidePerkReveal();
     if (this.element) {
       this.element.classList.add('hidden');
     }

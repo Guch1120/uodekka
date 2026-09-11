@@ -2,6 +2,7 @@
 // マリオカート風アイテム定義・挙動（赤・緑・青甲羅、ボム兵、スター、バナナ/三連、キノコ/三連、サンダー、相殺・落下拾得、ボム爆発エフェクト）
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { Icons } from '../icons/icons.js';
+import { AudioManager } from '../audio/audio_manager.js';
 
 export const Items = {
   lightningHeld: false,
@@ -115,7 +116,10 @@ export const Items = {
       canHoldBehind: false,
       use(kart, gameState) {
         kart.applyInvincible(8.0);
-        if (kart.isLocalPlayer) gameState.showItemNotification('スーパースター！無敵＆最高速！');
+        if (kart.isLocalPlayer) {
+          gameState.showItemNotification('スーパースター！無敵＆最高速！');
+          AudioManager.playSfx('star', { maxDurationMs: 8000 });
+        }
       }
     },
     lightning: {
