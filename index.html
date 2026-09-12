@@ -83,6 +83,7 @@
     const orientationPrompt = document.getElementById('orientation-prompt');
     const btnForceLandscape = document.getElementById('btn-force-landscape');
     const btnDismissOrientation = document.getElementById('btn-dismiss-orientation');
+    let _forceLandscapeRequested = false;
 
     function detectDeviceInfo() {
       const w = window.innerWidth;
@@ -91,8 +92,9 @@
       const screenW = window.screen ? window.screen.width : w;
       const screenH = window.screen ? window.screen.height : h;
 
-      if (w >= h && document.body && document.body.classList.contains('force-landscape')) {
-        document.body.classList.remove('force-landscape');
+      if (document.body) {
+        // 復帰直後の一時的な画面寸法で、ユーザーが選んだ横画面モードを失わない。
+        document.body.classList.toggle('force-landscape', _forceLandscapeRequested && h > w);
       }
 
       const isForcedLandscapeInPortrait = document.body && document.body.classList.contains('force-landscape') && (h > w);
@@ -130,9 +132,14 @@
       return info;
     }
 
-    let _resumeDebounceTimer = null;
-    function syncAppLayout() {
-      if (window._gameSessionStarted && screen.orientation && screen.orientation.lock) {
+    window.requestForcedLandscapeLayout = () => {
+      _forceLandscapeRequested = true;
+      detectDeviceInfo();
+    };
+
+    let _resumeLayoutTimers = [];
+    function syncAppLayout(tryOrientationLock = false) {
+      if (tryOrientationLock && window._gameSessionStarted && screen.orientation && screen.orientation.lock) {
         screen.orientation.lock('landscape').catch(() => {});
       }
       detectDeviceInfo();
@@ -144,9 +151,9 @@
     }
 
     function handleAppResume() {
-      syncAppLayout();
-      if (_resumeDebounceTimer) clearTimeout(_resumeDebounceTimer);
-      _resumeDebounceTimer = setTimeout(syncAppLayout, 140);
+      syncAppLayout(true);
+      _resumeLayoutTimers.forEach(clearTimeout);
+      _resumeLayoutTimers = [120, 500, 1200].map(delay => setTimeout(syncAppLayout, delay));
     }
 
     detectDeviceInfo();
@@ -164,6 +171,7 @@
     });
 
     function enableForcedLandscape() {
+      window.requestForcedLandscapeLayout();
       if (orientationPrompt) {
         orientationPrompt.classList.add('dismissed');
       }
@@ -174,11 +182,11 @@
       }
       if (screen.orientation && screen.orientation.lock) {
         screen.orientation.lock('landscape').catch(() => {
-          document.body.classList.add('force-landscape');
+          window.requestForcedLandscapeLayout();
           window.dispatchEvent(new Event('resize'));
         });
       } else {
-        document.body.classList.add('force-landscape');
+        window.requestForcedLandscapeLayout();
         window.dispatchEvent(new Event('resize'));
       }
     }

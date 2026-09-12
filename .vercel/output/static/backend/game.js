@@ -254,6 +254,9 @@ export class Game {
     if (orientationPrompt) {
       orientationPrompt.classList.add('dismissed');
     }
+    if (window.requestForcedLandscapeLayout) {
+      window.requestForcedLandscapeLayout();
+    }
 
     // 全画面リクエストを試行
     if (document.documentElement.requestFullscreen) {
@@ -263,7 +266,11 @@ export class Game {
     }
 
     const applyLandscapeLayout = () => {
-      document.body.classList.add('force-landscape');
+      if (window.requestForcedLandscapeLayout) {
+        window.requestForcedLandscapeLayout();
+      } else {
+        document.body.classList.add('force-landscape');
+      }
       if (this.renderer) {
         this.renderer.onResize();
       }
