@@ -98,6 +98,10 @@ export function courseArt(course) {
   };
   const colors = palettes[course.theme] || palettes.grassland;
   const [x, y] = coords[0];
+  const svgPoint = t => {
+    const point = curve.getPointAt(((t % 1) + 1) % 1);
+    return [300 + (point.x - (minX + maxX) / 2) * scale, 175 + (point.z - (minZ + maxZ) / 2) * scale];
+  };
   // 頂点順と同じ向きに矢印を置き、コースの進行方向を示す。
   const arrows = [0.16, 0.49, 0.82].map(t => {
     const p = curve.getPoint(t), tangent = curve.getTangent(t);
@@ -106,7 +110,19 @@ export function courseArt(course) {
     const angle = Math.atan2(tangent.z, tangent.x) * 180 / Math.PI;
     return '<path data-course-direction transform="translate(' + ax + ' ' + ay + ') rotate(' + angle + ')" d="M-5 -5 L1 0 L-5 5" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>';
   }).join('');
-  return `<svg viewBox="0 0 600 350" role="img" aria-label="コースの俯瞰図。白い矢印は走行方向、オレンジの点はスタート地点" style="overflow:hidden;border-radius:12px" xmlns="http://www.w3.org/2000/svg">
+  const jumpMarkers = (course.jumpRamps || []).map(ramp => {
+    const [mx, my] = svgPoint(ramp.t);
+    return `<g data-course-jump transform="translate(${mx.toFixed(1)} ${my.toFixed(1)})"><circle r="9" fill="#1f9eea" stroke="white" stroke-width="2"/><path d="M-4 2 L0 -3 L4 2" fill="none" stroke="white" stroke-width="2"/></g>`;
+  }).join('');
+  const wallSegments = [...(course.tireWallSegments || [])].sort((a, b) => a.start - b.start);
+  const hazardMarkers = wallSegments.map((segment, index) => {
+    const next = wallSegments[(index + 1) % wallSegments.length];
+    const gap = ((next.start - segment.end) + 1) % 1;
+    if (gap < 0.025) return '';
+    const [mx, my] = svgPoint(segment.end + gap / 2);
+    return `<g data-course-hazard transform="translate(${mx.toFixed(1)} ${my.toFixed(1)})"><path d="M0 -10 L10 8 L-10 8 Z" fill="#ff773e" stroke="white" stroke-width="2"/><text y="5" text-anchor="middle" font-family="sans-serif" font-size="11" font-weight="900" fill="white">!</text></g>`;
+  }).join('');
+  return `<svg viewBox="0 0 600 350" role="img" aria-label="コースの俯瞰図。白矢印は進行方向、青はジャンプ台、オレンジはタイヤ壁の切れ目" style="overflow:hidden;border-radius:12px" xmlns="http://www.w3.org/2000/svg">
     <defs><clipPath id="${clipId}"><rect width="600" height="350" rx="12"/></clipPath></defs>
     <g clip-path="url(#${clipId})">
     <rect width="600" height="350" rx="12" fill="${colors[0]}"/>
@@ -117,12 +133,18 @@ export function courseArt(course) {
     <path d="${path}" fill="none" stroke="#304050" stroke-width="19" stroke-linejoin="round"/>
     <path d="${path}" fill="none" stroke="#f4e4a4" stroke-width="1.4" stroke-dasharray="5 7"/>
     ${arrows}
+    ${jumpMarkers}
+    ${hazardMarkers}
     <circle cx="${x}" cy="${y}" r="7" fill="#fa733c" stroke="white" stroke-width="3"/>
     <rect x="${x - 18}" y="${y + 17}" width="82" height="22" rx="5" fill="#14263b"/>
     <text x="${x + 23}" y="${y + 32}" text-anchor="middle" font-family="sans-serif" font-size="10" font-weight="700" fill="white">START / FINISH</text>
     <text x="30" y="32" font-family="sans-serif" font-size="10" letter-spacing="2" fill="${colors[2]}">CIRCUIT MAP</text>
     <path d="M556 45v-20m-5 6 5-6 5 6" stroke="${colors[2]}" fill="none" stroke-width="2"/>
     <text x="556" y="60" text-anchor="middle" font-family="sans-serif" font-size="10" fill="${colors[2]}">N</text>
+    <g transform="translate(30 315)" font-family="sans-serif" font-size="10" font-weight="700" fill="${colors[2]}">
+      <circle cx="7" cy="0" r="6" fill="#1f9eea"/><text x="18" y="4">JUMP</text>
+      <path transform="translate(76 0)" d="M0 -7 L7 6 L-7 6 Z" fill="#ff773e"/><text x="94" y="4">WALL GAP</text>
+    </g>
     </g>
   </svg>`;
 }

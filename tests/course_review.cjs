@@ -22,10 +22,23 @@ require('node:fs').mkdirSync(artifactDir, {recursive:true});
     await page.selectOption('#course-select','course'+i);
     assert.equal(await page.evaluate(()=>gameInstance.lobbyModal.courseIndex),i-1);
     assert.equal(await page.locator('[data-course-direction]').count(),3);
+    assert.equal(await page.locator('[data-course-jump]').count(),[2,2,2,2,1,2,2][i-1]);
+    assert.equal(await page.locator('[data-course-hazard]').count(),3);
     summary.push(await page.locator('#course-metrics').innerText());
     await page.click('#course-confirm');
     await page.click('#btn-start-solo');
     await page.waitForFunction(()=>gameInstance.isRunning);
+    if (i === 3 || i === 5) {
+      const edgeVisuals = await page.evaluate(() => {
+        const markers = gameInstance.courseTrack.group.getObjectByName('track-edge-reflectors');
+        const luminousCurbs = gameInstance.courseTrack.group.children.some(child =>
+          child.children?.some(mesh => mesh.material?.emissiveIntensity > 1)
+        );
+        return { markerCount: markers?.count || 0, luminousCurbs };
+      });
+      assert.ok(edgeVisuals.markerCount >= 40);
+      assert.equal(edgeVisuals.luminousCurbs,true);
+    }
     await page.evaluate(()=>{gameInstance.isPaused=true;});
     await page.screenshot({path:artifactDir+'/uodekka-course-'+i+'.png'});
     await page.evaluate(()=>gameInstance.quitRace());
@@ -56,7 +69,7 @@ require('node:fs').mkdirSync(artifactDir, {recursive:true});
   assert.match(await page.locator('#course-metrics').innerText(),/20 m/);
   assert.match(await page.locator('#course-metrics').innerText(),/0 か所/);
   assert.deepEqual(errors,[]);
-  console.log('PASS: 7コース起動、一覧選択、確定保持、矢印、4画面寸法の操作到達、カスタム高低差、ブラウザ例外0件');
+  console.log('PASS: 7コース起動、一覧選択、確定保持、攻略マーカー、暗所路肩、4画面寸法の操作到達、カスタム高低差、ブラウザ例外0件');
   console.log(JSON.stringify(summary));
   await browser.close();
 })().catch(e=>{console.error(e);process.exit(1)});

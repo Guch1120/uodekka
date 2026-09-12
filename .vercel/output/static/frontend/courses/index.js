@@ -154,7 +154,8 @@ export const Courses = {
     trackMesh.receiveShadow = true;
 
     // ガードレール / フチ取り（赤白ゼブラゾーン）
-    const curbGroup = this.buildCurbs(points, divisions, trackWidth);
+    const curbGroup = this.buildCurbs(points, divisions, trackWidth, courseConfig.theme);
+    const edgeMarkerGroup = this.buildEdgeMarkers(points, divisions, trackWidth, courseConfig.theme);
 
     // スタート＆フィニッシュゲート
     const startLine = this.buildStartGate(points[0], points[1], trackWidth);
@@ -342,6 +343,7 @@ export const Courses = {
     const fullTrackGroup = new THREE.Group();
     fullTrackGroup.add(trackMesh);
     fullTrackGroup.add(curbGroup);
+    fullTrackGroup.add(edgeMarkerGroup);
     fullTrackGroup.add(tireWallGroup);
     fullTrackGroup.add(startLine);
     fullTrackGroup.add(dashPanelGroup);
@@ -514,7 +516,7 @@ export const Courses = {
     return { group: tireGroup, obstacles: obstacles };
   },
 
-  buildCurbs(points, divisions, trackWidth) {
+  buildCurbs(points, divisions, trackWidth, theme) {
     const curbGroup = new THREE.Group();
     const up = new THREE.Vector3(0, 1, 0);
 
@@ -541,12 +543,51 @@ export const Courses = {
     const curbGeoL = new THREE.TubeGeometry(leftCurve, divisions, 0.4, 6, true);
     const curbGeoR = new THREE.TubeGeometry(rightCurve, divisions, 0.4, 6, true);
 
-    const curbMat = new THREE.MeshStandardMaterial({ color: 0xdd2c00, roughness: 0.5 });
+    const darkTheme = theme === 'space' || theme === 'metro';
+    const curbMat = new THREE.MeshStandardMaterial({
+      color: darkTheme ? 0x38d9ff : 0xdd2c00,
+      emissive: darkTheme ? 0x087a99 : 0x000000,
+      emissiveIntensity: darkTheme ? 1.15 : 0,
+      roughness: darkTheme ? 0.3 : 0.5
+    });
 
     curbGroup.add(new THREE.Mesh(curbGeoL, curbMat));
     curbGroup.add(new THREE.Mesh(curbGeoR, curbMat));
 
     return curbGroup;
+  },
+
+  buildEdgeMarkers(points, divisions, trackWidth, theme) {
+    const markerGroup = new THREE.Group();
+    markerGroup.name = 'track-edge-markers';
+    if (theme !== 'space' && theme !== 'metro') return markerGroup;
+
+    const up = new THREE.Vector3(0, 1, 0);
+    const markerGeo = new THREE.BoxGeometry(0.32, 0.75, 1.5);
+    const markerMat = new THREE.MeshBasicMaterial({ color: theme === 'space' ? 0x9ff4ff : 0xffd166 });
+    const interval = 12;
+    const markerCount = Math.ceil(divisions / interval) * 2;
+    const markers = new THREE.InstancedMesh(markerGeo, markerMat, markerCount);
+    markers.name = 'track-edge-reflectors';
+    const dummy = new THREE.Object3D();
+    let markerIndex = 0;
+
+    for (let i = 0; i < divisions; i += interval) {
+      const point = points[i];
+      const next = points[(i + 1) % divisions];
+      const tangent = new THREE.Vector3().subVectors(next, point).normalize();
+      const normal = new THREE.Vector3().crossVectors(tangent, up).normalize();
+      for (const side of [-1, 1]) {
+        dummy.position.copy(point).addScaledVector(normal, side * (trackWidth / 2 + 0.55));
+        dummy.position.y += 0.55;
+        dummy.rotation.set(0, Math.atan2(-tangent.x, -tangent.z), 0);
+        dummy.updateMatrix();
+        markers.setMatrixAt(markerIndex++, dummy.matrix);
+      }
+    }
+    markers.instanceMatrix.needsUpdate = true;
+    markerGroup.add(markers);
+    return markerGroup;
   },
 
   buildStartGate(p0, p1, trackWidth) {
