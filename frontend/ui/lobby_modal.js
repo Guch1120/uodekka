@@ -6,6 +6,11 @@ import { CPU_ROSTER } from '../../backend/ai/cpu_driver.js';
 import { UpdateModal } from './update_modal.js';
 import { FeedbackModal } from './feedback_modal.js';
 import { AudioManager } from '../audio/audio_manager.js';
+import { getVehicleMissions, NumericBuffTable, CPU_MISSION_MIN_LEVEL } from '../../backend/missions/mission_definitions.js';
+import { drawMission } from '../../backend/missions/mission_engine.js';
+import { readStoredLearningLevel } from '../../backend/ai/learning_ai.js';
+
+const MISSION_STAT_LABEL = { acceleration: '加速度', topSpeed: '最高速度', miniTurboDuration: 'ミニターボ持続時間' };
 
 const arrow = (id, direction, label) => `<button id="${id}" class="garage-arrow" aria-label="${label}">${direction === 'prev' ? '◀' : '▶'}</button>`;
 const stats = () => `<section class="garage-specs"><div class="garage-eyebrow">YOUR MACHINE</div><h2 class="vehicle-name"></h2><p class="vehicle-description"></p><div class="garage-stat-list">${[['topSpeed', 'スピード', 50], ['acceleration', '加速', 35], ['weight', '重さ', 1.5]].map(([key, label, max]) => `<label class="garage-stat"><span>${label}</span><meter data-stat="${key}" min="0" max="${max}" aria-label="${label}"></meter><span data-stat-value="${key}" class="garage-stat-value"></span></label>`).join('')}</div><div class="garage-stat-skill"><span class="garage-skill-badge">固有スキル</span><strong class="spec-skill-name"></strong><span class="spec-skill-status"></span></div></section>`;
@@ -68,6 +73,10 @@ export class LobbyModal {
                   <p id="garage-skill-desc" class="garage-skill-desc"></p>
                   <button type="button" id="btn-unlock-skill" class="garage-skill-unlock-btn"></button>
                 </div>
+                <button type="button" id="btn-show-missions" class="garage-mission-chip" title="レース開始時に3種から1つを等確率で抽選します">
+                  <span class="garage-mission-badge">ミッション</span>
+                  <span>車体別の3ミッションを見る ▶</span>
+                </button>
               </div>
             </div>
             <div class="garage-mode-panel"><div class="garage-mode-heading"><span class="garage-eyebrow">02 / CHOOSE YOUR RACE</span><h2>さあ、走り出そう。</h2></div>
@@ -204,6 +213,7 @@ export class LobbyModal {
       this.updateModal.show();
     });
     on('#btn-show-feedback', () => this.feedbackModal.show(this.playerName));
+    on('#btn-show-missions', () => this.showMissionModal());
     on('#btn-open-lobby-settings', () => this.onOpenSettings?.());
     on('#tab-solo', () => { this.saveProfile(); this.refreshCourses(); this.confirmedCourse = null; this.showScreen('solo'); this.updateCourse(); });
     on('#tab-create', () => this.openDialog('host'));
@@ -239,7 +249,24 @@ export class LobbyModal {
           ...bot,
           gridIndex: memberCount + idx
         }));
-        this.p2pManager.broadcastStartRace(aiRacers);
+
+        // ミッション抽選とCPUレベルはホストが確定し、開始情報に含める（同車体の別レーサーが同じミッションになることは許容する）
+        const courseCfg = Courses.getCourse(this.p2pManager.courseId);
+        const missionCapabilities = {
+          hasOpponents: true,
+          hasCoins: !Array.isArray(courseCfg.coinLocations) || courseCfg.coinLocations.length > 0,
+          hasItemBoxes: !Array.isArray(courseCfg.itemBoxLocations) || courseCfg.itemBoxLocations.length > 0
+        };
+        const missionAssignments = {};
+        this.p2pManager.members.forEach(m => {
+          missionAssignments[m.id] = drawMission(m.vehicleKey, missionCapabilities)?.id ?? null;
+        });
+        aiRacers.forEach(bot => {
+          missionAssignments[bot.id] = drawMission(bot.vehicleKey, missionCapabilities)?.id ?? null;
+        });
+        const cpuLevel = readStoredLearningLevel(this.p2pManager.courseId);
+
+        this.p2pManager.broadcastStartRace(aiRacers, missionAssignments, cpuLevel);
       }
     });
     on('#btn-reset-ai', () => {
@@ -353,6 +380,50 @@ export class LobbyModal {
     }
 
     this.preview.setVehicle(this.vehicleKey);
+  }
+
+  // ガレージのミッション詳細ポップアップ（固定オーバーレイなので showroom の overflow:hidden の影響を受けない）
+  showMissionModal() {
+    const existing = this.container.querySelector('#garage-mission-modal');
+    if (existing) existing.remove();
+
+    const vehicle = Vehicles.types[this.vehicleKey];
+    const missions = getVehicleMissions(this.vehicleKey);
+    const buffEntries = NumericBuffTable[this.vehicleKey] || [];
+    const buffText = buffEntries
+      .map(e => `${MISSION_STAT_LABEL[e.stat] || e.stat}＋${Math.round(e.maxRatio * 100)}%`)
+      .join('・');
+
+    const modalEl = document.createElement('div');
+    modalEl.id = 'garage-mission-modal';
+    modalEl.className = 'modal-backdrop mission-info-modal-backdrop';
+    modalEl.innerHTML = `
+      <div class="mission-info-modal-card" role="dialog" aria-modal="true" aria-labelledby="mission-info-title">
+        <div class="mission-info-modal-header">
+          <span class="garage-mission-badge">ミッション</span>
+          <h2 id="mission-info-title">${vehicle.name} の固有ミッション</h2>
+          <button type="button" id="btn-close-mission-modal" class="mission-info-close-btn" aria-label="閉じる">✕</button>
+        </div>
+        <p class="mission-info-note">レース開始時に3種類から1つを等確率で抽選し、初級→中級→最終の3段階で進めます。</p>
+        <ul class="mission-info-list">
+          ${missions.map(m => `
+            <li class="mission-info-item">
+              <div class="mission-info-item-head">
+                <strong>${m.name}</strong>
+                <span class="garage-mission-thresholds">${m.thresholds.join(' / ')} ${m.unit === 'seconds' ? '秒' : m.unit === 'points' ? '点' : '枚'}</span>
+              </div>
+              <p>${m.description}</p>
+            </li>
+          `).join('')}
+        </ul>
+        <p class="mission-info-note">最大強化: ${buffText || '—'} ／ 2段階・3段階達成で固有スキルに追加効果 ／ CPUはコース別学習Lv.${CPU_MISSION_MIN_LEVEL}以上でのみミッションが有効になります。</p>
+      </div>
+    `;
+    this.container.appendChild(modalEl);
+
+    const close = () => modalEl.remove();
+    modalEl.querySelector('#btn-close-mission-modal').addEventListener('click', close);
+    modalEl.addEventListener('click', e => { if (e.target === modalEl) close(); });
   }
 
   refreshCourses() {
@@ -649,7 +720,9 @@ export class LobbyModal {
         courseId: data.courseId,
         vehicleKey: this.vehicleKey,
         isHost: this.p2pManager.isHost,
-        aiRacers: data.aiRacers || []
+        aiRacers: data.aiRacers || [],
+        missionAssignments: data.missionAssignments || {},
+        cpuLevel: data.cpuLevel || 1
       });
     }, data.delayMs);
   }

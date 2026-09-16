@@ -7,7 +7,10 @@ import { FollowCamera } from './engine/camera.js';
 import { InputManager } from './input/input_manager.js';
 import { WebSocketManager } from './network/websocket_manager.js';
 
-import { Vehicles, SkillsManager, InRacePerks } from '../frontend/vehicles/vehicles.js';
+import { Vehicles, SkillsManager } from '../frontend/vehicles/vehicles.js';
+import { MissionTracker, isCpuMissionEligible } from './missions/mission_engine.js';
+import { MISSION_SPEC_VERSION } from './missions/mission_definitions.js';
+import { createSkillState, activateSkill, tickSkill } from './skills/unique_skills.js';
 import { Courses } from '../frontend/courses/index.js';
 import { Items } from '../frontend/items/items.js';
 import { HUD } from '../frontend/ui/hud.js';
@@ -89,15 +92,22 @@ export class Game {
     this.itemBoxes = [];
     this.coins = [];
     this.playerCoins = 0;
-    this.inRacePerks = {};
-    this.nextPerkThreshold = 3;
-    this.skillCooldown = 0;
-    this.skillActiveTimer = 0;
-    this.skillActiveType = null;
+    this.playerSkillState = null;
     this.shieldMesh = null;
     this._audioCtx = null;
     this.knowledgeBase = null;
     this._lastPlayerLap = 1;
+
+    // ミッション形式スキルアップシステム
+    this.playerMissionTracker = null;
+    this._trackerByPhysicsId = new Map();
+    this._skillStateByPhysicsId = new Map();
+    this.frozenCpuLevel = 1;
+    this.missions = {
+      tickFor: (physics, dt, inputState, gameState) => this._missionTickFor(physics, dt, inputState, gameState),
+      reportHitLanded: (attackerId, targetId) => this._missionReportHitLanded(attackerId, targetId),
+      reportTurboSuccess: (racerId, level) => this._missionReportTurboSuccess(racerId, level)
+    };
 
     this.clock = new THREE.Clock();
 
@@ -325,6 +335,21 @@ export class Game {
       peerKart.physics.currentLap = state.lap;
       peerKart.physics.progress = state.progress;
       peerKart.physics.speed = state.speed;
+
+      // ミッション・固有スキル状態は表示専用（人間の進捗はその車体を操作するクライアントが更新し、
+      // 受信側は最新値で置換するだけで報酬の再適用は行わない）
+      peerKart.missionDisplay = {
+        missionId: state.missionId || null,
+        stage: state.missionStage || 0,
+        progress: state.missionProgress || 0,
+        rescueActive: !!state.missionRescueActive,
+        rescueKind: state.missionRescueKind || null
+      };
+      peerKart.skillDisplay = {
+        cooldown: state.skillCooldown || 0,
+        activeTimer: state.skillActiveTimer || 0,
+        activeType: state.skillActiveType || null
+      };
     };
 
     this.p2p.onItemEvent = (itemEvent) => {
@@ -361,9 +386,6 @@ export class Game {
             aiKart.physics.currentLap = state.lap;
             aiKart.physics.progress = state.progress;
             aiKart.physics.speed = state.speed;
-            if (state.inRacePerks) {
-              aiKart.physics.inRacePerks = state.inRacePerks;
-            }
             if (state.coins !== undefined) {
               aiKart.physics.coins = state.coins;
             }
@@ -371,6 +393,19 @@ export class Game {
               aiKart.physics.isFinished = true;
               aiKart.physics.finishTime = state.finishTime || performance.now();
             }
+            // ミッション・固有スキル状態は表示専用（CPUの進捗はホストが更新し、受信側は最新値で置換するだけで報酬の再適用は行わない）
+            aiKart.missionDisplay = {
+              missionId: state.missionId || null,
+              stage: state.missionStage || 0,
+              progress: state.missionProgress || 0,
+              rescueActive: !!state.missionRescueActive,
+              rescueKind: state.missionRescueKind || null
+            };
+            aiKart.skillDisplay = {
+              cooldown: state.skillCooldown || 0,
+              activeTimer: state.skillActiveTimer || 0,
+              activeType: state.skillActiveType || null
+            };
           }
         });
       } catch (err) {
@@ -440,15 +475,14 @@ export class Game {
     this.itemBoxes = [];
     this.coins = [];
     this.playerCoins = 0;
-    this.inRacePerks = {};
-    this.nextPerkThreshold = 3;
-    this.skillCooldown = 0;
-    this.skillActiveTimer = 0;
-    this.skillActiveType = null;
+    this.playerSkillState = null;
     this.shieldMesh = null;
-    this.hud.updateCoins(0, this.nextPerkThreshold);
-    this.hud.updateActivePerks({});
-    this.hud.hidePerkReveal?.();
+    this.hud.updateCoins(0);
+    this.hud.updateMission(null);
+    this.hud.hideMissionReveal?.();
+    this.playerMissionTracker = null;
+    this._trackerByPhysicsId.clear();
+    this._skillStateByPhysicsId.clear();
     this.courseObstacles = [];
     this._finishedNotified = false;
     Items.lightningHeld = false;
@@ -491,6 +525,9 @@ export class Game {
     this.knowledgeBase = new CourseKnowledgeBase(config.courseId, this.courseTrack.curve, this.currentCourseConfig.trackWidth);
     this._lastPlayerLap = 1;
 
+    // ミッション・追加スキル・救済はCPU学習Lv.5以上でのみ有効。判定レベルはレース開始時に固定する。
+    this.frozenCpuLevel = config.cpuLevel ?? this.knowledgeBase.learningLevel;
+
     const curve = this.courseTrack.curve;
     const localKartMesh = Vehicles.createKartMesh(config.vehicleKey);
     const gridIndex = config.mode === 'solo' ? 0 : Math.max(0, this.p2p.members.findIndex(member => member.id === this.p2p.myPeerId));
@@ -509,13 +546,26 @@ export class Game {
 
     const isSkillUnlocked = SkillsManager.isSkillUnlocked(config.vehicleKey);
     this.hud.setupSkill(vehicleConfig.skill, isSkillUnlocked);
+    this.playerSkillState = createSkillState(config.vehicleKey, isSkillUnlocked);
+    this._skillStateByPhysicsId.set(this.localPlayerKart.id, this.playerSkillState);
+
+    const missionCapabilities = {
+      hasOpponents: true,
+      hasCoins: this.coins.length > 0,
+      hasItemBoxes: this.itemBoxes.length > 0
+    };
+    // マルチプレイではホストが確定したミッション抽選(config.missionAssignments)を使用し、ローカルでは再抽選しない
+    const missionAssignments = config.missionAssignments || {};
+    const presetMissionId = config.mode !== 'solo' ? (missionAssignments[this.p2p.myPeerId] || null) : null;
+    this.playerMissionTracker = new MissionTracker(this.localPlayerKart.id, config.vehicleKey, missionCapabilities, presetMissionId);
+    this._trackerByPhysicsId.set(this.localPlayerKart.id, this.playerMissionTracker);
 
     this.followCamera.setTarget(localKartMesh);
 
     // 12人レースの編成
     if (config.mode === 'solo') {
       // ソロ：プレイヤー1人 ＋ CPU 11台 ＝ 合計12台
-      this.spawnAICarts(config.vehicleKey, 11, 1);
+      this.spawnAICarts(config.vehicleKey, 11, 1, missionAssignments);
     } else {
       // マルチプレイ：他の参加プレイヤーをグリッドに初期配置
       if (Array.isArray(this.p2p.members)) {
@@ -549,7 +599,7 @@ export class Game {
         const memberCount = this.p2p.members.length;
         const neededCpu = Math.max(0, 12 - memberCount);
         if (neededCpu > 0) {
-          this.spawnAICarts(config.vehicleKey, neededCpu, memberCount);
+          this.spawnAICarts(config.vehicleKey, neededCpu, memberCount, missionAssignments);
         }
       } else if (config.mode === 'multi_guest') {
         // マルチゲスト：ホストから送られたCPUカートリストを配置（なければフォールバック自動生成）
@@ -724,7 +774,7 @@ export class Game {
     } catch {}
   }
 
-  spawnAICarts(playerVehicleKey, count = 11, startGridIndex = 1) {
+  spawnAICarts(playerVehicleKey, count = 11, startGridIndex = 1, missionAssignments = {}) {
     const curve = this.courseTrack.curve;
 
     for (let i = 0; i < count; i++) {
@@ -744,7 +794,7 @@ export class Game {
       physics.progress = grid.progress;
       physics.lastSafeT = grid.progress;
 
-      this.otherPlayers.set(bot.id, {
+      const racerEntry = {
         id: bot.id,
         name: bot.name,
         mesh,
@@ -754,8 +804,26 @@ export class Game {
         personality: bot,
         aiOffset: bot.offsetBias,
         speedMultiplier: bot.speedScale,
-        colorHex: '#' + bot.color.toString(16).padStart(6, '0')
-      });
+        colorHex: '#' + bot.color.toString(16).padStart(6, '0'),
+        missionTracker: null,
+        skillState: null
+      };
+
+      // ミッション・途中強化・追加スキル・救済は、コース別CPU学習レベルがLv.5以上の場合のみ有効。
+      // 判定レベルはレース開始時に固定済み(this.frozenCpuLevel)で、レース中の学習による途中解放は行わない。
+      if (isCpuMissionEligible(this.frozenCpuLevel)) {
+        const cpuMissionCapabilities = {
+          hasOpponents: true,
+          hasCoins: this.coins.length > 0,
+          hasItemBoxes: this.itemBoxes.length > 0
+        };
+        racerEntry.missionTracker = new MissionTracker(physics.id, vKey, cpuMissionCapabilities, missionAssignments[bot.id] || null);
+        this._trackerByPhysicsId.set(physics.id, racerEntry.missionTracker);
+        racerEntry.skillState = createSkillState(vKey, true);
+        this._skillStateByPhysicsId.set(physics.id, racerEntry.skillState);
+      }
+
+      this.otherPlayers.set(bot.id, racerEntry);
     }
   }
 
@@ -806,6 +874,7 @@ export class Game {
       input.isForwardThrow = false;
       const item = this.localPlayerKart.holdingItem;
       item.use(this.localPlayerKart, this, throwDir);
+      this.playerMissionTracker?.onItemConsumed();
       if (this.p2p.roomId && (item.id === 'banana' || item.id === 'poop' || item.id === 'lightning')) {
         this.p2p.sendItemEvent({
           itemType: item.id,
@@ -922,6 +991,7 @@ export class Game {
       isBoosting: this.localPlayerKart.boostTimer > 0,
       boostTimer: this.localPlayerKart.boostTimer
     }, this.courseTrack.points);
+    this.hud.updateMission(this._buildMissionHudPayload());
 
     // 9. マルチプレイ位置送信（自機 + ホスト主導のCPU位置、約20Hz制限・例外保護）
     this.updateNetworkSync(dt);
@@ -965,13 +1035,26 @@ export class Game {
             rTime = totalTime + (idx + 1 - myRank) * 2200;
           }
         }
+        const tracker = this._trackerByPhysicsId.get(kart.id);
+        const missionSummary = (tracker && tracker.missionDef) ? {
+          name: tracker.missionDef.name,
+          stage: tracker.stage,
+          cumulativeProgress: tracker.cumulativeProgress,
+          thresholds: tracker.missionDef.thresholds,
+          unit: tracker.missionDef.unit,
+          rescueActive: tracker.rescueActive,
+          rescueKind: tracker.rescueKind,
+          skillStageUnlocked: tracker.appliedReward.skillStageUnlocked,
+          altRewardAccelBonus: tracker.appliedReward.altRewardAccelBonus
+        } : null;
+
         return {
           rank: idx + 1,
           name: name,
           isLocal: isLocal,
           colorHex: colorHex,
           totalTime: Math.max(8000, rTime),
-          inRacePerks: isLocal ? { ...this.inRacePerks } : { ...(kart.inRacePerks || {}) }
+          missionSummary
         };
       });
 
@@ -987,8 +1070,7 @@ export class Game {
           courseName: this.currentCourseConfig.name,
           racers: racersList,
           coinsEarned: this.playerCoins || 0,
-          bankCoins: SkillsManager.getBankCoins(),
-          inRacePerks: { ...this.inRacePerks }
+          bankCoins: SkillsManager.getBankCoins()
         }, {
           onHome: () => this.quitRace(),
           onChangeCourse: () => this.selectOtherCourse(),
@@ -1017,7 +1099,16 @@ export class Game {
         qw: this.localPlayerKart.mesh.quaternion.w,
         speed: this.localPlayerKart.speed,
         lap: this.localPlayerKart.currentLap,
-        progress: this.localPlayerKart.progress
+        progress: this.localPlayerKart.progress,
+        missionId: this.playerMissionTracker?.missionId || null,
+        missionStage: this.playerMissionTracker?.stage || 0,
+        missionProgress: this.playerMissionTracker?.cumulativeProgress || 0,
+        missionRescueActive: this.playerMissionTracker?.rescueActive || false,
+        missionRescueKind: this.playerMissionTracker?.rescueKind || null,
+        skillCooldown: this.playerSkillState?.cooldown || 0,
+        skillActiveTimer: this.playerSkillState?.activeTimer || 0,
+        skillActiveType: this.playerSkillState?.activeType || null,
+        specVersion: MISSION_SPEC_VERSION
       });
 
       if (this.p2p.isHost) {
@@ -1044,7 +1135,14 @@ export class Game {
               isFinished: !!p.physics.isFinished,
               finishTime: p.physics.finishTime || 0,
               coins: p.physics.coins || 0,
-              inRacePerks: p.physics.inRacePerks || {}
+              missionId: p.missionTracker?.missionId || null,
+              missionStage: p.missionTracker?.stage || 0,
+              missionProgress: p.missionTracker?.cumulativeProgress || 0,
+              missionRescueActive: p.missionTracker?.rescueActive || false,
+              missionRescueKind: p.missionTracker?.rescueKind || null,
+              skillCooldown: p.skillState?.cooldown || 0,
+              skillActiveTimer: p.skillState?.activeTimer || 0,
+              skillActiveType: p.skillState?.activeType || null
             });
           }
         });
@@ -1403,10 +1501,7 @@ export class Game {
         aiKart._lastLap = aiKart.physics.currentLap;
         aiKart.physics.coins = (aiKart.physics.coins || 0) + 2;
         aiKart.physics.coinBonusSpeed = Math.min(10, aiKart.physics.coins) * 0.35;
-        if (aiKart.physics.coins >= (aiKart.physics.nextPerkThreshold || 3)) {
-          aiKart.physics.nextPerkThreshold = (aiKart.physics.nextPerkThreshold || 3) + 3;
-          this.grantAIPerk(aiKart.physics);
-        }
+        // 周回ボーナスのコインは「コインライン」ミッションの進捗に含めない
       }
     }
   }
@@ -1467,13 +1562,12 @@ export class Game {
       coin.mesh.rotation.y += dt * coin.rotationSpeed;
       coin.mesh.position.y = coin.baseY + Math.sin(time + coin.mesh.position.x) * 0.18;
 
-      // コイン吸引（プレイヤーおよびマグネットスキル/パーク所持者）
+      // コイン吸引（マグネット・バリア発動中のレーサーのみ、プレイヤー・CPU共通）
       for (const kart of allKarts) {
         if (!kart || kart.isRespawning) continue;
-        const isPlayer = (kart === playerKart);
-        const magnetActive = isPlayer && this.skillActiveType === 'magnet_barrier' && this.skillActiveTimer > 0;
-        const extraMagnet = kart.perkMagnetRadius || 0;
-        const effectiveMagnetDist = (magnetActive ? 14.0 : 0) + extraMagnet;
+        const kartSkillState = this._skillStateByPhysicsId.get(kart.id);
+        const magnetActive = kartSkillState?.activeType === 'magnet_barrier' && kartSkillState?.activeTimer > 0;
+        const effectiveMagnetDist = magnetActive ? 14.0 : 0;
         if (effectiveMagnetDist > 0 && coin.active) {
           const distToKart = coin.pos.distanceTo(kart.mesh.position);
           if (distToKart < effectiveMagnetDist) {
@@ -1496,29 +1590,14 @@ export class Game {
             playerKart.coinBonusSpeed = Math.min(10, this.playerCoins) * 0.35;
             SkillsManager.addBankCoins(1);
             AudioManager.playSfx('coin');
-            this.hud?.updateCoins(this.playerCoins, this.nextPerkThreshold);
-            const tierProgress = 3 - Math.max(0, Math.min(3, this.nextPerkThreshold - this.playerCoins));
-            this.showItemNotification(`🪙 コイン獲得！ (${tierProgress}/3 - 3枚で強化スキル解禁！)`, 1200);
-
-            if (playerKart.perkLuckyCoin) {
-              playerKart.applyBoost(1.2, 0.6);
-            }
-
-            if (this.playerCoins >= (this.nextPerkThreshold || 3)) {
-              this.nextPerkThreshold = (this.nextPerkThreshold || 3) + 3;
-              this.grantPlayerPerk();
-            }
+            this.hud?.updateCoins(this.playerCoins);
+            this.showItemNotification(`🪙 コイン獲得！ (所持: ${this.playerCoins}枚)`, 1200);
+            this.playerMissionTracker?.onCoinCollected();
           } else {
             // CPUまたはホストシミュレーション配下の他プレイヤー
             kart.coins = (kart.coins || 0) + 1;
             kart.coinBonusSpeed = Math.min(10, kart.coins) * 0.35;
-            if (kart.perkLuckyCoin) {
-              kart.applyBoost(1.2, 0.6);
-            }
-            if (kart.coins >= (kart.nextPerkThreshold || 3)) {
-              kart.nextPerkThreshold = (kart.nextPerkThreshold || 3) + 3;
-              this.grantAIPerk(kart);
-            }
+            this._trackerByPhysicsId.get(kart.id)?.onCoinCollected();
           }
           break;
         }
@@ -1526,80 +1605,73 @@ export class Game {
     });
   }
 
-  grantAIPerk(kart) {
-    if (!kart || kart.isFinished) return;
-    const choices = InRacePerks.getRandomPerks(3);
-    if (!choices || choices.length === 0) return;
+  // --- ミッション形式スキルアップシステム: 物理層(physics.js)からgameState.missions経由で呼ばれるディスパッチャ ---
 
-    let personality = null;
-    let aiName = 'ライバル';
-    for (const [id, player] of this.otherPlayers.entries()) {
-      if (player.physics === kart) {
-        personality = player.personality;
-        aiName = player.name || aiName;
-        break;
+  _missionTickFor(physics, dt, inputState, gameState) {
+    const tracker = this._trackerByPhysicsId.get(physics.id);
+    if (!tracker) return;
+    const vehicleConfig = Vehicles.types[tracker.vehicleKey] || Vehicles.types.standard_red;
+    // プレイヤーは恒久解禁状態(SkillsManager)に従うが、Lv.5以上のCPUは固有スキル使用可能として扱う。
+    const isUnlocked = (physics === this.localPlayerKart)
+      ? SkillsManager.isSkillUnlocked(tracker.vehicleKey)
+      : true;
+    tracker.isSkillUnlocked = isUnlocked;
+    tracker.tick(physics, dt, inputState, gameState);
+
+    if (physics._justEnteredLap3) {
+      physics._justEnteredLap3 = false;
+      tracker.onLapEntered(3);
+      if (tracker._rescueCooldownCutPending) {
+        tracker._rescueCooldownCutPending = false;
+        const skillState = this._skillStateByPhysicsId.get(physics.id);
+        if (skillState && skillState.cooldown > 0) {
+          skillState.cooldown *= 0.7;
+        }
       }
     }
 
-    const preferred = personality?.preferredPerks || [];
-    let chosen = choices.find(c => preferred.includes(c.id));
-    if (!chosen) {
-      chosen = choices[Math.floor(Math.random() * choices.length)];
-    }
+    tracker.applyToPhysics(physics, vehicleConfig, isUnlocked);
 
-    chosen.apply(kart);
-    kart.inRacePerks = kart.inRacePerks || {};
-    kart.inRacePerks[chosen.id] = (kart.inRacePerks[chosen.id] || 0) + 1;
-
-    const now = performance.now();
-    if (!this._lastAiPerkNotifTime || now - this._lastAiPerkNotifTime > 2500) {
-      this._lastAiPerkNotifTime = now;
-      this.showItemNotification(`⚡ ${aiName} が「${chosen.name}」を獲得！`, 2000);
+    // 段階達成・救済の通知はプレイヤーのHUDにのみ表示する（走行を止めない短い通知）
+    if (physics === this.localPlayerKart && tracker.pendingNotifications.length > 0) {
+      tracker.pendingNotifications.forEach(note => this._showMissionNotification(tracker, note));
+      tracker.pendingNotifications.length = 0;
     }
   }
 
-  // コイン3枚ごとにローグライク強化パークを1つランダム抽選し、選択操作なしで即座に自動適用する。
-  // （以前はソロ=スローモーション+カード選択、マルチ=6秒タイマー選択だったが、
-  // マルチプレイでの選択操作のユーザビリティが悪いとのフィードバックを受けて、
-  // grantAIPerk()と同じ完全自動抽選方式に統一。毎レース開始時にinRacePerksはリセットされるため、
-  // 抽選も「マシン選択時の固定ビルド」ではなく毎レースその場で行われる。）
-  grantPlayerPerk() {
-    if (!this.isRunning || !this.localPlayerKart || this.activeResultModal) return;
-    const choices = InRacePerks.getRandomPerks(3);
-    if (!choices || choices.length === 0) return;
-    const chosen = choices[Math.floor(Math.random() * choices.length)];
-
-    this.inRacePerks = this.inRacePerks || {};
-    this.inRacePerks[chosen.id] = (this.inRacePerks[chosen.id] || 0) + 1;
-    chosen.apply(this.localPlayerKart);
-
-    this.hud?.updateActivePerks(this.inRacePerks);
-    this.hud?.showPerkReveal(chosen, this.inRacePerks[chosen.id]);
-    this.playPerkSelectSfx();
-    this.showItemNotification(`✨ 強化解禁: 【${chosen.name}】Lv.${this.inRacePerks[chosen.id]}!`, 2500);
+  _showMissionNotification(tracker, note) {
+    if (note.kind === 'stage') {
+      const stageLabel = note.stage === 1 ? '初級' : note.stage === 2 ? '中級' : '最終';
+      let description = tracker.missionDef?.name || '';
+      if (note.stage >= 2) {
+        description += tracker.isSkillUnlocked ? ' ／ 固有スキルに追加効果が解放！' : ' ／ 加速度に追加ボーナス！';
+      }
+      this.hud?.showMissionReveal({ kind: 'stage', icon: '🎯', title: `ミッション${stageLabel}達成！`, description });
+    } else if (note.kind === 'rescue') {
+      const description = note.rescueKind === 'unlocked' ? '固有スキルのクールダウンを短縮！' : '加速度・最高速度を強化！';
+      this.hud?.showMissionReveal({ kind: 'rescue', icon: '🆘', title: '未達成救済発動！', description });
+    }
   }
 
-  playPerkSelectSfx() {
-    try {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtx) return;
-      if (!this._audioCtx) this._audioCtx = new AudioCtx();
-      if (this._audioCtx.state === 'suspended') this._audioCtx.resume();
-      const now = this._audioCtx.currentTime;
-      const osc = this._audioCtx.createOscillator();
-      const gain = this._audioCtx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(523.25, now);
-      osc.frequency.setValueAtTime(659.25, now + 0.08);
-      osc.frequency.setValueAtTime(783.99, now + 0.16);
-      osc.frequency.setValueAtTime(1046.50, now + 0.24);
-      gain.gain.setValueAtTime(0.2, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
-      osc.connect(gain);
-      gain.connect(this._audioCtx.destination);
-      osc.start(now);
-      osc.stop(now + 0.6);
-    } catch {}
+  _buildMissionHudPayload() {
+    const tracker = this.playerMissionTracker;
+    if (!tracker || !tracker.missionDef) return null;
+    return {
+      missionId: tracker.missionId,
+      name: tracker.missionDef.name,
+      thresholds: tracker.missionDef.thresholds,
+      unit: tracker.missionDef.unit,
+      stage: tracker.stage,
+      cumulativeProgress: tracker.cumulativeProgress
+    };
+  }
+
+  _missionReportHitLanded(attackerId, targetId) {
+    this._trackerByPhysicsId.get(attackerId)?.onHitLanded();
+  }
+
+  _missionReportTurboSuccess(racerId, level) {
+    this._trackerByPhysicsId.get(racerId)?.onTurboSuccess(level);
   }
 
   triggerPlayerSkill() {
@@ -1614,33 +1686,20 @@ export class Game {
       return;
     }
 
-    if (this.skillCooldown > 0) {
-      this.showItemNotification(`⏳ クールダウン中 (あと ${Math.ceil(this.skillCooldown)}秒)`, 1000);
+    if (!this.playerSkillState || this.playerSkillState.cooldown > 0) {
+      this.showItemNotification(`⏳ クールダウン中 (あと ${Math.ceil(this.playerSkillState?.cooldown || 0)}秒)`, 1000);
       return;
     }
 
     const kart = this.localPlayerKart;
-    const cdReduction = kart.perkCooldownReduction || 0;
-    this.skillCooldown = (skill.cooldown || 15.0) * Math.max(0.3, 1.0 - cdReduction);
-    this.skillActiveTimer = skill.duration || 3.0;
-    this.skillActiveType = skill.id;
+    activateSkill(kart, this.playerSkillState, skill, this.playerMissionTracker);
     this.playSkillSfx(skill.id);
 
     if (skill.id === 'rocket_charge') {
-      kart.speed = Math.max(kart.speed * 1.5, kart.maxSpeed * 1.6);
-      kart.boostTimer = 3.0;
-      kart.boostMultiplier = 1.6;
       this.showItemNotification(`🚀 ロケット・チャージ発動！ 爆発ダッシュ！`, 2500);
     } else if (skill.id === 'sky_glider') {
-      kart.isAirborne = true;
-      kart.isGliding = true;
-      kart.velocityY = 18.0;
-      kart.speed = Math.max(kart.speed, kart.maxSpeed * 1.25);
-      const gMesh = kart.mesh.userData?.gliderMesh;
-      if (gMesh) gMesh.visible = true;
       this.showItemNotification(`🪂 スカイ・グライダー展開！ 空中滑空！`, 2500);
     } else if (skill.id === 'magnet_barrier') {
-      kart.hasShield = true;
       if (!this.shieldMesh) {
         const shieldGeo = new THREE.SphereGeometry(2.4, 16, 16);
         const shieldMat = new THREE.MeshBasicMaterial({
@@ -1655,57 +1714,57 @@ export class Game {
       this.shieldMesh.visible = true;
       this.showItemNotification(`🧲 マグネット・バリア展開！ コイン吸引＆シールド！`, 2500);
     } else if (skill.id === 'giga_stampede') {
-      kart.invincibleTimer = 4.5;
-      kart.isGigaStampede = true;
-      kart.speed = Math.max(kart.speed * 1.25, kart.maxSpeed * 1.35);
-      kart.mesh.scale.set(1.45, 1.45, 1.45);
       this.showItemNotification(`⚡ ギガ・スタンピード発動！ 巨大化＆無敵突進！`, 2500);
     }
   }
 
   updateSkill(dt) {
-    if (this.skillCooldown > 0) {
-      this.skillCooldown = Math.max(0, this.skillCooldown - dt);
+    if (!this.localPlayerKart) return;
+
+    if (this.playerSkillState) {
+      this._tickSkillForRacer(this.localPlayerKart, this.playerSkillState, dt);
     }
-
-    if (this.skillActiveTimer > 0) {
-      this.skillActiveTimer -= dt;
-
-      if (this.skillActiveType === 'giga_stampede' && this.localPlayerKart) {
-        const allRivals = Array.from(this.otherPlayers.values()).map(p => p.physics);
-        allRivals.forEach(rival => {
-          if (!rival || rival.isRespawning) return;
-          if (this.localPlayerKart.mesh.position.distanceTo(rival.mesh.position) < 4.0) {
-            rival.spinOut?.();
-          }
-        });
+    // Lv.5以上のCPUも同じ固有スキル効果処理を使用する（走行中かつ再使用可能ならcpu_driver.jsが自動発動する）
+    this.otherPlayers.forEach(p => {
+      if (p.skillState && p.physics) {
+        this._tickSkillForRacer(p.physics, p.skillState, dt);
       }
-
-      if (this.skillActiveType === 'magnet_barrier' && this.shieldMesh) {
-        this.shieldMesh.rotation.y += dt * 3.0;
-        if (!this.localPlayerKart?.hasShield) {
-          this.shieldMesh.visible = false;
-        }
-      }
-
-      if (this.skillActiveTimer <= 0) {
-        if (this.skillActiveType === 'giga_stampede' && this.localPlayerKart) {
-          this.localPlayerKart.mesh.scale.set(1.0, 1.0, 1.0);
-          this.localPlayerKart.isGigaStampede = false;
-        }
-        if (this.skillActiveType === 'magnet_barrier') {
-          if (this.shieldMesh) this.shieldMesh.visible = false;
-          if (this.localPlayerKart) this.localPlayerKart.hasShield = false;
-        }
-        this.skillActiveType = null;
-      }
-    }
+    });
 
     const vKey = this.currentGameConfig?.vehicleKey || this.localPlayerKart?.config?.id || 'standard_red';
     const vehicle = Vehicles.types[vKey];
     const maxCd = vehicle?.skill?.cooldown || 15.0;
-    const isActive = this.skillActiveTimer > 0;
-    this.hud?.updateSkill(this.skillCooldown, maxCd, isActive);
+    const isActive = !!this.playerSkillState && this.playerSkillState.activeTimer > 0;
+    this.hud?.updateSkill(this.playerSkillState ? this.playerSkillState.cooldown : 0, maxCd, isActive);
+  }
+
+  // 固有スキルの毎フレーム更新（プレイヤー・CPU共通）。マグネット・バリアの可視シールドはプレイヤー専用の演出。
+  _tickSkillForRacer(kart, skillState, dt) {
+    if (skillState.activeTimer > 0) {
+      if (skillState.activeType === 'giga_stampede') {
+        const allOthers = [this.localPlayerKart, ...Array.from(this.otherPlayers.values()).map(p => p.physics)]
+          .filter(k => k && k !== kart);
+        allOthers.forEach(rival => {
+          if (!rival || rival.isRespawning) return;
+          if (kart.mesh.position.distanceTo(rival.mesh.position) < 4.0) {
+            rival.spinOut?.(this, kart.id);
+          }
+        });
+      }
+
+      if (skillState.activeType === 'magnet_barrier' && kart === this.localPlayerKart && this.shieldMesh) {
+        this.shieldMesh.rotation.y += dt * 3.0;
+        if (!kart.hasShield) {
+          this.shieldMesh.visible = false;
+        }
+      }
+    }
+
+    const typeBeforeTick = skillState.activeType;
+    tickSkill(kart, skillState, dt);
+    if (typeBeforeTick === 'magnet_barrier' && skillState.activeType === null && kart === this.localPlayerKart && this.shieldMesh) {
+      this.shieldMesh.visible = false;
+    }
   }
 
   updateWorldItems(dt) {

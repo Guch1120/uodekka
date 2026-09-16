@@ -6,6 +6,25 @@ import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 
 export const NUM_TRACK_BINS = 120;
 
+// 蓄積ラップ数からCPU習熟レベル (Lv.1〜Lv.10) を算出する純関数。
+// CourseKnowledgeBaseインスタンスを持たない箇所（例: レース開始前のロビー）からも参照できるよう独立させている。
+export function computeLearningLevel(totalLapsLearned) {
+  return Math.min(10, Math.floor((totalLapsLearned || 0) / 2) + 1);
+}
+
+// 保存済みのコース別CPU学習データからレベルだけを読み取る（レース開始前のロビーなど、
+// curveを持たずCourseKnowledgeBaseを構築できない箇所から使用する）。
+export function readStoredLearningLevel(courseId) {
+  try {
+    const raw = localStorage.getItem(`kart_ai_knowledge_${courseId}`);
+    if (!raw) return 1;
+    const parsed = JSON.parse(raw);
+    return computeLearningLevel(parsed?.totalLapsLearned);
+  } catch {
+    return 1;
+  }
+}
+
 export class CourseKnowledgeBase {
   constructor(courseId, curve, trackWidth = 24) {
     this.courseId = courseId;
@@ -61,9 +80,7 @@ export class CourseKnowledgeBase {
   }
 
   get learningLevel() {
-    // 蓄積ラップ数に応じたAI習熟レベル (Lv.1 〜 Lv.10)
-    const laps = this.profile.totalLapsLearned || 0;
-    return Math.min(10, Math.floor(laps / 2) + 1);
+    return computeLearningLevel(this.profile.totalLapsLearned);
   }
 
   // 初回や学習データ未成熟時用の幾何学的アウト・イン・アウト基準線

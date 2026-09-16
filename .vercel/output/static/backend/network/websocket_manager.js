@@ -1,6 +1,7 @@
 import { normalizeRoomId } from './room_id.js';
+import { MISSION_SPEC_VERSION } from '../missions/mission_definitions.js';
 
-const VEHICLES = new Set(['standard_red', 'speed_blue', 'handling_green']);
+const VEHICLES = new Set(['standard_red', 'speed_blue', 'handling_green', 'heavy_yellow']);
 const COURSES = new Set(['course1', 'course2', 'course3', 'course4', 'course5', 'course6', 'course7']);
 const profile = data => ({ name: String(data?.name || 'プレイヤー').trim().slice(0, 20) || 'プレイヤー', vehicleKey: VEHICLES.has(data?.vehicleKey) ? data.vehicleKey : 'standard_red' });
 
@@ -33,7 +34,7 @@ export class WebSocketManager {
     const id = normalizeRoomId(roomId);
     this.leaveRoom(); this.startedAt = Date.now(); this.connectionAttempt++; this.report('connecting', 'ゲームサーバーへ接続しています…');
     const endpoint = new URL(this.url, location.href); endpoint.searchParams.set('room', id);
-    await this.connect(endpoint.toString()); this.pendingRoom = { type, roomId: id, ...profile(data) }; this.report('signaling', 'ルームを確認しています…');
+    await this.connect(endpoint.toString()); this.pendingRoom = { type, roomId: id, ...profile(data), specVersion: MISSION_SPEC_VERSION }; this.report('signaling', 'ルームを確認しています…');
     return new Promise((resolve, reject) => {
       this.pendingResolve = resolve; this.pendingReject = reject;
       this.roomTimer = setTimeout(() => { this.pendingReject = null; reject(Object.assign(new Error('ルームへの参加がタイムアウトしました。'), { retryable: true })); this.leaveRoom(); }, this.timeouts.connecting);
@@ -50,7 +51,13 @@ export class WebSocketManager {
       if (this.pendingResolve) { const done = this.pendingResolve; this.pendingResolve = null; this.report('connected', 'ルームに接続しました。'); done(this.roomId); }
       return;
     }
-    if (data.type === 'START_RACE') { this.phase = 'starting'; this.onGameStart?.(data); return; }
+    if (data.type === 'START_RACE') {
+      if (data.specVersion !== MISSION_SPEC_VERSION) {
+        this.onConnectionError?.('ミッション仕様のバージョンが一致しないため開始できません。全員でページを再読み込みしてください。');
+        return;
+      }
+      this.phase = 'starting'; this.onGameStart?.(data); return;
+    }
     if (data.type === 'KART_STATE' && data.state && data.senderId !== this.myPeerId) this.onPeerStateReceived?.(data.senderId, data.state);
     if (data.type === 'CPU_STATES' && Array.isArray(data.states) && !this.isHost) this.onCpuStatesReceived?.(data.states);
     if (data.type === 'ITEM_USE' && data.senderId !== this.myPeerId) this.onItemEvent?.(data);
@@ -76,7 +83,7 @@ export class WebSocketManager {
     this.send({ type: 'UPDATE_PROFILE', ...p });
   }
   selectCourse(courseId) { if (!this.isHost || !COURSES.has(courseId)) return false; this.courseId = courseId; this.send({ type: 'SELECT_COURSE', courseId }); return true; }
-  broadcastStartRace(aiRacers = []) { if (!this.isHost || !this.courseId || this.phase !== 'lobby') return false; this.phase = 'starting'; this.send({ type: 'START_RACE', courseId: this.courseId, aiRacers }); return true; }
+  broadcastStartRace(aiRacers = [], missionAssignments = {}, cpuLevel = 1) { if (!this.isHost || !this.courseId || this.phase !== 'lobby') return false; this.phase = 'starting'; this.send({ type: 'START_RACE', courseId: this.courseId, aiRacers, missionAssignments, cpuLevel, specVersion: MISSION_SPEC_VERSION }); return true; }
   sendKartState(state) {
     if (!this.roomId || this.socket?.readyState !== WebSocket.OPEN) return;
     if (this.socket.bufferedAmount > 32768) {

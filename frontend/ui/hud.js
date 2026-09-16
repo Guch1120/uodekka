@@ -1,7 +1,6 @@
 // frontend/ui/hud.js
 // レース中のHUD（順位、ラップ、速度メーター、アイテムスロット、ミニマップ、復帰カウントダウン、逆走警告）
 import { Icons } from '../icons/icons.js';
-import { InRacePerks } from '../vehicles/vehicles.js';
 
 export class HUD {
   constructor(container) {
@@ -38,13 +37,18 @@ export class HUD {
           <div class="hud-badge coin-badge">
             <span class="coin-icon">🪙</span>
             <span id="hud-coin-count">0</span>
-            <!-- 次の強化スキル解禁までの進捗ピップ（初見でもコイン=強化解禁と気づけるように） -->
-            <span class="coin-perk-pips" id="hud-coin-pips" title="3枚集めるごとに強化スキルを自動解禁！">
-              <span class="coin-pip"></span><span class="coin-pip"></span><span class="coin-pip"></span>
+          </div>
+        </div>
+        <!-- 抽選されたミッション・現在の段階・進捗・次の報酬 -->
+        <div class="hud-mission-tracker hidden" id="hud-mission-tracker">
+          <div class="hud-mission-head">
+            <span class="hud-mission-name" id="hud-mission-name"></span>
+            <span class="hud-mission-stage-pips" id="hud-mission-stage-pips">
+              <span class="mission-pip"></span><span class="mission-pip"></span><span class="mission-pip"></span>
             </span>
           </div>
-          <!-- 獲得したレース内強化スキル一覧トレイ -->
-          <div class="hud-perks-tray" id="hud-perks-tray"></div>
+          <div class="hud-mission-progress-bar"><div class="hud-mission-progress-fill" id="hud-mission-progress-fill"></div></div>
+          <span class="hud-mission-next" id="hud-mission-next"></span>
         </div>
         <!-- 拡大された大型ミニマップ -->
         <div class="hud-minimap-wrapper">
@@ -111,14 +115,14 @@ export class HUD {
         </div>
       </div>
 
-      <!-- レース内ローグライクスキル自動解禁の演出（選択操作なし・自動で消える） -->
-      <div id="hud-perk-modal" class="hud-perk-modal hidden" aria-live="polite">
-        <div class="perk-modal-card">
-          <div class="perk-modal-header">
-            <span class="perk-modal-kicker">LEVEL UP!</span>
-            <h2 id="perk-modal-title" class="perk-modal-title">強化スキル解禁！</h2>
+      <!-- ミッション段階達成・追加機能解放・救済の演出（走行を止めない・選択操作なし・自動で消える） -->
+      <div id="hud-mission-reveal" class="hud-mission-reveal hidden" aria-live="polite">
+        <div class="mission-reveal-card" id="mission-reveal-card">
+          <div class="mission-reveal-header">
+            <span class="mission-reveal-kicker" id="mission-reveal-kicker">MISSION</span>
+            <h2 id="mission-reveal-title" class="mission-reveal-title"></h2>
           </div>
-          <div class="perk-cards-grid single" id="perk-cards-grid"></div>
+          <div class="mission-reveal-body" id="mission-reveal-body"></div>
         </div>
       </div>
     `;
@@ -126,13 +130,21 @@ export class HUD {
     this.container.appendChild(hudDiv);
     this.element = hudDiv;
 
-    this.perksTrayEl = hudDiv.querySelector('#hud-perks-tray');
-    this.perkModalEl = hudDiv.querySelector('#hud-perk-modal');
-    this.perkCardsGridEl = this.perkModalEl?.querySelector('#perk-cards-grid');
-    if (this.perkModalEl) {
-      this.container.appendChild(this.perkModalEl);
+    this.missionTrackerEl = hudDiv.querySelector('#hud-mission-tracker');
+    this.missionNameEl = hudDiv.querySelector('#hud-mission-name');
+    this.missionPipEls = Array.from(hudDiv.querySelectorAll('#hud-mission-stage-pips .mission-pip'));
+    this.missionProgressFillEl = hudDiv.querySelector('#hud-mission-progress-fill');
+    this.missionNextEl = hudDiv.querySelector('#hud-mission-next');
+
+    this.missionRevealEl = hudDiv.querySelector('#hud-mission-reveal');
+    this.missionRevealCardEl = hudDiv.querySelector('#mission-reveal-card');
+    this.missionRevealKickerEl = hudDiv.querySelector('#mission-reveal-kicker');
+    this.missionRevealTitleEl = hudDiv.querySelector('#mission-reveal-title');
+    this.missionRevealBodyEl = hudDiv.querySelector('#mission-reveal-body');
+    if (this.missionRevealEl) {
+      this.container.appendChild(this.missionRevealEl);
     }
-    this._perkRevealTimer = null;
+    this._missionRevealTimer = null;
 
     this.itemSlotEl = hudDiv.querySelector('#hud-item-slot');
     this.itemIconEl = hudDiv.querySelector('#hud-item-icon');
@@ -145,7 +157,6 @@ export class HUD {
     this.wrongWayEl = hudDiv.querySelector('#hud-wrong-way');
 
     this.coinCountEl = hudDiv.querySelector('#hud-coin-count');
-    this.coinPipEls = Array.from(hudDiv.querySelectorAll('#hud-coin-pips .coin-pip'));
     this.skillBtnEl = hudDiv.querySelector('#btn-hud-skill');
     this.skillIconEl = hudDiv.querySelector('#hud-skill-icon');
     this.skillNameEl = hudDiv.querySelector('#hud-skill-name');
@@ -443,16 +454,42 @@ export class HUD {
     });
   }
 
-  updateCoins(count, nextThreshold = 3) {
+  updateCoins(count) {
     if (this.coinCountEl) {
       this.coinCountEl.textContent = String(count || 0);
       this._restartAnimation(this.coinCountEl.parentElement, 'coin-pop');
     }
-    if (this.coinPipEls && this.coinPipEls.length) {
-      const remaining = Math.max(0, Math.min(3, nextThreshold - (count || 0)));
-      const filled = 3 - remaining;
-      this.coinPipEls.forEach((pip, i) => pip.classList.toggle('filled', i < filled));
+  }
+
+  // 抽選ミッションの現在段階・進捗・次の報酬を表示する
+  updateMission(missionState) {
+    if (!this.missionTrackerEl) return;
+    if (!missionState || !missionState.missionId) {
+      this.missionTrackerEl.classList.add('hidden');
+      return;
     }
+    this.missionTrackerEl.classList.remove('hidden');
+    if (this.missionNameEl) this.missionNameEl.textContent = missionState.name || '';
+
+    const stage = missionState.stage || 0;
+    this.missionPipEls.forEach((pip, i) => pip.classList.toggle('filled', i < stage));
+
+    const thresholds = missionState.thresholds || [];
+    const progress = missionState.cumulativeProgress || 0;
+    let fillPct = 100;
+    let nextText = '🏆 最終段階まで達成済み！';
+    if (stage < 3) {
+      const prev = stage === 0 ? 0 : thresholds[stage - 1];
+      const next = thresholds[stage];
+      const span = next - prev;
+      const ratio = span > 0 ? Math.max(0, Math.min(1, (progress - prev) / span)) : 0;
+      fillPct = Math.round(ratio * 100);
+      const remaining = Math.max(0, next - progress);
+      const unitLabel = missionState.unit === 'seconds' ? '秒' : missionState.unit === 'points' ? '点' : '枚';
+      nextText = `次の段階まであと ${remaining.toFixed(1)}${unitLabel}`;
+    }
+    if (this.missionProgressFillEl) this.missionProgressFillEl.style.width = `${fillPct}%`;
+    if (this.missionNextEl) this.missionNextEl.textContent = nextText;
   }
 
   setupSkill(skillInfo, isUnlocked) {
@@ -497,45 +534,36 @@ export class HUD {
     }
   }
 
-  updateActivePerks(perksMap) {
-    if (!this.perksTrayEl) return;
-    if (!perksMap || Object.keys(perksMap).length === 0) {
-      this.perksTrayEl.innerHTML = '';
-      return;
+  // 段階達成・追加機能解放・救済を、走行を止めない短い通知として1件だけ表示する（操作不要、約1.8秒で自動的に消える）。
+  // payload: { kind: 'stage'|'rescue', icon, title, description }
+  showMissionReveal(payload) {
+    if (!this.missionRevealEl || !this.missionRevealBodyEl || !payload) return;
+    clearTimeout(this._missionRevealTimer);
+
+    const kind = payload.kind || 'stage';
+    if (this.missionRevealCardEl) {
+      this.missionRevealCardEl.className = `mission-reveal-card kind-${kind}`;
     }
-    const html = Object.entries(perksMap).map(([id, count]) => {
-      const def = InRacePerks.definitions[id];
-      if (!def) return '';
-      return `<span class="hud-perk-badge rarity-${def.rarity}" title="${def.name} Lv.${count} (${def.description})">${def.icon}<small>${count}</small></span>`;
-    }).join('');
-    this.perksTrayEl.innerHTML = html;
-  }
-
-  // コイン閾値到達で自動抽選された強化パークを1枚だけ一時的に表示する（操作不要、約1.8秒で自動的に消える）。
-  showPerkReveal(perk, level = 1) {
-    if (!this.perkModalEl || !this.perkCardsGridEl || !perk) return;
-    clearTimeout(this._perkRevealTimer);
-
-    this.perkCardsGridEl.innerHTML = `
-      <div class="perk-card rarity-${perk.rarity}">
-        <div class="perk-card-top">
-          <span class="perk-rarity-badge">${perk.rarity.toUpperCase()}</span>
-        </div>
-        <div class="perk-icon">${perk.icon}</div>
-        <h3 class="perk-name">${perk.name}${level > 1 ? ` Lv.${level}` : ''}</h3>
-        <p class="perk-desc">${perk.description}</p>
-      </div>
+    if (this.missionRevealKickerEl) {
+      this.missionRevealKickerEl.textContent = kind === 'rescue' ? 'RESCUE!' : 'MISSION';
+    }
+    if (this.missionRevealTitleEl) {
+      this.missionRevealTitleEl.textContent = payload.title || '';
+    }
+    this.missionRevealBodyEl.innerHTML = `
+      <div class="mission-reveal-icon">${payload.icon || '🎯'}</div>
+      <p class="mission-reveal-desc">${payload.description || ''}</p>
     `;
 
-    this.perkModalEl.classList.remove('hidden');
-    this._perkRevealTimer = setTimeout(() => this.hidePerkReveal(), 1800);
+    this.missionRevealEl.classList.remove('hidden');
+    this._missionRevealTimer = setTimeout(() => this.hideMissionReveal(), 1800);
   }
 
-  hidePerkReveal() {
-    clearTimeout(this._perkRevealTimer);
-    this._perkRevealTimer = null;
-    if (this.perkModalEl) {
-      this.perkModalEl.classList.add('hidden');
+  hideMissionReveal() {
+    clearTimeout(this._missionRevealTimer);
+    this._missionRevealTimer = null;
+    if (this.missionRevealEl) {
+      this.missionRevealEl.classList.add('hidden');
     }
   }
 
@@ -546,7 +574,7 @@ export class HUD {
   }
 
   hide() {
-    this.hidePerkReveal();
+    this.hideMissionReveal();
     if (this.element) {
       this.element.classList.add('hidden');
     }

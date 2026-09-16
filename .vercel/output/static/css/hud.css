@@ -238,29 +238,6 @@
   100% { transform: scale(1); }
 }
 
-/* 次の強化スキル解禁までの進捗ピップ（コイン3枚=1解禁、の関係を初見でも分かるように） */
-.coin-perk-pips {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  margin-left: 2px;
-}
-
-.coin-pip {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: rgba(254, 240, 138, 0.25);
-  border: 1px solid rgba(254, 240, 138, 0.5);
-  transition: background-color 0.2s ease, transform 0.2s ease;
-}
-
-.coin-pip.filled {
-  background: #fbbf24;
-  box-shadow: 0 0 6px rgba(251, 191, 36, 0.8);
-  transform: scale(1.15);
-}
-
 .hud-skill-btn {
   display: flex;
   align-items: center;

@@ -1,6 +1,8 @@
+import { MISSION_SPEC_VERSION } from '../backend/missions/mission_definitions.js';
+
 const MAX_PLAYERS = 12;
 const ROOM_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const VEHICLES = new Set(['standard_red', 'speed_blue', 'handling_green']);
+const VEHICLES = new Set(['standard_red', 'speed_blue', 'handling_green', 'heavy_yellow']);
 const COURSES = new Set(['course1', 'course2', 'course3', 'course4', 'course5', 'course6', 'course7']);
 
 const json = (socket, value) => { try { socket.send(JSON.stringify(value)); } catch { /* Closed sockets are removed by webSocketClose. */ } };
@@ -39,7 +41,8 @@ export class Room {
       if (room.phase !== 'lobby') return json(socket, { type: 'ROOM_ERROR', code: 'race-started', message: 'レースはすでに開始しています。' });
       if (room.members.length >= MAX_PLAYERS) return json(socket, { type: 'ROOM_ERROR', code: 'room-full', message: 'ルームは満員です（最大12人）。' });
       const memberId = message.type === 'CREATE_ROOM' ? room.hostId : crypto.randomUUID();
-      room.members.push({ id: memberId, ...profile(message) });
+      const specVersion = Number.isFinite(message?.specVersion) ? message.specVersion : 0;
+      room.members.push({ id: memberId, ...profile(message), specVersion });
       socket.serializeAttachment({ memberId });
       await this.ctx.storage.put('room', room);
       json(socket, { type: 'WELCOME', id: memberId, isHost: memberId === room.hostId });
@@ -61,9 +64,13 @@ export class Room {
     }
     if (message.type === 'START_RACE') {
       if (member.id !== room.hostId || room.phase !== 'lobby' || !room.courseId) return;
+      const versions = new Set(room.members.map(m => m.specVersion ?? 0));
+      if (versions.size > 1) return json(socket, { type: 'ROOM_ERROR', code: 'spec-mismatch', message: 'メンバー間でゲームのバージョンが一致していません。全員でページを再読み込みしてください。' });
       room.phase = 'starting'; await this.ctx.storage.put('room', room); await this.publish();
       const aiRacers = Array.isArray(message.aiRacers) ? message.aiRacers : [];
-      return this.broadcast({ type: 'START_RACE', courseId: room.courseId, delayMs: 2200, aiRacers });
+      const missionAssignments = (message.missionAssignments && typeof message.missionAssignments === 'object' && !Array.isArray(message.missionAssignments)) ? message.missionAssignments : {};
+      const cpuLevel = Number.isFinite(message.cpuLevel) ? Math.max(1, Math.min(10, Math.floor(message.cpuLevel))) : 1;
+      return this.broadcast({ type: 'START_RACE', courseId: room.courseId, delayMs: 2200, aiRacers, missionAssignments, cpuLevel, specVersion: member.specVersion ?? MISSION_SPEC_VERSION });
     }
     if (message.type === 'KART_STATE' || message.type === 'ITEM_USE') return this.broadcast({ ...message, senderId: member.id }, socket);
     if (message.type === 'CPU_STATES') {

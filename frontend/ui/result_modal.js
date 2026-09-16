@@ -1,6 +1,5 @@
 // frontend/ui/result_modal.js
 // レース終了リザルト画面（順位、ラップタイム、トータルタイム、3つのアクション選択）
-import { InRacePerks } from '../vehicles/vehicles.js';
 
 export class ResultModal {
   static formatTime(ms) {
@@ -60,37 +59,54 @@ export class ResultModal {
 
     // 全員（12名）の順位リスト
     const racers = this.data.racers || [];
+    const missionPipsHtml = (missionSummary) => {
+      if (!missionSummary) return '';
+      const pips = [0, 1, 2].map(i => `<span class="mission-pip ${i < missionSummary.stage ? 'filled' : ''}"></span>`).join('');
+      return `<span class="standing-mission-pips" title="${missionSummary.name}: ${missionSummary.stage}/3段階達成">${pips}</span>`;
+    };
     const racersHtml = racers.slice(0, 12).map((r, i) => {
       const isLocal = r.isLocal;
-      const perks = r.inRacePerks || {};
-      const perkIcons = Object.entries(perks).map(([id, count]) => {
-        const def = InRacePerks.definitions[id];
-        return def ? `<span class="racer-perk-badge" title="${def.name} Lv.${count}">${def.icon}${count > 1 ? `<small>${count}</small>` : ''}</span>` : '';
-      }).join('');
       return `
         <li class="result-standing-item ${isLocal ? 'current-player' : ''}">
           <span class="standing-rank">${i + 1}</span>
           <span class="standing-dot" style="background-color: ${r.colorHex || '#e74c3c'}"></span>
-          <span class="standing-name">${r.name || 'CPU'}${perkIcons ? `<span class="standing-perks">${perkIcons}</span>` : ''}</span>
+          <span class="standing-name">${r.name || 'CPU'}</span>
+          ${missionPipsHtml(r.missionSummary)}
           <span class="standing-time">${r.totalTime ? ResultModal.formatTime(r.totalTime) : (isLocal ? totalTimeStr : 'FINISH')}</span>
         </li>
       `;
     }).join('');
 
-    const perks = this.data.inRacePerks || {};
-    const perkEntries = Object.entries(perks);
-    const perksHtml = perkEntries.length > 0 ? `
-      <div class="result-perks-summary">
-        <span class="perks-summary-title">⚡ 獲得強化スキル:</span>
-        <div class="result-perks-chips">
-          ${perkEntries.map(([id, count]) => {
-            const def = InRacePerks.definitions[id];
-            if (!def) return '';
-            return `<span class="result-perk-chip" title="${def.description}">${def.icon} ${def.name} <small>Lv.${count}</small></span>`;
-          }).join('')}
+    // ミッション達成サマリー（自分のみ）
+    const myMission = racers.find(r => r.isLocal)?.missionSummary;
+    let missionSummaryHtml = '';
+    if (myMission) {
+      const pips = [0, 1, 2].map(i => `<span class="mission-pip ${i < myMission.stage ? 'filled' : ''}"></span>`).join('');
+      const unitLabel = myMission.unit === 'seconds' ? '秒' : myMission.unit === 'points' ? '点' : '枚';
+      const progressText = `${myMission.cumulativeProgress.toFixed(1)}${unitLabel}（最終目標 ${myMission.thresholds[2]}${unitLabel}）`;
+      const effectsParts = [];
+      if (myMission.skillStageUnlocked >= 2) effectsParts.push('固有スキル追加効果 解放');
+      if (myMission.altRewardAccelBonus > 0) effectsParts.push(`加速度＋${Math.round(myMission.altRewardAccelBonus * 100)}%`);
+      const effectsText = effectsParts.length > 0 ? effectsParts.join('・') : 'なし';
+      const rescueHtml = myMission.rescueActive
+        ? `<span class="mission-summary-rescue-badge">🆘 救済発動</span>`
+        : '';
+
+      missionSummaryHtml = `
+        <div class="result-mission-summary">
+          <span class="mission-summary-title">🎯 ミッション: ${myMission.name}</span>
+          <div class="mission-summary-body">
+            <div class="mission-summary-row">
+              <span class="mission-summary-stage-pips">${pips}</span>
+              <span>達成数 ${myMission.stage}/3</span>
+              ${rescueHtml}
+            </div>
+            <div class="mission-summary-row">最終進捗: ${progressText}</div>
+            <div class="mission-summary-row">獲得効果: ${effectsText}</div>
+          </div>
         </div>
-      </div>
-    ` : '';
+      `;
+    }
 
     const rankBadgeClass = rank === 1 ? 'rank-gold' : (rank === 2 ? 'rank-silver' : (rank === 3 ? 'rank-bronze' : 'rank-other'));
 
@@ -125,7 +141,7 @@ export class ResultModal {
               <span class="coin-gain-text">🪙 今回獲得コイン: <strong>+${this.data.coinsEarned || 0}</strong> 枚</span>
               <span class="coin-bank-text">（累計所持: 🪙 <strong>${this.data.bankCoins || 0}</strong> 枚）</span>
             </div>
-            ${perksHtml}
+            ${missionSummaryHtml}
           </div>
 
           <div class="result-standings-panel">

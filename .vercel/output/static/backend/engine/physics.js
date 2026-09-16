@@ -70,10 +70,21 @@ export class KartPhysics {
     this.holdingItem = null;
     this.trailingItemMesh = null;
 
-    // コイン & レース内ローグライクスキル
+    // コイン
     this.coins = 0;
-    this.inRacePerks = {};
-    this.nextPerkThreshold = 3;
+
+    // ミッション形式スキルアップシステムによる倍率（MissionTracker.applyToPhysicsが毎ティック再計算）
+    this.missionAccelMult = 1.0;
+    this.missionTopSpeedMult = 1.0;
+    this.missionDriftDurationMult = 1.0;
+    this.missionSkillCooldownMult = 1.0;
+    this._justEnteredLap3 = false;
+
+    // 固有スキルの2段階/3段階追加効果（次回発動時にunique_skills.jsが予約し、着地/バリア成立時にここで消費する）
+    this._pendingLandingBoost = null;
+    this._pendingBarrierAugment = null;
+    this._pendingRocketAugment = null;
+    this._pendingGigaAugment = null;
 
     this.position = this.mesh.position;
     this.rotation = this.mesh.quaternion;
@@ -241,11 +252,11 @@ export class KartPhysics {
     const smallSpeedFactor = this.isSmall ? 0.55 : 1.0;
     // 異臭パワー時は最高速度と加速度が45%低下
     const stinkSpeedFactor = this.stinkTimer > 0 ? 0.55 : 1.0;
-    const perkSpeedFactor = 1 + (this.perkTopSpeedBoost || 0);
-    const perkAccelFactor = 1 + (this.perkAccelBoost || 0);
-    const baseSpeedWithCoins = (this.maxSpeed + (this.coinBonusSpeed || 0)) * perkSpeedFactor;
+    const missionSpeedFactor = this.missionTopSpeedMult || 1.0;
+    const missionAccelFactor = this.missionAccelMult || 1.0;
+    const baseSpeedWithCoins = (this.maxSpeed + (this.coinBonusSpeed || 0)) * missionSpeedFactor;
     const currentMaxSpeed = baseSpeedWithCoins * this.boostMultiplier * smallSpeedFactor * stinkSpeedFactor;
-    const currentAccel = this.acceleration * perkAccelFactor * smallSpeedFactor * stinkSpeedFactor;
+    const currentAccel = this.acceleration * missionAccelFactor * smallSpeedFactor * stinkSpeedFactor;
 
     if (brakeInput > 0) {
       if (this.speed > 0) {
@@ -327,7 +338,7 @@ export class KartPhysics {
     } else {
       if (this.isDrifting) {
         // ドリフト終了時にスパークに応じた急加速
-        const durationMult = this.perkDriftBoost || 1.0;
+        const durationMult = this.missionDriftDurationMult || 1.0;
         if (this.driftSparkLevel === 2) {
           this.applyBoost(1.5, 1.8 * durationMult);
           if (this.isLocalPlayer && gameState) {
@@ -338,6 +349,9 @@ export class KartPhysics {
           if (this.isLocalPlayer && gameState) {
             gameState.showItemNotification('⚡ ミニターボ発動！', 1200);
           }
+        }
+        if (this.driftSparkLevel > 0 && gameState?.missions) {
+          gameState.missions.reportTurboSuccess?.(this.id, this.driftSparkLevel);
         }
         this.isDrifting = false;
         this.driftSparkLevel = 0;
@@ -429,6 +443,11 @@ export class KartPhysics {
       this.alignToTrack(courseSpline, nearestT);
       this.updateLapProgress(nearestT);
     }
+
+    // 10. ミッション形式スキルアップシステムの進捗判定（権威のあるカートのみ実際に処理される）
+    if (gameState?.missions) {
+      gameState.missions.tickFor(this, dt, inputState, gameState);
+    }
   }
 
   alignToTrack(curve, t) {
@@ -465,6 +484,11 @@ export class KartPhysics {
           this.mesh.userData.gliderMesh.visible = false;
         }
         this.mesh.quaternion.setFromRotationMatrix(basis);
+        if (this._pendingLandingBoost) {
+          const aug = this._pendingLandingBoost;
+          this.applyBoost(aug.multiplier, aug.duration);
+          this._pendingLandingBoost = null;
+        }
       } else {
         // 空中での姿勢制御（ピッチ＆ロール傾斜）
         this.mesh.quaternion.setFromRotationMatrix(basis);
@@ -574,6 +598,9 @@ export class KartPhysics {
       this.currentLap++;
       this.highestProgressThisLap = t;
       this.progress = t;
+      if (this.currentLap === 3 && this.totalLaps >= 3) {
+        this._justEnteredLap3 = true;
+      }
       if (this.currentLap > this.totalLaps) {
         this.isFinished = true;
         this.finishTime = performance.now();
@@ -620,24 +647,24 @@ export class KartPhysics {
     this.applyBoost(1.35, duration);
   }
 
-  spinOut(gameState = null) {
+  spinOut(gameState = null, attackerId = null) {
     if (this.isGigaStampede) return;
     if (this.hasShield) {
       this.hasShield = false;
+      if (this._pendingBarrierAugment) {
+        const aug = this._pendingBarrierAugment;
+        this.applyBoost(aug.multiplier, aug.duration);
+        this._pendingBarrierAugment = null;
+      }
       return; // 攻撃をバリアが身代わりで吸収！
     }
-    if (this.perkTrapShieldCount && this.perkTrapShieldCount > 0) {
-      this.perkTrapShieldCount--;
-      const gs = gameState || this.gameState;
-      if (gs && this.isLocalPlayer) {
-        gs.showItemNotification('🛡️ トラップシールドが身代わり発動！スピンを無効化！', 2000);
-      }
-      return;
-    }
     if (this.invincibleTimer > 0 || this.isSpinning || this.isRespawning) return;
+    if (gameState?.missions && attackerId) {
+      gameState.missions.reportHitLanded(attackerId, this.id);
+    }
     this.isSpinning = true;
-    this.spinTimer = this.perkIronBumper ? 0.6 : 1.2;
-    this.speed = this.speed * (this.perkIronBumper ? 0.45 : 0.2);
+    this.spinTimer = 1.2;
+    this.speed = this.speed * 0.2;
   }
 
   applySmall(duration) {

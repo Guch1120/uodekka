@@ -323,7 +323,7 @@ export const Items = {
       onHit(targetKart) {
         if (!this.active) return;
         this.destroy();
-        targetKart.spinOut();
+        targetKart.spinOut(gameState, this.ownerId);
         if (this.ownerId === gameState.localPlayerKart?.id && targetKart !== gameState.localPlayerKart) {
           gameState.showItemNotification('仕掛けたバナナに敵がスリップ！🍌', 2500);
         }
@@ -500,7 +500,7 @@ export const Items = {
         this.destroy();
 
         // 1. 直撃したカートはスピン＆異臭デバフ
-        targetKart.spinOut();
+        targetKart.spinOut(gameState, this.ownerId);
         targetKart.applyStinkDebuff?.(5.0, gameState);
 
         // 2. 異臭爆発エフェクト
@@ -602,7 +602,7 @@ export const Items = {
       onHit(targetKart) {
         if (!this.active) return;
         this.destroy();
-        targetKart.spinOut();
+        targetKart.spinOut(gameState, this.ownerId);
         if (this.ownerId === gameState.localPlayerKart?.id && targetKart !== gameState.localPlayerKart) {
           const name = colorType === 'green' ? 'ミドリカメ' : 'アカカメ';
           gameState.showItemNotification(`${name}が敵カートに命中！💥`, 2500);
@@ -679,7 +679,7 @@ export const Items = {
         if (targetKart.invincibleTimer > 0) {
           gameState.showItemNotification('スターで青こうらの爆発を防御！');
         } else {
-          targetKart.spinOut();
+          targetKart.spinOut(gameState, this.ownerId);
           if (targetKart === gameState.localPlayerKart) {
             gameState.showItemNotification('1位を狙う青こうらに被弾！！');
           } else if (this.ownerId === gameState.localPlayerKart?.id) {
@@ -771,7 +771,7 @@ export const Items = {
         let hitEnemy = false;
         allKarts.forEach(k => {
           if (k && group.position.distanceTo(k.position) < 9.0) {
-            k.spinOut();
+            k.spinOut(gameState, this.ownerId);
             if (k !== gameState.localPlayerKart) {
               hitEnemy = true;
             }
@@ -913,7 +913,7 @@ export const Items = {
       }
 
       // 1. スピン
-      target.spinOut();
+      target.spinOut(gameState, userKart.id);
 
       // 2. スモール化：上位（1位）ほど長く、下位から順に解除される
       // 1位: 6.0秒、2位: 4.5秒、3位: 3.0秒 ...
