@@ -122,5 +122,22 @@ print('Test 6: magnet_barrier clears hasShield when the skill naturally expires.
   print('PASS: magnet_barrier clears hasShield when the skill naturally expires');
 }
 
+// 7. スカイ・グライダー: 発動時に実際に上昇する（その場で展開して滑空しない、の再発防止）
+// physics.js の空中挙動は verticalSpeed フィールドのみを参照する（velocityY は存在せず無視される）。
+print('Test 7: sky_glider sets the real verticalSpeed field (not a nonexistent velocityY)...');
+{
+  const kart = makeFakeKart({ verticalSpeed: 0, airTime: 5, gliderPitch: 0.8, gliderRoll: -0.5 });
+  const state = createSkillState('speed_blue', true);
+  const skill = { id: 'sky_glider', cooldown: 16.0, duration: 5.0 };
+  activateSkill(kart, state, skill, null);
+  assert(kart.isAirborne === true, 'sky_glider should set isAirborne');
+  assert(kart.isGliding === true, 'sky_glider should set isGliding');
+  assert(kart.verticalSpeed > 0, `sky_glider must set a positive verticalSpeed to actually launch upward (got ${kart.verticalSpeed})`);
+  assert(kart.airTime === 0, 'airTime should reset to 0 on a fresh launch');
+  assert(kart.gliderPitch === 0 && kart.gliderRoll === 0, 'glider attitude should reset to level on a fresh launch');
+  assert(kart.velocityY === undefined, 'must not rely on the nonexistent velocityY field');
+  print('PASS: sky_glider sets the real verticalSpeed field (not a nonexistent velocityY)');
+}
+
 print('');
 print('ALL UNIQUE SKILLS TESTS PASSED!');

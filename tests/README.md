@@ -28,3 +28,4 @@ Chromiumでタイトルからソロ走行、キー解放、フォーカス喪失
 - `node tests/test_unique_skills.mjs`：固有スキルのクールダウン計算、2段階/3段階追加効果が発動につき1回だけ・次回発動から適用されること、再発動時の残留状態クリアを検証します。Node単体で実行可。
 - `node tests/test_mission_wire.mjs`：`START_RACE`の`missionAssignments`/`cpuLevel`/`specVersion`の送信・中継・不正値のサニタイズ、`specVersion`不一致時のクライアント側/サーバー側それぞれの開始拒否を検証します。Node単体で実行可。
 - `node tests/verify_mission_ui.mjs`：Docker/Playwright環境でガレージのミッションモーダル・車体切替・HUDミッショントラッカー・段階達成の非ブロッキング通知・リザルト画面のミッションサマリーを実ブラウザで確認します（`tests/smoke.cjs`と同じ実行方法）。
+- `node tests/multiplayer_devices.mjs`：実機複数台の代わりに、完全に独立した2つのブラウザプロセス（別Cookie/localStorage）を、ローカルで起動した`wrangler dev`（Miniflare、ログイン・Cloudflareアカウント・実デプロイ不要）経由の同一ルームへ接続させ、ホスト/ゲスト間で本物のWebSocket通信を検証します。ミッション抽選(`missionAssignments`)とCPUレベル(`frozenCpuLevel`)がホスト・ゲストで完全一致すること、`KART_STATE`によるホストの走行のリアルタイム反映、`CPU_STATES`によるホストローカルCPUのゲスト側への中継を確認します。`tests/Dockerfile`で`wrangler`を含め`npm install`済みの環境が必要です（`node tests/multiplayer_devices.mjs`単体では`npx wrangler`がローカルに解決できる環境が必要）。

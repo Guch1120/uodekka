@@ -1,12 +1,13 @@
 /* ================= ミッション形式スキルアップシステム: HUD通知・リザルト表示 ================= */
 
-/* レースを妨げないよう、画面全体を覆うモーダルではなく画面中央付近の小さなバナーとして表示する
-   （操作を止めない・視界を塞がないよう pointer-events:none・背景オーバーレイなし） */
+/* レースを妨げないよう、画面全体を覆うモーダルではなく画面上部の小さなバナーとして表示する
+   （前方の走行視界（画面中央〜下側）を塞がないよう空側の上部に寄せる。
+   操作を止めない・視界を塞がないよう pointer-events:none・背景オーバーレイなし） */
 .hud-mission-reveal {
   position: absolute;
-  top: 30%;
+  top: 96px;
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
   z-index: 45;
   pointer-events: none;
   animation: missionRevealFadeIn 0.2s ease-out;
@@ -17,19 +18,29 @@
 }
 
 @keyframes missionRevealFadeIn {
-  0% { opacity: 0; }
-  100% { opacity: 1; }
+  0% { opacity: 0; transform: translate(-50%, -10px); }
+  100% { opacity: 1; transform: translateX(-50%); }
 }
 
 .mission-reveal-card {
-  width: min(280px, 80vw);
+  width: min(240px, 70vw);
   background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
   border: 2px solid rgba(124, 58, 237, 0.5);
-  border-radius: 16px;
-  padding: 12px 16px;
+  border-radius: 14px;
+  padding: 8px 14px;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.6), 0 0 20px rgba(124, 58, 237, 0.3);
   text-align: center;
   color: #fff;
+}
+
+@media (max-height: 520px) {
+  .hud-mission-reveal {
+    top: 60px;
+  }
+  .mission-reveal-card {
+    width: min(200px, 60vw);
+    padding: 6px 10px;
+  }
 }
 
 .mission-reveal-card.kind-rescue {
@@ -38,21 +49,21 @@
 }
 
 .mission-reveal-header {
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .mission-reveal-kicker {
   display: inline-block;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 900;
   color: #fbbf24;
   letter-spacing: 2px;
 }
 
 .mission-reveal-title {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 900;
-  margin: 2px 0 4px;
+  margin: 2px 0 3px;
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
 }
 
@@ -65,8 +76,8 @@
 }
 
 .mission-reveal-icon {
-  font-size: 30px;
-  margin-bottom: 4px;
+  font-size: 22px;
+  margin-bottom: 3px;
 }
 
 .mission-reveal-desc {
@@ -94,6 +105,20 @@
 
 .hud-mission-tracker.hidden {
   display: none;
+}
+
+@media (max-height: 520px) {
+  .hud-mission-tracker {
+    margin-top: 3px;
+    padding: 3px 8px;
+    max-width: 180px;
+  }
+  .hud-mission-name {
+    font-size: 10px;
+  }
+  .hud-mission-next {
+    font-size: 9px;
+  }
 }
 
 .hud-mission-head {

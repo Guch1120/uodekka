@@ -50,10 +50,6 @@ export class HUD {
           <div class="hud-mission-progress-bar"><div class="hud-mission-progress-fill" id="hud-mission-progress-fill"></div></div>
           <span class="hud-mission-next" id="hud-mission-next"></span>
         </div>
-        <!-- 拡大された大型ミニマップ -->
-        <div class="hud-minimap-wrapper">
-          <canvas id="hud-minimap" width="260" height="260"></canvas>
-        </div>
       </div>
 
       <div class="hud-top-center">
@@ -87,6 +83,11 @@ export class HUD {
         <button id="btn-open-settings" class="icon-btn" title="設定">
           ${Icons.getSvg('gear')}
         </button>
+      </div>
+
+      <!-- ミニマップ: 左下のバーチャルスティックと重ならないよう右上に独立配置 -->
+      <div class="hud-minimap-wrapper">
+        <canvas id="hud-minimap" width="260" height="260"></canvas>
       </div>
 
       <!-- ダッシュキノコ／ブースト加速時の集中線Canvas -->

@@ -38,7 +38,12 @@ export function activateSkill(kart, skillState, skill, missionTracker) {
   } else if (skill.id === 'sky_glider') {
     kart.isAirborne = true;
     kart.isGliding = true;
-    kart.velocityY = 18.0;
+    kart.airTime = 0;
+    kart.gliderPitch = 0;
+    kart.gliderRoll = 0;
+    // 物理層(physics.js)は verticalSpeed で上下運動を扱う。velocityY は存在しないフィールドで
+    // 読み取られないため、その場に留まったまま(実質上昇せずに)着地判定に入り滑空しなかった。
+    kart.verticalSpeed = 18.0;
     kart.speed = Math.max(kart.speed, kart.maxSpeed * 1.25);
     const gMesh = kart.mesh.userData?.gliderMesh;
     if (gMesh) gMesh.visible = true;
