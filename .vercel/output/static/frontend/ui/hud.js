@@ -146,6 +146,7 @@ export class HUD {
       this.container.appendChild(this.missionRevealEl);
     }
     this._missionRevealTimer = null;
+    this._missionRevealExitTimer = null;
 
     this.itemSlotEl = hudDiv.querySelector('#hud-item-slot');
     this.itemIconEl = hudDiv.querySelector('#hud-item-icon');
@@ -540,6 +541,7 @@ export class HUD {
   showMissionReveal(payload) {
     if (!this.missionRevealEl || !this.missionRevealBodyEl || !payload) return;
     clearTimeout(this._missionRevealTimer);
+    clearTimeout(this._missionRevealExitTimer);
 
     const kind = payload.kind || 'stage';
     if (this.missionRevealCardEl) {
@@ -556,16 +558,24 @@ export class HUD {
       <p class="mission-reveal-desc">${payload.description || ''}</p>
     `;
 
-    this.missionRevealEl.classList.remove('hidden');
+    // ミニマップ位置にスライドイン演出で出すため、連続発火時も毎回アニメーションを最初から再生する
+    this.missionRevealEl.classList.remove('hidden', 'exiting', 'entering');
+    void this.missionRevealEl.offsetWidth;
+    this.missionRevealEl.classList.add('entering');
     this._missionRevealTimer = setTimeout(() => this.hideMissionReveal(), 1800);
   }
 
   hideMissionReveal() {
     clearTimeout(this._missionRevealTimer);
     this._missionRevealTimer = null;
-    if (this.missionRevealEl) {
+    if (!this.missionRevealEl || this.missionRevealEl.classList.contains('hidden')) return;
+    this.missionRevealEl.classList.remove('entering');
+    this.missionRevealEl.classList.add('exiting');
+    clearTimeout(this._missionRevealExitTimer);
+    this._missionRevealExitTimer = setTimeout(() => {
       this.missionRevealEl.classList.add('hidden');
-    }
+      this.missionRevealEl.classList.remove('exiting');
+    }, 240);
   }
 
   show() {

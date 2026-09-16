@@ -1,25 +1,36 @@
 /* ================= ミッション形式スキルアップシステム: HUD通知・リザルト表示 ================= */
 
-/* レースを妨げないよう、画面全体を覆うモーダルではなく画面上部の小さなバナーとして表示する
-   （前方の走行視界（画面中央〜下側）を塞がないよう空側の上部に寄せる。
-   操作を止めない・視界を塞がないよう pointer-events:none・背景オーバーレイなし） */
+/* レースを妨げないよう、画面中央〜下側の走行視界には一切かからない右上の計器ゾーン
+   （ミニマップと同じ位置）にドッキングして表示する。爽快感を出すため右端からの
+   スライドイン→ポップ→スライドアウトで演出し、表示中はミニマップを一時的に覆う
+   （数秒間ミニマップが隠れるより前方視界が塞がれる方が問題、という判断）。
+   操作を止めない・視界を塞がないよう pointer-events:none・背景オーバーレイなし */
 .hud-mission-reveal {
   position: absolute;
-  top: 96px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 45;
+  top: 84px;
+  right: 16px;
+  z-index: 46;
   pointer-events: none;
-  animation: missionRevealFadeIn 0.2s ease-out;
+  transition: opacity 0.22s ease-in, transform 0.22s ease-in;
+}
+
+.hud-mission-reveal.entering {
+  animation: missionRevealSlideIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.hud-mission-reveal.exiting {
+  opacity: 0;
+  transform: translateX(50px) scale(0.85);
 }
 
 .hud-mission-reveal.hidden {
   display: none;
 }
 
-@keyframes missionRevealFadeIn {
-  0% { opacity: 0; transform: translate(-50%, -10px); }
-  100% { opacity: 1; transform: translateX(-50%); }
+@keyframes missionRevealSlideIn {
+  0% { opacity: 0; transform: translateX(50px) scale(0.85); }
+  60% { opacity: 1; transform: translateX(-6px) scale(1.04); }
+  100% { opacity: 1; transform: translateX(0) scale(1); }
 }
 
 .mission-reveal-card {
@@ -35,11 +46,12 @@
 
 @media (max-height: 520px) {
   .hud-mission-reveal {
-    top: 60px;
+    top: 68px;
+    right: 10px;
   }
   .mission-reveal-card {
-    width: min(200px, 60vw);
-    padding: 6px 10px;
+    width: min(160px, 50vw);
+    padding: 6px 8px;
   }
 }
 
