@@ -51,6 +51,7 @@
   color: #94a3b8;
   font-size: 24px;
   cursor: pointer;
+  touch-action: manipulation;
 }
 
 .modal-body {

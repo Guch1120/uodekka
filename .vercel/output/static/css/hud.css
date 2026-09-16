@@ -553,6 +553,9 @@
   justify-content: center;
   gap: 10px;
   border-radius: 14px;
+  /* .hud-skill-btn 等と同様、モバイルでの300msダブルタップ判定遅延によりタップが
+     取りこぼされる（特に確認ダイアログ表示ボタンで顕著）ことを防ぐ */
+  touch-action: manipulation;
 }
 
 .restart-btn {
