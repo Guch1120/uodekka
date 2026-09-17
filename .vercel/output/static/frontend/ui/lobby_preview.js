@@ -79,6 +79,17 @@ export function courseMetrics(course) {
   };
 }
 
+// コースの実データ（幅・ジャンプ台数）から特徴タグを機械的に導出する（新規の持ち回しデータは追加しない）。
+export function deriveCourseTags(course) {
+  const tags = [];
+  if (course.trackWidth <= 29) tags.push('テクニカル');
+  else if (course.trackWidth >= 33) tags.push('初心者向け');
+  else tags.push('バランス型');
+  const ramps = (course.jumpRamps || []).length;
+  if (ramps >= 2) tags.push(`ジャンプ${ramps}か所`);
+  return tags;
+}
+
 let courseArtSequence = 0;
 
 export function courseArt(course) {

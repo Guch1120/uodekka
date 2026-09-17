@@ -63,19 +63,25 @@ body[data-is-landscape="true"] .garage-shell {
 .garage-dots { display: flex; gap: 6px; }
 .garage-dots i { width: 6px; height: 6px; border-radius: 4px; background: #d7e0e4; }
 .garage-dots i.active { width: 24px; background: #2c5167; }
+
+/* ホーム画面：車体ステータスを一目で見せる（コース選択/ルーム画面の.garage-specsと同じdata-stat行を再利用） */
+.garage-home-stats { background: #fff; padding: 0 25px 8px; }
+.garage-home-stats .garage-stat-list { margin-top: 2px; gap: 6px; }
+/* ホーム画面のみ: ステータス追加分を吸収するため車体プレビューを少し低くする（コース選択側は変更しない） */
+.garage-home .garage-vehicle-stage { height: clamp(150px, 24vh, 300px); }
 .garage-mode-panel { display: flex; flex-direction: column; gap: 16px; }
 .garage-mode-heading { color: white; margin-bottom: 3px; }
 .garage-mode-heading .garage-eyebrow { color: #9eb8c9; }
 .garage-mode-heading h2 { font-size: 23px; letter-spacing: -.5px; margin-top: 5px; }
 .garage-mode { position: relative; border: none; border-radius: 18px; padding: 26px; text-align: left; overflow: hidden; }
 .garage-mode-solo { flex: 1; min-height: 175px; background: #b6e5f2; display: flex; gap: 17px; color: #123e57; }
-.garage-mode-icon { width: 29px; height: 29px; border: 1px solid currentColor; opacity: .5; display: grid; place-items: center; border-radius: 50%; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+.garage-mode-icon { width: 40px; height: 40px; border: 1px solid currentColor; opacity: .85; display: grid; place-items: center; border-radius: 50%; font-size: 19px; font-weight: 700; flex-shrink: 0; }
 .garage-mode small { display: block; font-size: 10px; font-weight: 750; letter-spacing: 2px; margin-bottom: 9px; }
 .garage-mode strong, .garage-mode h2 { display: block; font-size: clamp(25px, 3vw, 39px); letter-spacing: -1px; line-height: 1.25; font-weight: 800; }
 .garage-mode-description, .garage-mode p { display: block; margin-top: 12px; font-size: 12px; line-height: 1.6; }
 .garage-mode-arrow { position: absolute; top: 25px; right: 25px; font-size: 29px; }
 .garage-mode-tag { align-self: flex-end; margin-left: auto; font-size: 10px; padding: 5px 9px; border: 1px solid #40839e55; border-radius: 20px; white-space: nowrap; }
-.garage-mode-multi { background: #c2e7a9; color: #284923; display: grid; grid-template-columns: 29px 1fr; column-gap: 17px; }
+.garage-mode-multi { background: #c2e7a9; color: #284923; display: grid; grid-template-columns: 40px 1fr; column-gap: 17px; }
 .garage-multi-actions { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 22px; }
 .garage-multi-actions button { border: 1px solid #729d6266; border-radius: 9px; padding: 12px 15px; background: #ffffff88; color: #254b28; font-size: 19px; font-weight: 800; text-align: left; }
 .garage-multi-actions span { display: block; margin-top: 5px; font-size: 10px; font-weight: 550; }
@@ -117,14 +123,37 @@ body[data-is-landscape="true"] .garage-shell {
 #garage-status { font-size: 11px; letter-spacing: .2px; color: #c0d3de; text-align: center; }
 .garage-subtle { border: 1px solid #5b778b; background: transparent; color: inherit; border-radius: 7px; padding: 8px 12px; font-size: 12px !important; }
 .garage-setup { align-items: stretch; }
-.garage-map-card { background: #eef3f5; border-radius: 18px; position: relative; padding: 25px 45px; min-height: 250px; height: clamp(260px, 43vh, 430px); display: grid; place-items: center; }
+.garage-map-card { background: #eef3f5; border-radius: 18px; position: relative; padding: 25px 45px; min-height: 250px; height: clamp(260px, 43vh, 430px); display: grid; place-items: center; overflow: hidden; }
 .garage-map { width: 100%; height: 100%; min-height: 0; }
 .garage-map svg { display: block; width: 100%; height: 100%; max-height: 370px; }
-.garage-map-card > .garage-counter { position: absolute; right: 23px; bottom: 14px; }
-.garage-course-caption { display: flex; justify-content: space-between; align-items: center; color: white; margin: 20px 2px 0; gap: 12px; }
-.garage-course-caption .garage-eyebrow { color: #9eb8c9; }
-.garage-course-caption h2 { font-size: clamp(20px, 2vw, 29px); margin-top: 6px; letter-spacing: -.7px; }
+.garage-map-card > .garage-counter { position: absolute; right: 23px; bottom: 14px; z-index: 2; }
 .garage-course-description { margin-top: 5px; color: #b4c8d4; font-size: 11px; line-height: 1.5; }
+
+/* コースプレビュー上部：カテゴリタブ（実在するコースのテーマへのショートカット） */
+.course-category-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; margin-bottom: 10px; scrollbar-width: none; }
+.course-category-tabs::-webkit-scrollbar { display: none; }
+.course-category-tab { flex-shrink: 0; padding: 6px 14px; border-radius: 999px; border: 1px solid #35526a; background: #1c3346; color: #b4c8d4; font-size: 12px; font-weight: 700; cursor: pointer; transition: all .15s ease; touch-action: manipulation; }
+.course-category-tab.active { background: #38bdf8; border-color: #38bdf8; color: #06202f; }
+
+/* プレビュー画像に重ねるキャプション（コース名・説明を写真の上に表示するオーバーレイ演出） */
+.course-preview-caption { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; padding: 16px 22px 12px; background: linear-gradient(to top, rgba(8, 18, 28, 0.85), rgba(8, 18, 28, 0)); border-radius: 0 0 18px 18px; text-align: left; color: #fff; pointer-events: none; }
+.course-preview-caption .garage-eyebrow { color: #a8d8f0; }
+.course-preview-caption h2 { font-size: clamp(18px, 2vw, 26px); margin: 4px 0 3px; letter-spacing: -.6px; color: #fff; }
+.course-preview-caption .garage-course-description { color: #dbe8ef; margin-top: 2px; }
+
+/* コースサムネイル帯 */
+.course-thumb-strip { display: flex; gap: 8px; overflow-x: auto; padding: 4px 2px; margin-top: 10px; scrollbar-width: thin; }
+.course-thumb { flex-shrink: 0; width: 74px; height: 46px; border-radius: 10px; overflow: hidden; border: 2px solid transparent; background: #eef3f5; cursor: pointer; padding: 0; touch-action: manipulation; }
+.course-thumb svg { display: block; width: 100%; height: 100%; }
+.course-thumb.active { border-color: #38bdf8; }
+
+/* コースタグ（実データから機械的に導出、新規の永続データは持たない） */
+.course-tags { display: flex; gap: 6px; flex-wrap: wrap; margin: 2px 0 4px; }
+.course-tag-chip { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: #eef6fb; color: #1c5c82; border: 1px solid #bfe0f2; }
+
+/* サムネイル帯導入後は、既存のセレクトはキーボード操作・カスタムコース向けの補助手段として控えめに */
+.course-picker-fallback { display: flex; align-items: center; gap: 8px; margin-top: 6px; color: #9eb8c9; font-size: 10px; }
+.course-picker-fallback select { min-height: 34px; padding: 4px 8px; font-size: 11px; border: 1px solid #47637a; border-radius: 7px; background: #1c3346; color: #fff; font: inherit; }
 .garage-setup-side { display: flex; flex-direction: column; gap: 14px; }
 .garage-course-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .garage-button { border: 0; border-radius: 10px; padding: 17px 18px; font-size: 15px; font-weight: 750 !important; color: var(--ink); min-height: 48px; }
@@ -441,6 +470,7 @@ body[data-is-landscape="true"] .garage-shell {
   .garage-vehicle-stage { height: clamp(65px, 18vh, 120px); flex: 1 1 auto; min-height: 55px; }
   .garage-vehicle-caption { padding: 4px 12px; flex-shrink: 0; }
   .garage-vehicle-caption h2 { font-size: 16px; }
+  .garage-home-stats { display: none; }
   .garage-mode-heading { display: none; }
   .garage-mode-panel {
     gap: 4px;
@@ -469,8 +499,13 @@ body[data-is-landscape="true"] .garage-shell {
   .garage-map svg { max-height: 100%; }
   .garage-arrow { width: 28px; height: 38px; font-size: 12px !important; }
   .garage-arrow:first-of-type { left: 8px; } .garage-arrow:last-of-type { right: 8px; }
-  .garage-course-caption { margin-top: 3px; }
-  .garage-course-caption h2 { font-size: 16px; }
+  .course-category-tabs { display: none; }
+  .course-thumb-strip { display: none; }
+  .course-preview-caption { padding: 4px 10px; }
+  .course-preview-caption h2 { font-size: 13px; margin: 1px 0; }
+  .course-preview-caption .garage-course-description { display: none; }
+  .course-tags { margin: 2px 0; }
+  .course-tag-chip { font-size: 9px; padding: 2px 6px; }
   .garage-setup-side { gap: 4px; }
   .garage-button { padding: 7px 10px; min-height: 32px; font-size: 12px !important; }
   .garage-button-start { font-size: 20px !important; padding: 8px 16px; min-height: 38px; }
@@ -517,7 +552,7 @@ body[data-is-landscape="true"] .garage-shell {
   body:not(.force-landscape) .garage-footer { justify-content: center; }
   body:not(.force-landscape) .garage-footer > span:first-child, body:not(.force-landscape) .garage-footer > span:last-child { display: none; }
   body:not(.force-landscape) .garage-map-card { min-height: 215px; height: 260px; padding: 20px 30px; }
-  body:not(.force-landscape) .garage-course-caption h2 { font-size: 23px; }
+  body:not(.force-landscape) .course-preview-caption h2 { font-size: 23px; }
   body:not(.force-landscape) .garage-members-panel { padding: 20px; }
   body:not(.force-landscape) .garage-room-code button { font-size: 10px !important; }
   body:not(.force-landscape) .garage-setup-side { gap: 14px; }
@@ -620,6 +655,10 @@ body[data-is-compact="true"] .garage-vehicle-caption {
 body.force-landscape .garage-vehicle-caption h2,
 body[data-is-compact="true"] .garage-vehicle-caption h2 {
   font-size: 16px !important;
+}
+body.force-landscape .garage-home-stats,
+body[data-is-compact="true"] .garage-home-stats {
+  display: none !important;
 }
 body.force-landscape .garage-skill-card,
 body[data-is-compact="true"] .garage-skill-card {
@@ -739,13 +778,26 @@ body.force-landscape .garage-map svg,
 body[data-is-compact="true"] .garage-map svg {
   max-height: 100% !important;
 }
-body.force-landscape .garage-course-caption,
-body[data-is-compact="true"] .garage-course-caption {
-  margin-top: 3px !important;
+body.force-landscape .course-preview-caption,
+body[data-is-compact="true"] .course-preview-caption {
+  padding: 6px 10px 5px !important;
 }
-body.force-landscape .garage-course-caption h2,
-body[data-is-compact="true"] .garage-course-caption h2 {
+body.force-landscape .course-preview-caption h2,
+body[data-is-compact="true"] .course-preview-caption h2 {
   font-size: 16px !important;
+  margin: 2px 0 !important;
+}
+body.force-landscape .course-preview-caption .garage-course-description,
+body[data-is-compact="true"] .course-preview-caption .garage-course-description {
+  display: none !important;
+}
+body.force-landscape .course-category-tabs,
+body[data-is-compact="true"] .course-category-tabs {
+  display: none !important;
+}
+body.force-landscape .course-thumb-strip,
+body[data-is-compact="true"] .course-thumb-strip {
+  display: none !important;
 }
 body.force-landscape .garage-setup-side,
 body[data-is-compact="true"] .garage-setup-side {
@@ -1284,25 +1336,25 @@ body.force-landscape .garage-dialog .garage-button-start {
 }
 
 /* コースを一覧で選び、実際の距離と高低差を比較できるようにする。 */
-.garage-course-picker { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; color: #c1d1dc; font-size: 12px; }
-.garage-course-picker > span { flex-shrink: 0; }
-.garage-course-picker select { min-width: 0; flex: 1; min-height: 44px; padding: 8px 12px; border: 1px solid #68869a; border-radius: 9px; background: #203e55; color: white; font: inherit; cursor: pointer; }
-.garage-course-picker select:focus-visible { outline: 3px solid #ffad68; outline-offset: 3px; }
+.course-picker-fallback select { min-width: 0; flex: 1; min-height: 34px; padding: 4px 8px; border: 1px solid #68869a; border-radius: 9px; background: #203e55; color: white; font: inherit; cursor: pointer; }
+.course-picker-fallback select:focus-visible { outline: 3px solid #ffad68; outline-offset: 3px; }
 .garage-course-metrics { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; padding: 10px 12px; border: 1px solid #537187; border-radius: 10px; background: #203e55; color: #b4c8d4; font-size: 11px; }
 .garage-course-metrics strong { display: block; margin-top: 3px; color: #fff; font-size: 16px; font-variant-numeric: tabular-nums; }
-.garage-course-panel .garage-course-caption { flex-wrap: wrap; margin-top: 12px; }
 @media (max-height: 520px) {
-  .garage-course-picker { margin-bottom: 4px; gap: 8px; font-size: 11px; }
-  .garage-course-picker select { min-height: 32px; padding: 4px 8px; }
+  .course-category-tabs { margin-bottom: 4px; }
+  .course-category-tab { padding: 3px 10px; font-size: 10px; }
+  .course-thumb-strip { margin-top: 4px; }
+  .course-thumb { width: 46px; height: 30px; }
+  .course-preview-caption { padding: 6px 10px 5px; }
+  .course-preview-caption h2 { font-size: 14px; margin: 2px 0; }
+  .course-preview-caption .garage-course-description { display: none; }
+  .course-tags { margin: 0 0 2px; }
+  .course-tag-chip { font-size: 9px; padding: 2px 7px; }
   .garage-course-metrics { margin-top: 4px; padding: 4px 8px; font-size: 10px; }
   .garage-course-metrics strong { display: inline; font-size: 11px; }
-  .garage-course-panel .garage-course-caption { margin-top: 4px; gap: 4px; }
 }
-body[data-is-compact="true"] .garage-course-picker { margin-bottom: 4px; font-size: 11px; }
-body[data-is-compact="true"] .garage-course-picker select { min-height: 32px; padding: 4px 8px; }
 body[data-is-compact="true"] .garage-course-metrics { margin-top: 4px; padding: 4px 8px; font-size: 10px; }
 body[data-is-compact="true"] .garage-course-metrics strong { display: inline; font-size: 11px; }
-body[data-is-compact="true"] .garage-course-panel .garage-course-caption { margin-top: 4px; gap: 4px; }
 
 @media (min-width: 901px) and (min-height: 521px) {
   .garage-course-panel .garage-map-card { height: clamp(220px, 34vh, 340px); min-height: 220px; }

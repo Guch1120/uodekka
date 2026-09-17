@@ -1,7 +1,7 @@
 import { Vehicles, SkillsManager } from '../vehicles/vehicles.js';
 import { Courses } from '../courses/index.js';
 import { normalizeRoomId } from '../../backend/network/room_id.js';
-import { GaragePreview, courseArt, courseMetrics } from './lobby_preview.js';
+import { GaragePreview, courseArt, courseMetrics, deriveCourseTags } from './lobby_preview.js';
 import { CPU_ROSTER } from '../../backend/ai/cpu_driver.js';
 import { UpdateModal } from './update_modal.js';
 import { FeedbackModal } from './feedback_modal.js';
@@ -13,7 +13,9 @@ import { readStoredLearningLevel } from '../../backend/ai/learning_ai.js';
 const MISSION_STAT_LABEL = { acceleration: '加速度', topSpeed: '最高速度', miniTurboDuration: 'ミニターボ持続時間' };
 
 const arrow = (id, direction, label) => `<button id="${id}" class="garage-arrow" aria-label="${label}">${direction === 'prev' ? '◀' : '▶'}</button>`;
-const stats = () => `<section class="garage-specs"><div class="garage-eyebrow">YOUR MACHINE</div><h2 class="vehicle-name"></h2><p class="vehicle-description"></p><div class="garage-stat-list">${[['topSpeed', 'スピード', 50], ['acceleration', '加速', 35], ['weight', '重さ', 1.5]].map(([key, label, max]) => `<label class="garage-stat"><span>${label}</span><meter data-stat="${key}" min="0" max="${max}" aria-label="${label}"></meter><span data-stat-value="${key}" class="garage-stat-value"></span></label>`).join('')}</div><div class="garage-stat-skill"><span class="garage-skill-badge">固有スキル</span><strong class="spec-skill-name"></strong><span class="spec-skill-status"></span></div></section>`;
+const STAT_ROWS_HTML = [['topSpeed', 'スピード', 50], ['acceleration', '加速', 35], ['weight', '重さ', 1.5]].map(([key, label, max]) => `<label class="garage-stat"><span>${label}</span><meter data-stat="${key}" min="0" max="${max}" aria-label="${label}"></meter><span data-stat-value="${key}" class="garage-stat-value"></span></label>`).join('');
+const statRows = () => `<div class="garage-stat-list">${STAT_ROWS_HTML}</div>`;
+const stats = () => `<section class="garage-specs"><div class="garage-eyebrow">YOUR MACHINE</div><h2 class="vehicle-name"></h2><p class="vehicle-description"></p>${statRows()}<div class="garage-stat-skill"><span class="garage-skill-badge">固有スキル</span><strong class="spec-skill-name"></strong><span class="spec-skill-status"></span></div></section>`;
 
 export class LobbyModal {
   constructor(container, p2pManager, onStartGame, inputManager = null) {
@@ -64,6 +66,7 @@ export class LobbyModal {
                 <div class="garage-showroom-top"><span class="garage-chip" id="vehicle-category"></span><span id="vehicle-counter" class="garage-counter"></span></div>
                 <div class="garage-vehicle-stage"><div id="garage-vehicle-preview"></div>${arrow('vehicle-prev', 'prev', '前の車体')}${arrow('vehicle-next', 'next', '次の車体')}</div>
                 <div class="garage-vehicle-caption"><div><span class="garage-eyebrow">YOUR MACHINE</span><h2 class="vehicle-name" aria-live="polite"></h2></div><div id="vehicle-dots" class="garage-dots" aria-hidden="true"></div></div>
+                <div class="garage-home-stats">${statRows()}</div>
                 <div class="garage-skill-card" id="garage-skill-card">
                   <div class="garage-skill-head">
                     <span class="garage-skill-badge">固有スキル</span>
@@ -80,10 +83,10 @@ export class LobbyModal {
               </div>
             </div>
             <div class="garage-mode-panel"><div class="garage-mode-heading"><span class="garage-eyebrow">02 / CHOOSE YOUR RACE</span><h2>さあ、走り出そう。</h2></div>
-              <button id="tab-solo" class="garage-mode garage-mode-solo"><span class="garage-mode-icon">01</span><span><small>SOLO RACE</small><strong>ソロゲーム</strong><span class="garage-mode-description">CPUと競う、自分だけのレース。</span></span><span class="garage-mode-arrow">↗</span><span class="garage-mode-tag">CPU 対戦</span></button>
-              <section class="garage-mode garage-mode-multi"><span class="garage-mode-icon">02</span><div><small>MULTIPLAYER</small><h2>マルチゲーム</h2><p>ルームに集まって、友だちと対戦。</p></div><div class="garage-multi-actions"><button id="tab-create">ホスト <span>ルームを作成 ↗</span></button><button id="tab-join">ゲスト <span>ルームに参加 ↗</span></button></div></section>
+              <button id="tab-solo" class="garage-mode garage-mode-solo"><span class="garage-mode-icon">🏁</span><span><small>SOLO RACE</small><strong>ソロゲーム</strong><span class="garage-mode-description">CPUと競う、自分だけのレース。</span></span><span class="garage-mode-arrow">↗</span><span class="garage-mode-tag">CPU 対戦</span></button>
+              <section class="garage-mode garage-mode-multi"><span class="garage-mode-icon">👥</span><div><small>MULTIPLAYER</small><h2>マルチゲーム</h2><p>ルームに集まって、友だちと対戦。</p></div><div class="garage-multi-actions"><button id="tab-create">ホスト <span>ルームを作成 ↗</span></button><button id="tab-join">ゲスト <span>ルームに参加 ↗</span></button></div></section>
               <button id="tab-editor" class="garage-mode garage-mode-editor" type="button">
-                <span class="garage-mode-icon">03</span>
+                <span class="garage-mode-icon">🌀</span>
                 <span>
                   <small>COURSE MAKER</small>
                   <strong>コースを作る</strong>
@@ -96,12 +99,27 @@ export class LobbyModal {
           </section>
           <section class="garage-screen garage-setup" data-screen="solo" hidden>
             <div class="garage-course-panel"><div class="garage-section-heading"><div><span class="garage-eyebrow">SOLO / SELECT YOUR COURSE</span><h1>次の舞台を選ぼう。</h1></div><span class="garage-chip">CPU 11台と対戦（合計12人）</span></div>
-              <label class="garage-course-picker" for="course-select"><span>コース一覧</span><select id="course-select"></select></label>
-              <div class="garage-map-card"><div class="garage-map" id="solo-map"></div>${arrow('course-prev', 'prev', '前のコース')}${arrow('course-next', 'next', '次のコース')}<span id="course-counter" class="garage-counter"></span></div>
-              <div id="course-metrics" class="garage-course-metrics" aria-live="polite"></div>
-              <div class="garage-course-caption"><div><span class="garage-eyebrow" id="solo-course-theme">CIRCUIT</span><h2 id="solo-course-name" aria-live="polite"></h2><p id="solo-course-description" class="garage-course-description"></p></div><div class="garage-course-badges"><span id="solo-course-laps" class="garage-chip"></span><span id="solo-ai-level" class="garage-chip garage-chip-ai">🧠 CPU学習 Lv.1</span><button type="button" id="btn-reset-ai" class="garage-ai-reset-btn" title="このコースの学習データを初期化">↺ 学習リセット</button></div></div>
+              <div class="course-category-tabs" id="course-category-tabs"></div>
+              <div class="garage-map-card" id="course-map-card">
+                <div class="garage-map" id="solo-map"></div>${arrow('course-prev', 'prev', '前のコース')}${arrow('course-next', 'next', '次のコース')}<span id="course-counter" class="garage-counter"></span>
+                <div class="course-preview-caption">
+                  <span class="garage-eyebrow" id="solo-course-theme">CIRCUIT</span>
+                  <h2 id="solo-course-name" aria-live="polite"></h2>
+                  <p id="solo-course-description" class="garage-course-description"></p>
+                </div>
+              </div>
+              <div class="course-thumb-strip" id="course-thumb-strip"></div>
+              <label class="course-picker-fallback" for="course-select"><span>コース一覧</span><select id="course-select"></select></label>
             </div>
-            <div class="garage-setup-side"><div class="garage-course-actions"><button id="course-confirm" class="garage-button garage-button-green">✓ コース決定</button><button id="course-random" class="garage-button garage-button-light">⤨ ランダム決定</button></div><p id="course-confirmation" class="garage-note" aria-live="polite">コースを選んで確定してください。</p>${stats()}<button id="btn-start-solo" class="garage-button garage-button-start" disabled>ゲームスタート <span>→</span></button></div>
+            <div class="garage-setup-side">
+              <div id="course-metrics" class="garage-course-metrics" aria-live="polite"></div>
+              <div class="course-tags" id="course-tags"></div>
+              <div class="garage-course-badges"><span id="solo-course-laps" class="garage-chip"></span><span id="solo-ai-level" class="garage-chip garage-chip-ai">🧠 CPU学習 Lv.1</span><button type="button" id="btn-reset-ai" class="garage-ai-reset-btn" title="このコースの学習データを初期化">↺ 学習リセット</button></div>
+              ${stats()}
+              <div class="garage-course-actions"><button id="course-confirm" class="garage-button garage-button-green">✓ コース決定</button><button id="course-random" class="garage-button garage-button-light">⤨ ランダム決定</button></div>
+              <p id="course-confirmation" class="garage-note" aria-live="polite">コースを選んで確定してください。</p>
+              <button id="btn-start-solo" class="garage-button garage-button-start" disabled>ゲームスタート <span>→</span></button>
+            </div>
           </section>
           <section class="garage-screen garage-setup" data-screen="room" hidden>
             <section class="garage-members-panel">
@@ -439,6 +457,54 @@ export class LobbyModal {
       option.textContent = Courses.getCourse(id).name;
       return option;
     }));
+    this.renderCategoryTabs();
+    this.renderThumbStrip();
+  }
+
+  // カテゴリタブ（すべて + 実在するコースのテーマ種別）。フィルタはせず、該当テーマの最初の
+  // コースへジャンプするショートカットとして機能させ、現在のコースのテーマを常時ハイライトする。
+  renderCategoryTabs() {
+    const tabsEl = this.el('#course-category-tabs');
+    if (!tabsEl) return;
+    const seen = new Set();
+    this._courseCategories = [{ key: 'all', label: 'すべて' }];
+    Object.keys(Courses.list).forEach(id => {
+      const c = Courses.list[id];
+      if (!seen.has(c.theme)) {
+        seen.add(c.theme);
+        this._courseCategories.push({ key: c.theme, label: c.themeLabel || c.theme, jumpToId: id });
+      }
+    });
+    tabsEl.innerHTML = this._courseCategories.map(cat =>
+      `<button type="button" class="course-category-tab" data-category="${cat.key}">${cat.label}</button>`
+    ).join('');
+    tabsEl.querySelectorAll('.course-category-tab').forEach(btn => {
+      btn.onclick = () => {
+        const key = btn.dataset.category;
+        const cat = this._courseCategories.find(c => c.key === key);
+        if (cat?.jumpToId) {
+          const idx = this.courseIds.indexOf(cat.jumpToId);
+          if (idx >= 0) this.courseIndex = idx;
+        }
+        this.updateCourse();
+      };
+    });
+  }
+
+  // サムネイル帯（全コースの小さいプレビューを並べ、タップで直接ジャンプできるようにする）
+  renderThumbStrip() {
+    const stripEl = this.el('#course-thumb-strip');
+    if (!stripEl) return;
+    stripEl.innerHTML = this.courseIds.map((id, i) => {
+      const course = Courses.getCourse(id);
+      return `<button type="button" class="course-thumb" data-index="${i}" title="${course.name}">${courseArt(course)}</button>`;
+    }).join('');
+    stripEl.querySelectorAll('.course-thumb').forEach(btn => {
+      btn.onclick = () => {
+        this.courseIndex = Number(btn.dataset.index);
+        this.updateCourse();
+      };
+    });
   }
 
   changeCourse(step) {
@@ -475,6 +541,23 @@ export class LobbyModal {
     this.el('#solo-course-theme').textContent = `${course.themeLabel || 'CIRCUIT'} / LANDMARK TOUR`;
     this.el('#solo-course-description').textContent = course.description || '';
     this.el('#solo-course-laps').textContent = `${course.totalLaps} LAPS`;
+
+    const tagsEl = this.el('#course-tags');
+    if (tagsEl) {
+      tagsEl.innerHTML = deriveCourseTags(course).map(t => `<span class="course-tag-chip">${t}</span>`).join('');
+    }
+    const tabsEl = this.el('#course-category-tabs');
+    if (tabsEl) {
+      tabsEl.querySelectorAll('.course-category-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.category === course.theme);
+      });
+    }
+    const stripEl = this.el('#course-thumb-strip');
+    if (stripEl) {
+      stripEl.querySelectorAll('.course-thumb').forEach((btn, i) => {
+        btn.classList.toggle('active', i === this.courseIndex);
+      });
+    }
 
     const courseId = this.courseIds[this.courseIndex];
     let aiLaps = 0;
