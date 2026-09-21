@@ -117,6 +117,11 @@
   padding: 10px 18px;
 }
 
+.update-close-bottom::before {
+  content: '× ';
+  font-weight: 900;
+}
+
 .garage-header-actions {
   display: flex;
   align-items: center;

@@ -1665,6 +1665,7 @@ export class Game {
       name: tracker.missionDef.name,
       thresholds: tracker.missionDef.thresholds,
       unit: tracker.missionDef.unit,
+      description: tracker.missionDef.description,
       stage: tracker.stage,
       cumulativeProgress: tracker.cumulativeProgress
     };

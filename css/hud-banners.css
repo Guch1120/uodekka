@@ -102,6 +102,9 @@
   align-items: center;
   gap: 10px;
   animation: wrongWayBlink 0.6s infinite alternate;
+  white-space: nowrap;
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
 }
 
 .wrong-way-banner.hidden {
@@ -112,4 +115,3 @@
   0% { transform: translateX(-50%) scale(0.95); filter: brightness(1.0); }
   100% { transform: translateX(-50%) scale(1.08); filter: brightness(1.4); }
 }
-

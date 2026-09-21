@@ -20,6 +20,8 @@ export class HUD {
   }
 
   init() {
+    const existing = this.container.querySelector('#game-hud');
+    if (existing) existing.remove();
     const hudDiv = document.createElement('div');
     hudDiv.id = 'game-hud';
     hudDiv.className = 'hud-container hidden';
@@ -481,6 +483,7 @@ export class HUD {
     }
     this.missionTrackerEl.classList.remove('hidden');
     if (this.missionNameEl) this.missionNameEl.textContent = missionState.name || '';
+    if (this.missionTrackerEl) this.missionTrackerEl.title = missionState.description || '';
 
     const stage = missionState.stage || 0;
     this.missionPipEls.forEach((pip, i) => pip.classList.toggle('filled', i < stage));
