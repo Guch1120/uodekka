@@ -98,9 +98,13 @@
   #feedback-modal .modal-header h2 {
     font-size: 15px;
     margin: 0;
+    min-width: 0;
   }
   #feedback-modal .btn-close {
     font-size: 18px;
+    flex-basis: 36px;
+    width: 36px;
+    height: 36px;
   }
   #feedback-modal .modal-body {
     padding: 6px 16px;
@@ -414,10 +418,14 @@ body[data-is-compact="true"] #feedback-modal .modal-header h2,
 body.force-landscape #feedback-modal .modal-header h2 {
   font-size: 15px;
   margin: 0;
+  min-width: 0;
 }
 body[data-is-compact="true"] #feedback-modal .btn-close,
 body.force-landscape #feedback-modal .btn-close {
   font-size: 18px;
+  flex-basis: 36px;
+  width: 36px;
+  height: 36px;
 }
 body[data-is-compact="true"] #feedback-modal .modal-body,
 body.force-landscape #feedback-modal .modal-body {
