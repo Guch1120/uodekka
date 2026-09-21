@@ -116,8 +116,7 @@ export class FeedbackModal {
     imageEl.addEventListener('change', () => {
       const file = imageEl.files[0];
       imageNameEl.textContent = file ? `${file.name}（${Math.ceil(file.size / 1024)}KB）` : '画像は1枚、2MBまで添付できます。';
-      window.requestForcedLandscapeLayout?.();
-      window.dispatchEvent(new Event('uodekka-app-resume'));
+      window.recoverAppPresentation?.();
     });
 
     btnSend.onclick = () => this.submit();

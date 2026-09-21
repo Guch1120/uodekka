@@ -100,8 +100,7 @@ export class UpdateModal {
           ${pastToggleHtml}
         </div>
         <div class="update-modal-footer">
-          <button id="btn-update-confirm" class="primary-btn update-confirm-btn">確認して進む ➔</button>
-          <button id="btn-update-close-bottom" class="action-btn update-close-bottom" type="button">閉じる</button>
+          <button id="btn-update-confirm" class="primary-btn update-confirm-btn">閉じる</button>
         </div>
       </div>
     `;
@@ -120,13 +119,14 @@ export class UpdateModal {
     }
 
     const btnConfirm = this.modalEl.querySelector('#btn-update-confirm');
-    const close = () => this.hide();
-    this.modalEl.querySelector('#btn-update-close-top').addEventListener('click', close);
-    this.modalEl.querySelector('#btn-update-close-bottom').addEventListener('click', close);
-    btnConfirm.addEventListener('click', () => {
+    const close = () => {
       this.hide();
       UpdateModal.markAsRead();
       if (this.onDismiss) this.onDismiss();
+    };
+    this.modalEl.querySelector('#btn-update-close-top').addEventListener('click', close);
+    btnConfirm.addEventListener('click', () => {
+      close();
     });
   }
 

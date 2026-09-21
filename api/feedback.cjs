@@ -7,6 +7,7 @@
 //   GITHUB_TOKEN          issuesへの書き込み権限を持つFine-grained PAT（このリポジトリに限定推奨）
 // 任意環境変数:
 //   GITHUB_FEEDBACK_REPO  "owner/repo" 形式。未設定時は Guch1120/uodekka を使用
+const crypto = require('node:crypto');
 const CATEGORIES = ['不具合報告', '新機能の要望', '操作性・UI改善', 'その他'];
 const MAX_MESSAGE_LENGTH = 1000;
 const MAX_NAME_LENGTH = 20;
@@ -47,6 +48,30 @@ async function createIssue({ token, repo, title, body, labels }) {
     body: JSON.stringify(labels ? { title, body, labels } : { title, body }),
     signal: AbortSignal.timeout(8000)
   });
+}
+
+async function uploadImage({ token, repo, image }) {
+  if (!image) return '';
+  const [, encoded] = image.split(',', 2);
+  const path = `feedback-assets/${Date.now()}-${crypto.randomBytes(6).toString('hex')}.jpg`;
+  const response = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/vnd.github+json',
+      'Content-Type': 'application/json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      'User-Agent': 'uodekka-feedback-form'
+    },
+    body: JSON.stringify({
+      message: `chore: add feedback image ${path.split('/').pop()}`,
+      content: encoded
+    }),
+    signal: AbortSignal.timeout(12000)
+  });
+  if (!response.ok) throw new Error(`GitHub asset upload error: ${response.status}`);
+  const result = await response.json();
+  return result.content?.download_url || '';
 }
 
 async function createGitHubIssue({ token, repo, title, body }) {
@@ -103,19 +128,20 @@ async function handler(req, res) {
   const name = sanitize(data.name, MAX_NAME_LENGTH) || '匿名';
 
   const titleExcerpt = message.replace(/\n/g, ' ').slice(0, 60);
-  const image = typeof data.image === 'string' && IMAGE_PATTERN.test(data.image) ? data.image : '';
+  const imageData = typeof data.image === 'string' && IMAGE_PATTERN.test(data.image) ? data.image : '';
   const title = `[フィードバック/${category}] ${titleExcerpt}${message.length > 60 ? '…' : ''}`;
   const body = [
     `- **カテゴリ**: ${category}`,
     `- **お名前**: ${name}`,
     `- **送信日時**: ${new Date().toISOString()}`,
     '',
-    message,
-    image ? `\n\n![添付画像](${image})` : ''
+    message
   ].join('\n');
 
   try {
-    const issue = await createGitHubIssue({ token, repo, title, body });
+    const imageUrl = await uploadImage({ token, repo, image: imageData });
+    const bodyWithImage = imageUrl ? `${body}\n\n![添付画像](${imageUrl})` : body;
+    const issue = await createGitHubIssue({ token, repo, title, body: bodyWithImage });
     res.statusCode = 200;
     res.end(JSON.stringify({ ok: true, issueUrl: issue.html_url }));
   } catch {

@@ -156,6 +156,15 @@
       _resumeLayoutTimers = [120, 500, 1200].map(delay => setTimeout(syncAppLayout, delay));
     }
 
+    window.recoverAppPresentation = () => {
+      window.requestForcedLandscapeLayout();
+      const root = document.documentElement;
+      const requestFullscreen = root.requestFullscreen || root.webkitRequestFullscreen;
+      if (requestFullscreen) requestFullscreen.call(root).catch(() => {});
+      if (screen.orientation?.lock) screen.orientation.lock('landscape').catch(() => {});
+      handleAppResume();
+    };
+
     detectDeviceInfo();
     window.addEventListener('resize', detectDeviceInfo);
     window.addEventListener('orientationchange', handleAppResume);
