@@ -553,6 +553,7 @@
 }
 
 .update-modal-header {
+  position: relative;
   margin-bottom: 20px;
   text-align: center;
 }
@@ -632,4 +633,3 @@
   color: #cbd5e1;
   margin: 0;
 }
-

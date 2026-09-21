@@ -90,6 +90,7 @@ export class UpdateModal {
     this.modalEl.innerHTML = `
       <div class="modal-card update-modal-card" role="dialog" aria-modal="true" aria-labelledby="update-modal-title">
         <div class="update-modal-header">
+          <button id="btn-update-close-top" class="btn-close update-close-btn" type="button" aria-label="閉じる">×</button>
           <div class="update-version-tag">Ver ${latest ? latest.version : ''} (${latest ? latest.date : ''})</div>
           <h2 id="update-modal-title" class="update-modal-title">${latest ? latest.title : ''}</h2>
           <p class="update-modal-subtitle">いつもUO:De Carをお楽しみいただきありがとうございます！新機能をお知らせします。</p>
@@ -100,6 +101,7 @@ export class UpdateModal {
         </div>
         <div class="update-modal-footer">
           <button id="btn-update-confirm" class="primary-btn update-confirm-btn">確認して進む ➔</button>
+          <button id="btn-update-close-bottom" class="action-btn update-close-bottom" type="button">閉じる</button>
         </div>
       </div>
     `;
@@ -118,6 +120,9 @@ export class UpdateModal {
     }
 
     const btnConfirm = this.modalEl.querySelector('#btn-update-confirm');
+    const close = () => this.hide();
+    this.modalEl.querySelector('#btn-update-close-top').addEventListener('click', close);
+    this.modalEl.querySelector('#btn-update-close-bottom').addEventListener('click', close);
     btnConfirm.addEventListener('click', () => {
       this.hide();
       UpdateModal.markAsRead();

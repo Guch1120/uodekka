@@ -9,7 +9,7 @@
     max-height: 94%;
     padding: 8px 16px;
     border-radius: 12px;
-    overflow-y: hidden;
+    overflow-y: auto;
   }
   .update-modal-header {
     display: flex;
@@ -73,6 +73,10 @@
     text-align: center;
     margin-top: 4px;
   }
+  .update-close-bottom {
+    padding: 6px 14px;
+    font-size: 12px;
+  }
   .update-confirm-btn {
     padding: 6px 24px;
     font-size: 12px;
@@ -104,7 +108,7 @@
     display: grid;
     grid-template-columns: 1fr 1.2fr;
     align-items: stretch;
-    overflow-y: hidden;
+    overflow-y: auto;
   }
   #feedback-modal .feedback-intro {
     grid-column: 1 / -1;
@@ -492,4 +496,3 @@ body.force-landscape #feedback-modal .primary-btn {
   border-radius: 8px;
   min-height: 30px;
 }
-

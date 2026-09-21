@@ -161,6 +161,7 @@ export class FeedbackModal {
   }
 
   show(defaultName = '') {
+    document.body.classList.add('feedback-open');
     const nameEl = this.modalEl.querySelector('#feedback-name');
     if (nameEl && !nameEl.value) {
       nameEl.value = defaultName || (this.getDefaultName ? this.getDefaultName() : '');
@@ -171,5 +172,6 @@ export class FeedbackModal {
 
   hide() {
     this.modalEl.classList.add('hidden');
+    document.body.classList.remove('feedback-open');
   }
 }

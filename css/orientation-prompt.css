@@ -59,3 +59,7 @@ body.force-landscape .orientation-prompt {
   display: none !important;
 }
 
+/* ファイル選択などで一時的にfullscreenが解除されても、入力中のモーダルを覆わない。 */
+body.feedback-open .orientation-prompt {
+  display: none !important;
+}
