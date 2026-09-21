@@ -170,6 +170,10 @@ export class Game {
     // マシン固有スキルの発動トリガー（HUDボタンおよびPCの[F]キー）
     if (this.hud) {
       this.hud.onTriggerSkill = () => this.triggerPlayerSkill();
+      this.hud.onTriggerItem = () => {
+        if (!this.isRunning || this.isPaused || !this.localPlayerKart?.holdingItem) return;
+        this.inputManager.state.useItemTrigger = true;
+      };
     }
     window.addEventListener('keydown', (e) => {
       if (e.code === 'KeyF' && !e.repeat) {

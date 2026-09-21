@@ -74,9 +74,9 @@ export class HUD {
           </span>
         </button>
 
-        <div id="hud-item-slot" class="item-slot-box empty">
-          <div class="item-icon-wrapper" id="hud-item-icon"></div>
-        </div>
+          <button id="hud-item-slot" class="item-slot-box empty" type="button" aria-label="アイテムを使う">
+            <span class="item-icon-wrapper" id="hud-item-icon"></span>
+          </button>
         <button id="btn-open-pause" class="icon-btn" title="一時停止・中断 (Esc)">
           ${Icons.getSvg('pause')}
         </button>
@@ -172,6 +172,15 @@ export class HUD {
       };
       this.skillBtnEl.addEventListener('pointerdown', trigger);
       this.skillBtnEl.addEventListener('click', trigger);
+    }
+    if (this.itemSlotEl) {
+      const trigger = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.onTriggerItem?.();
+      };
+      this.itemSlotEl.addEventListener('pointerdown', trigger);
+      this.itemSlotEl.addEventListener('click', trigger);
     }
 
     this.respawnBannerEl = hudDiv.querySelector('#hud-respawn-banner');

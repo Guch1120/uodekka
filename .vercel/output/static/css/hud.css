@@ -378,6 +378,10 @@
   align-items: center;
   justify-content: center;
   box-shadow: 0 4px 15px rgba(243, 156, 18, 0.4);
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
 }
 
 .item-slot-box.empty {
@@ -569,4 +573,3 @@
   color: #f87171;
   border: 1px solid #ef4444;
 }
-
