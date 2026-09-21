@@ -10,7 +10,8 @@
 const CATEGORIES = ['不具合報告', '新機能の要望', '操作性・UI改善', 'その他'];
 const MAX_MESSAGE_LENGTH = 1000;
 const MAX_NAME_LENGTH = 20;
-const MAX_BODY_BYTES = 20_000;
+const MAX_BODY_BYTES = 3_000_000;
+const IMAGE_PATTERN = /^data:image\/(png|jpeg|gif|webp);base64,[A-Za-z0-9+/=]+$/;
 
 function sanitize(value, maxLength) {
   return String(value ?? '').replace(/\r\n/g, '\n').trim().slice(0, maxLength);
@@ -102,13 +103,15 @@ async function handler(req, res) {
   const name = sanitize(data.name, MAX_NAME_LENGTH) || '匿名';
 
   const titleExcerpt = message.replace(/\n/g, ' ').slice(0, 60);
+  const image = typeof data.image === 'string' && IMAGE_PATTERN.test(data.image) ? data.image : '';
   const title = `[フィードバック/${category}] ${titleExcerpt}${message.length > 60 ? '…' : ''}`;
   const body = [
     `- **カテゴリ**: ${category}`,
     `- **お名前**: ${name}`,
     `- **送信日時**: ${new Date().toISOString()}`,
     '',
-    message
+    message,
+    image ? `\n\n![添付画像](${image})` : ''
   ].join('\n');
 
   try {

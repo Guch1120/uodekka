@@ -68,11 +68,34 @@ export const AudioManager = {
   _bgmAudio: null,
   _bgmKey: null,
   _fadeToken: 0,
+  _bgmSuspended: false,
+  _lifecycleBound: false,
 
   _bgmVolume: readVolume(STORAGE_KEYS.bgmVolume, DEFAULT_BGM_VOLUME),
   _sfxVolume: readVolume(STORAGE_KEYS.sfxVolume, DEFAULT_SFX_VOLUME),
   _bgmMuted: readBool(STORAGE_KEYS.bgmMuted, false),
   _sfxMuted: readBool(STORAGE_KEYS.sfxMuted, false),
+
+  _bindLifecycle() {
+    if (this._lifecycleBound || typeof document === 'undefined') return;
+    this._lifecycleBound = true;
+    const suspend = () => {
+      if (document.visibilityState === 'hidden') {
+        this._bgmSuspended = true;
+        if (this._bgmAudio && !this._bgmAudio.paused) this._bgmAudio.pause();
+      } else {
+        this._bgmSuspended = false;
+        const audio = this._bgmAudio;
+        if (audio && audio.paused) audio.play().catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', suspend);
+    window.addEventListener('pagehide', () => {
+      this._bgmSuspended = true;
+      if (this._bgmAudio) this._bgmAudio.pause();
+    });
+    window.addEventListener('pageshow', suspend);
+  },
 
   get effectiveBgmVolume() {
     return this._bgmMuted ? 0 : this._bgmVolume;
@@ -114,6 +137,7 @@ export const AudioManager = {
 
   // レース中のコースBGM等、明示的に呼ばれない限り自動再生しない（各UIの表示イベントから呼び出す想定）。
   async playBgm(key) {
+    this._bindLifecycle();
     const src = BGM_SOURCES[key];
     if (!src) return;
     if (this._bgmKey === key && this._bgmAudio && !this._bgmAudio.paused) return; // 既に再生中なら何もしない
@@ -133,6 +157,7 @@ export const AudioManager = {
     this._bgmKey = key;
     audio.play().catch(() => {}); // 自動再生ポリシーで拒否されても無視（ユーザー操作後の呼び出しのみ想定）
     await fade(audio, 0, this.effectiveBgmVolume, FADE_MS);
+    if (this._bgmSuspended && !audio.paused) audio.pause();
   },
 
   async stopBgm() {

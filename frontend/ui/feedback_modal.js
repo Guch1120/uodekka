@@ -8,6 +8,7 @@
 
 const CATEGORIES = ['不具合報告', '新機能の要望', '操作性・UI改善', 'その他'];
 const MESSAGE_MAX_LENGTH = 1000;
+const IMAGE_MAX_BYTES = 2 * 1024 * 1024;
 
 function defaultFeedbackServerUrl() {
   if (typeof window !== 'undefined' && window.FEEDBACK_SERVER_URL) return window.FEEDBACK_SERVER_URL;
@@ -54,6 +55,12 @@ export class FeedbackModal {
             <div class="feedback-char-count"><span id="feedback-char-count">0</span> / ${MESSAGE_MAX_LENGTH}</div>
           </div>
 
+          <div class="setting-row">
+            <div class="setting-label"><strong>画像（任意）</strong></div>
+            <input type="file" id="feedback-image" class="feedback-file" accept="image/png,image/jpeg,image/gif,image/webp">
+            <div id="feedback-image-name" class="feedback-file-name">画像は1枚、2MBまで添付できます。</div>
+          </div>
+
           <div id="feedback-status" class="feedback-status hidden"></div>
         </div>
         <div class="modal-footer">
@@ -72,11 +79,17 @@ export class FeedbackModal {
     const btnSend = this.modalEl.querySelector('#btn-send-feedback');
     const messageEl = this.modalEl.querySelector('#feedback-message');
     const charCountEl = this.modalEl.querySelector('#feedback-char-count');
+    const imageEl = this.modalEl.querySelector('#feedback-image');
+    const imageNameEl = this.modalEl.querySelector('#feedback-image-name');
 
     btnClose.onclick = () => this.hide();
 
     messageEl.addEventListener('input', () => {
       charCountEl.textContent = String(messageEl.value.length);
+    });
+    imageEl.addEventListener('change', () => {
+      const file = imageEl.files[0];
+      imageNameEl.textContent = file ? `${file.name}（${Math.ceil(file.size / 1024)}KB）` : '画像は1枚、2MBまで添付できます。';
     });
 
     btnSend.onclick = () => this.submit();
@@ -95,11 +108,17 @@ export class FeedbackModal {
     const nameEl = this.modalEl.querySelector('#feedback-name');
     const messageEl = this.modalEl.querySelector('#feedback-message');
     const btnSend = this.modalEl.querySelector('#btn-send-feedback');
+    const imageEl = this.modalEl.querySelector('#feedback-image');
 
     const message = messageEl.value.trim();
     if (!message) {
       this.setStatus('内容を入力してください。', 'error');
       messageEl.focus();
+      return;
+    }
+    const image = imageEl.files[0];
+    if (image && (!image.type.startsWith('image/') || image.size > IMAGE_MAX_BYTES)) {
+      this.setStatus('画像はPNG/JPEG/GIF/WebP形式で2MBまで添付できます。', 'error');
       return;
     }
 
@@ -109,13 +128,20 @@ export class FeedbackModal {
     this.setStatus('', 'hidden');
 
     try {
+      const imageData = image ? await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(image);
+      }) : null;
       const response = await fetch(defaultFeedbackServerUrl(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           category: categoryEl.value,
           name: nameEl.value.trim(),
-          message: message.slice(0, MESSAGE_MAX_LENGTH)
+          message: message.slice(0, MESSAGE_MAX_LENGTH),
+          image: imageData
         })
       });
       if (!response.ok) throw new Error(`status ${response.status}`);
@@ -123,6 +149,8 @@ export class FeedbackModal {
       this.setStatus('送信しました。ありがとうございます！', 'success');
       messageEl.value = '';
       this.modalEl.querySelector('#feedback-char-count').textContent = '0';
+      imageEl.value = '';
+      this.modalEl.querySelector('#feedback-image-name').textContent = '画像は1枚、2MBまで添付できます。';
     } catch (err) {
       this.setStatus('送信に失敗しました。ローカルのフィードバックサーバーが起動しているかご確認ください。', 'error');
     } finally {

@@ -18,13 +18,13 @@ const NEEDS_FILE = path.join(__dirname, '..', 'needs.md');
 const CATEGORIES = ['不具合報告', '新機能の要望', '操作性・UI改善', 'その他'];
 const MAX_MESSAGE_LENGTH = 1000;
 const MAX_NAME_LENGTH = 20;
-const MAX_BODY_BYTES = 20_000;
+const MAX_BODY_BYTES = 3_000_000;
 
 function sanitizeText(value, maxLength) {
   return String(value ?? '').replace(/\r\n/g, '\n').trim().slice(0, maxLength);
 }
 
-function appendFeedback({ category, name, message }) {
+function appendFeedback({ category, name, message, image }) {
   const safeCategory = CATEGORIES.includes(category) ? category : 'その他';
   const safeName = sanitizeText(name, MAX_NAME_LENGTH) || '匿名';
   const timestamp = new Date().toISOString();
@@ -33,7 +33,8 @@ function appendFeedback({ category, name, message }) {
     fs.writeFileSync(NEEDS_FILE, '# ユーザーからのご意見・ご要望\n\nゲーム内フィードバックフォームからの送信を自動的に追記します。\n', 'utf8');
   }
 
-  const block = `\n## ${timestamp}\n\n- **カテゴリ**: ${safeCategory}\n- **お名前**: ${safeName}\n\n${message}\n\n---\n`;
+  const imageLine = image ? `\n\n![添付画像](${image})\n` : '';
+  const block = `\n## ${timestamp}\n\n- **カテゴリ**: ${safeCategory}\n- **お名前**: ${safeName}\n\n${message}${imageLine}\n---\n`;
   fs.appendFileSync(NEEDS_FILE, block, 'utf8');
 }
 
@@ -74,7 +75,9 @@ const server = http.createServer((req, res) => {
         res.end(JSON.stringify({ error: 'message is required' }));
         return;
       }
-      appendFeedback({ category: data.category, name: data.name, message });
+      const image = typeof data.image === 'string' && /^data:image\/(png|jpeg|gif|webp);base64,[A-Za-z0-9+/=]+$/.test(data.image)
+        ? data.image : '';
+      appendFeedback({ category: data.category, name: data.name, message, image });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true }));
     } catch {
