@@ -161,6 +161,7 @@
     window.addEventListener('orientationchange', handleAppResume);
     window.addEventListener('pageshow', handleAppResume);
     window.addEventListener('focus', handleAppResume);
+    window.addEventListener('uodekka-app-resume', handleAppResume);
     if (screen.orientation && typeof screen.orientation.addEventListener === 'function') {
       screen.orientation.addEventListener('change', handleAppResume);
     }

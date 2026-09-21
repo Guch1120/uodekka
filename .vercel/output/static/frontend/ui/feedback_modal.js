@@ -9,6 +9,32 @@
 const CATEGORIES = ['不具合報告', '新機能の要望', '操作性・UI改善', 'その他'];
 const MESSAGE_MAX_LENGTH = 1000;
 const IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+const IMAGE_PAYLOAD_MAX_CHARS = 48_000;
+
+function prepareImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => {
+      const image = new Image();
+      image.onerror = reject;
+      image.onload = () => {
+        const scale = Math.min(1, 1024 / Math.max(image.width, image.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(image.width * scale));
+        canvas.height = Math.max(1, Math.round(image.height * scale));
+        canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+        for (const quality of [0.72, 0.55, 0.4, 0.25]) {
+          const data = canvas.toDataURL('image/jpeg', quality);
+          if (data.length <= IMAGE_PAYLOAD_MAX_CHARS) return resolve(data);
+        }
+        reject(new Error('image too large'));
+      };
+      image.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 function defaultFeedbackServerUrl() {
   if (typeof window !== 'undefined' && window.FEEDBACK_SERVER_URL) return window.FEEDBACK_SERVER_URL;
@@ -90,6 +116,8 @@ export class FeedbackModal {
     imageEl.addEventListener('change', () => {
       const file = imageEl.files[0];
       imageNameEl.textContent = file ? `${file.name}（${Math.ceil(file.size / 1024)}KB）` : '画像は1枚、2MBまで添付できます。';
+      window.requestForcedLandscapeLayout?.();
+      window.dispatchEvent(new Event('uodekka-app-resume'));
     });
 
     btnSend.onclick = () => this.submit();
@@ -128,12 +156,7 @@ export class FeedbackModal {
     this.setStatus('', 'hidden');
 
     try {
-      const imageData = image ? await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(image);
-      }) : null;
+      const imageData = image ? await prepareImage(image) : null;
       const response = await fetch(defaultFeedbackServerUrl(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
