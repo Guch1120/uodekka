@@ -244,7 +244,7 @@
       let startupStage = 'module';
       try {
         // タッチ完了後に初期化し、開始操作がゲーム入力に混ざるのを防ぐ。
-        const { Game } = await import('./backend/game.js');
+        const { Game } = await import('./backend/game.js?v=20260922-feedback-2');
         startupStage = 'initialization';
         window.gameInstance = new Game();
         app.inert = false;

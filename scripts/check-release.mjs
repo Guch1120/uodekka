@@ -22,7 +22,8 @@ for (const file of [...sources, ...walk(output), ...walk(resolve(root, 'worker')
     const result = spawnSync(process.execPath, ['--input-type=module', '--check'], { input: script, encoding: 'utf8' });
     if (result.status !== 0) failures.push(`構文エラー: ${file}\n${result.stderr}`);
     for (const match of script.matchAll(/(?:from\s*|import\s*\(?\s*)['"](\.[^'"]+)['"]/g)) {
-      if (!existsSync(resolve(dirname(file), match[1]))) failures.push(`参照欠落: ${file} → ${match[1]}`);
+      const importPath = match[1].split('?')[0];
+      if (!existsSync(resolve(dirname(file), importPath))) failures.push(`参照欠落: ${file} → ${match[1]}`);
     }
   }
 }

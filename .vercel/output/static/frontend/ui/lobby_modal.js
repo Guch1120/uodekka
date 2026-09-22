@@ -4,7 +4,7 @@ import { normalizeRoomId } from '../../backend/network/room_id.js';
 import { GaragePreview, courseArt, courseMetrics, deriveCourseTags } from './lobby_preview.js';
 import { CPU_ROSTER } from '../../backend/ai/cpu_driver.js';
 import { UpdateModal } from './update_modal.js';
-import { FeedbackModal } from './feedback_modal.js';
+import { FeedbackModal } from './feedback_modal.js?v=20260922-feedback-2';
 import { AudioManager } from '../audio/audio_manager.js';
 import { getVehicleMissions, NumericBuffTable, CPU_MISSION_MIN_LEVEL } from '../../backend/missions/mission_definitions.js';
 import { drawMission } from '../../backend/missions/mission_engine.js';
