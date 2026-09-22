@@ -152,7 +152,12 @@ async function handler(req, res) {
     const bodyWithImage = imageUrl ? `${body}\n\n![添付画像](${imageUrl})` : body;
     const issue = await createGitHubIssue({ token, repo, title, body: bodyWithImage });
     res.statusCode = 200;
-    res.end(JSON.stringify({ ok: true, issueUrl: issue.html_url, imageAttached: Boolean(imageUrl) }));
+    res.end(JSON.stringify({
+      ok: true,
+      issueUrl: issue.html_url,
+      imageReceived: Boolean(imageData),
+      imageAttached: Boolean(imageUrl)
+    }));
   } catch {
     // GitHubトークンや上流のエラー詳細はクライアントへ漏らさない。
     res.statusCode = 502;

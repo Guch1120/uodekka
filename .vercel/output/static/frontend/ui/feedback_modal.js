@@ -168,6 +168,9 @@ export class FeedbackModal {
       });
       if (!response.ok) throw new Error(`status ${response.status}`);
       const result = await response.json();
+      if (image && !result.imageReceived) {
+        throw new Error('image was not received');
+      }
       if (image && !result.imageAttached) {
         throw new Error('image was not attached');
       }
@@ -178,7 +181,9 @@ export class FeedbackModal {
       imageEl.value = '';
       this.modalEl.querySelector('#feedback-image-name').textContent = '画像は1枚、2MBまで添付できます。';
     } catch (err) {
-      this.setStatus(image && err.message === 'image was not attached'
+      this.setStatus(image && err.message === 'image was not received'
+        ? '本番APIに画像が届いていません。画面を再読み込みしてから画像を選び直してください。'
+        : image && err.message === 'image was not attached'
         ? '送信できましたが、画像の保存に失敗しました。画像を選び直して再送信してください。'
         : '送信に失敗しました。ローカルのフィードバックサーバーが起動しているかご確認ください。', 'error');
     } finally {
