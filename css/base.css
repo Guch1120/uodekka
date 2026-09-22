@@ -17,8 +17,8 @@ body, html {
 }
 
 #app {
-  width: 100vw;
-  height: 100vh;
+  width: var(--app-width, 100vw);
+  height: var(--app-height, 100dvh);
   position: relative;
   overflow: hidden;
 }
@@ -26,4 +26,3 @@ body, html {
 canvas {
   display: block;
 }
-

@@ -1,7 +1,7 @@
 /* Pre-race screens: shared garage, course selection and room lobby. */
 .garage {
   --ink: #14293b; --muted: #667887; --line: #dce5eb; --orange: #ff773e;
-  position: fixed; inset: 0; z-index: 45; overflow: auto;
+  position: fixed; inset: 0 auto auto 0; width: var(--app-width, 100vw); height: var(--app-height, 100dvh); max-height: var(--app-height, 100dvh); z-index: 45; overflow: auto;
   color: var(--ink); background: #142c42;
   background-image: radial-gradient(ellipse at 5% 0, #284c64 0, transparent 65%);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans JP", sans-serif;
@@ -33,7 +33,7 @@ body[data-is-landscape="true"] .garage-shell {
 .garage-brand-mark span { color: var(--orange); }
 .garage-location { display: flex; gap: 9px; align-items: center; margin-left: auto; color: #c1d1dc; font-size: 11px; letter-spacing: .8px; }
 .garage-live-dot { width: 6px; height: 6px; border-radius: 50%; background: #bbefb1; box-shadow: 0 0 0 4px #bbefb114; }
-.garage main { flex: 1; display: flex; align-items: center; }
+.garage main { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; }
 .garage-screen { display: grid; width: 100%; grid-template-columns: 1.22fr 1fr; gap: 28px; }
 .garage-eyebrow { display: block; font-size: 10px; font-weight: 750; letter-spacing: 1.7px; line-height: 1.6; color: var(--muted); }
 .garage-section-heading { display: flex; justify-content: space-between; gap: 15px; align-items: center; margin-bottom: 20px; }
