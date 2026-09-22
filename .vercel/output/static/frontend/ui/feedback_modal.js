@@ -167,14 +167,20 @@ export class FeedbackModal {
         })
       });
       if (!response.ok) throw new Error(`status ${response.status}`);
+      const result = await response.json();
+      if (image && !result.imageAttached) {
+        throw new Error('image was not attached');
+      }
 
-      this.setStatus('送信しました。ありがとうございます！', 'success');
+      this.setStatus(image ? '送信しました。画像もGitHubに添付されています。' : '送信しました。ありがとうございます！', 'success');
       messageEl.value = '';
       this.modalEl.querySelector('#feedback-char-count').textContent = '0';
       imageEl.value = '';
       this.modalEl.querySelector('#feedback-image-name').textContent = '画像は1枚、2MBまで添付できます。';
     } catch (err) {
-      this.setStatus('送信に失敗しました。ローカルのフィードバックサーバーが起動しているかご確認ください。', 'error');
+      this.setStatus(image && err.message === 'image was not attached'
+        ? '送信できましたが、画像の保存に失敗しました。画像を選び直して再送信してください。'
+        : '送信に失敗しました。ローカルのフィードバックサーバーが起動しているかご確認ください。', 'error');
     } finally {
       this.sending = false;
       btnSend.disabled = false;
