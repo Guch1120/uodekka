@@ -121,7 +121,15 @@ export class LobbyModal {
               <label class="course-picker-fallback" for="course-select"><span>コース一覧</span><select id="course-select"></select></label>
             </div>
             <div class="garage-setup-side">
-              <div class="garage-course-vehicle"><span class="garage-eyebrow">YOUR MACHINE</span><strong class="vehicle-name"></strong><span class="garage-course-vehicle-category" id="course-vehicle-category"></span></div>
+              <div class="garage-course-vehicle-card">
+                <div class="garage-course-vehicle"><span class="garage-eyebrow">YOUR MACHINE</span><strong class="vehicle-name"></strong><span class="garage-course-vehicle-category" id="course-vehicle-category"></span></div>
+                <div class="garage-course-vehicle-stats" aria-label="車体パラメータ">
+                  <div class="garage-course-stat"><span>スピード</span><meter data-course-stat="topSpeed" min="0" max="50"></meter><strong data-course-stat-value="topSpeed"></strong></div>
+                  <div class="garage-course-stat"><span>加速</span><meter data-course-stat="acceleration" min="0" max="35"></meter><strong data-course-stat-value="acceleration"></strong></div>
+                  <div class="garage-course-stat"><span>重さ</span><meter data-course-stat="weight" min="0" max="1.5"></meter><strong data-course-stat-value="weight"></strong></div>
+                </div>
+                <div class="garage-course-skill"><span class="garage-skill-badge">固有スキル</span><strong id="course-skill-name"></strong><span id="course-skill-status" class="garage-skill-status"></span></div>
+              </div>
               <div class="garage-course-actions"><button id="course-confirm" class="garage-button garage-button-green">✓ コース決定</button><button id="course-random" class="garage-button garage-button-light">⤨ ランダム決定</button></div>
               <p id="course-confirmation" class="garage-note" aria-live="polite">コースを選んで確定してください。</p>
               <button id="btn-start-solo" class="garage-button garage-button-start" disabled>ゲームスタート <span>→</span></button>
@@ -382,10 +390,26 @@ export class LobbyModal {
     const wrap = this.el('.garage-home-menu-wrap');
     const menu = this.el('#garage-home-menu');
     if (!wrap || !menu) return;
-    const availableHeight = Math.max(0, this.modalEl.clientHeight - wrap.offsetTop - 72);
-    const needsCollapse = menu.scrollWidth > wrap.clientWidth + 1 || menu.scrollHeight > availableHeight;
+    // 固定値を引かず、現在のシェルの下端と実際のメニュー寸法で判定する。
+    // 開閉式から通常表示へ戻る場合も、非表示状態の scrollHeight に依存しない。
+    menu.classList.add('is-measuring');
+    const menuHeight = menu.scrollHeight;
+    menu.classList.remove('is-measuring');
+    const shell = this.el('.garage-shell');
+    const shellStyle = shell ? getComputedStyle(shell) : null;
+    const bottomPadding = shellStyle ? parseFloat(shellStyle.paddingBottom) || 0 : 0;
+    const availableHeight = shell
+      ? Math.max(0, shell.getBoundingClientRect().bottom - wrap.getBoundingClientRect().top - bottomPadding)
+      : menuHeight;
+    const needsCollapse = menu.scrollWidth > wrap.clientWidth + 1 || menuHeight > availableHeight + 1;
     wrap.classList.toggle('menu-collapsible', needsCollapse);
-    if (!needsCollapse) this.closeHomeMenu();
+    if (needsCollapse) {
+      const toggleHeight = this.el('#garage-menu-toggle')?.getBoundingClientRect().height || 44;
+      menu.style.setProperty('--garage-menu-max-height', `${Math.max(44, availableHeight - toggleHeight - 8)}px`);
+    } else {
+      menu.style.removeProperty('--garage-menu-max-height');
+      this.closeHomeMenu();
+    }
   }
 
   setDetailTab(tab) {
@@ -427,6 +451,11 @@ export class LobbyModal {
       const key = el.dataset.statValue;
       el.textContent = key === 'topSpeed' ? `${Math.round(vehicle.topSpeed * 3)}` : key === 'acceleration' ? `${vehicle.acceleration}` : `${vehicle.weight.toFixed(1)}`;
     });
+    this.modalEl.querySelectorAll('[data-course-stat]').forEach(el => { el.value = vehicle[el.dataset.courseStat]; });
+    this.modalEl.querySelectorAll('[data-course-stat-value]').forEach(el => {
+      const key = el.dataset.courseStatValue;
+      el.textContent = key === 'topSpeed' ? `${Math.round(vehicle.topSpeed * 3)}` : key === 'acceleration' ? `${vehicle.acceleration}` : `${vehicle.weight.toFixed(1)}`;
+    });
 
     // コイン残高の表示更新
     const bankCoins = SkillsManager.getBankCoins();
@@ -436,6 +465,13 @@ export class LobbyModal {
     // 固有スキルの表示・解禁ボタンの更新
     const skill = vehicle.skill;
     const isUnlocked = SkillsManager.isSkillUnlocked(this.vehicleKey);
+    const courseSkillNameEl = this.el('#course-skill-name');
+    const courseSkillStatusEl = this.el('#course-skill-status');
+    if (courseSkillNameEl) courseSkillNameEl.textContent = skill && isUnlocked ? `${skill.icon || '⚡'} ${skill.name}` : '解放済みスキルなし';
+    if (courseSkillStatusEl) {
+      courseSkillStatusEl.textContent = skill && isUnlocked ? '✨ 解禁済み' : '';
+      courseSkillStatusEl.className = `garage-skill-status ${skill && isUnlocked ? 'unlocked' : 'locked'}`;
+    }
     const skillTitleEl = this.el('#detail-skill-title');
     const skillStatusEl = this.el('#detail-skill-status');
     const skillDescEl = this.el('#detail-skill-desc');

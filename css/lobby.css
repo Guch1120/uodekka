@@ -161,6 +161,7 @@ body[data-is-landscape="true"] .garage-shell {
 .garage-button-light { background: #ffddc3; color: #783912; }
 .garage-button-start { background: var(--orange); color: #1f2630; display: flex; align-items: center; justify-content: space-between; gap: 15px; font-size: clamp(19px, 2.2vw, 27px) !important; padding: 20px 24px; width: 100%; }
 .garage-button-start span { font-size: 28px; }
+.garage-setup-side > .garage-button-start { margin-top: auto; }
 .garage-note { font-size: 11px; color: var(--muted); line-height: 1.7; }
 .garage-setup-side > .garage-note { color: #bcced9; margin-top: -5px; }
 .garage-specs { background: #fff; border: 1px solid #e3eaee; border-radius: 15px; padding: 24px; flex: 1; }
@@ -1516,7 +1517,7 @@ body[data-is-compact="true"] .garage-course-metrics strong { display: inline; fo
 .garage-course-skill .garage-skill-badge { grid-column: 1 / -1; }
 .garage-course-skill strong { min-width: 0; color: #fff; font-size: 11px; overflow-wrap: anywhere; }
 .garage-course-skill .garage-skill-status { justify-self: end; font-size: 9px; white-space: nowrap; }
-.garage-home-menu.is-measuring { display: grid !important; position: absolute !important; inset: 0 auto auto 0; visibility: hidden !important; pointer-events: none !important; }
+.garage-home-menu.is-measuring { display: grid !important; position: absolute !important; inset: 0 auto auto 0; width: 100% !important; visibility: hidden !important; pointer-events: none !important; }
 
 /* スマホ横画面は表示領域の残りを main に渡し、ホーム/コースとも同じ50:50規則で配置する。 */
 @media (max-width: 850px) and (orientation: landscape), (max-height: 520px) and (orientation: landscape) {
