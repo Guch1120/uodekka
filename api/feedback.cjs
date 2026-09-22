@@ -69,7 +69,10 @@ async function uploadImage({ token, repo, image }) {
     }),
     signal: AbortSignal.timeout(12000)
   });
-  if (!response.ok) throw new Error(`GitHub asset upload error: ${response.status}`);
+  if (!response.ok) {
+    console.error('[feedback] GitHub asset upload failed', response.status);
+    throw new Error(`GitHub asset upload error: ${response.status}`);
+  }
   // Contents APIのレスポンスにdownload_urlが含まれない場合があるため、
   // 保存先が確定した時点でraw.githubusercontent.comのURLを組み立てる。
   return `https://raw.githubusercontent.com/${repo}/main/${path}`;
