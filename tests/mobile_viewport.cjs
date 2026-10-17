@@ -9,6 +9,7 @@ const assert = require('node:assert/strict');
   await page.goto('http://localhost:8099');
   await page.evaluate(h => {
    Object.defineProperty(window, 'innerHeight', { configurable:true, value:h });
+   Object.defineProperty(window.visualViewport, 'height', {configurable:true, value:h});
    window.dispatchEvent(new Event('resize'));
   },visibleHeight);
   let size = await page.evaluate(() => ({w:document.querySelector('#app').offsetWidth,h:document.querySelector('#app').offsetHeight}));

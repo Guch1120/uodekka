@@ -12,7 +12,7 @@ const assert = require('node:assert/strict');
  await page.waitForFunction(() => !!window.gameInstance);
  for (const [width,height,visibleHeight] of [[852,393,393],[915,412,412],[852,393,330]]) {
    await page.setViewportSize({width,height});
-   await page.evaluate(h => { Object.defineProperty(window,'innerHeight',{configurable:true,value:h}); window.dispatchEvent(new Event('resize')); },visibleHeight);
+   await page.evaluate(h => { Object.defineProperty(window,'innerHeight',{configurable:true,value:h}); Object.defineProperty(window.visualViewport,'height',{configurable:true,value:h}); window.dispatchEvent(new Event('resize')); },visibleHeight);
    for (const [screen,selector] of [['home','#tab-solo'],['solo','#btn-start-solo']]) {
      await page.evaluate(name => { gameInstance.lobbyModal.showScreen(name); if (name === 'solo') gameInstance.lobbyModal.updateCourse(); }, screen);
      await page.evaluate(() => new Promise(requestAnimationFrame));

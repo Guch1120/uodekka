@@ -86,8 +86,16 @@
     let _forceLandscapeRequested = false;
 
     function detectDeviceInfo() {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
+      // モバイルブラウザのアドレスバー表示中は window.innerHeight と
+      // 実際に描画できる高さが異なるため、visualViewport を優先する。
+      const viewport = window.visualViewport;
+      const innerW = window.innerWidth;
+      const innerH = window.innerHeight;
+      // 復帰テストや一部のWebViewでは innerWidth/innerHeight だけが先に
+      // 更新されることがあるため、向きが食い違う visualViewport は使わない。
+      const visualMatchesOrientation = viewport && ((viewport.width >= viewport.height) === (innerW >= innerH));
+      const w = Math.round(visualMatchesOrientation ? viewport.width : innerW);
+      const h = Math.round(visualMatchesOrientation ? viewport.height : innerH);
       const dpr = window.devicePixelRatio || 1;
       const screenW = window.screen ? window.screen.width : w;
       const screenH = window.screen ? window.screen.height : h;
@@ -179,6 +187,9 @@
         handleAppResume();
       }
     });
+    if (window.visualViewport && typeof window.visualViewport.addEventListener === 'function') {
+      window.visualViewport.addEventListener('resize', handleAppResume);
+    }
 
     function enableForcedLandscape() {
       window.requestForcedLandscapeLayout();
