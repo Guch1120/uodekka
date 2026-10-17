@@ -38,3 +38,5 @@ Chromiumでタイトルからソロ走行、キー解放、フォーカス喪失
 - `node tests/mobile_lobby.cjs`：横持ちホーム・シングルの主要操作が画面内に収まることを確認します。
 
 ブラウザ用テストは既存Dockerコンテナ内のPlaywrightと `tests/server.cjs` を使います。
+
+痕跡・回復ゲートは `node tests/test_track_effects.mjs`（描画非依存）と `node tests/track_effects_browser.cjs`（Playwright）で確認します。`tests/multiplayer_devices.mjs` にはゲスト発動→ホスト配置→寿命共有の実WebSocket回帰も含みます。実行はDocker内です。

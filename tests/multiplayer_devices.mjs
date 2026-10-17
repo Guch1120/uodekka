@@ -193,6 +193,43 @@ async function dismissUpdateModalIfPresent(page) {
     assert.ok(cpuMoved, `ゲストから見たCPU(${guestViewOfCpu1.id})の位置が変化していない（CPU_STATES中継の疑い）`);
     print(`PASS: ホストのローカルCPUシミュレーションがCPU_STATES経由でゲスト側にも実時間で反映される (${guestViewOfCpu1.id})`);
 
+    // 痕跡はゲスト発動→ホスト採用→共有snapshotの一方向で確定する。
+    await waitFor(() => host.page.evaluate(() => gameInstance.trackEffects?.enabled), { message: '痕跡機能の相互対応確認' });
+    await host.page.evaluate(() => { const g=gameInstance;g.isPaused=true;g.trackEffects.traces=[];g.updateNetworkSync(.05,performance.now()+1000); });
+    const activationT = await guest.page.evaluate(async () => {
+      const g=gameInstance;localStorage.setItem('kart_unlocked_skills',JSON.stringify({speed_blue:true}));
+      const k=g.localPlayerKart;
+      const occupied=[...g.courseTrack.dashPanels.map(p=>p.position),...g.trackEffects.gates.map(p=>g.trackEffectsView.frame(p.t,p.offset).position)];
+      let t=.12;
+      while(t<.9&&occupied.some(p=>p.distanceTo(g.trackEffectsView.frame(t,2).position)<22))t+=.07;
+      const frame=g.trackEffectsView.frame(t,2);
+      k.mesh.position.copy(frame.position);k.mesh.position.y+=.4;k.progress=t;k.currentLap=1;k.speed=25;k.isAirborne=false;k.isRespawning=false;
+      g.playerSkillState.cooldown=0;g.isPaused=false;g.triggerPlayerSkill();g.isPaused=true;
+      g.updateNetworkSync(.05,performance.now()+1000);
+      return t;
+    });
+    await waitFor(() => host.page.evaluate(t => gameInstance.trackEffects.traces.some(trace=>Math.abs(trace.t-t)<.001), activationT), { message: 'ゲストの発動地点をホストが配置' });
+    const hostTrace = await host.page.evaluate(t => gameInstance.trackEffects.traces.find(trace=>Math.abs(trace.t-t)<.001),activationT);
+    await host.page.evaluate(() => gameInstance.updateNetworkSync(.05,performance.now()+2000));
+    await waitFor(() => guest.page.evaluate(id => gameInstance.trackEffects.traces.some(t=>t.id===id),hostTrace.id), { message: 'ホストの痕跡snapshotをゲストへ反映' });
+    const guestTrace=await guest.page.evaluate(id=>gameInstance.trackEffects.traces.find(t=>t.id===id),hostTrace.id);
+    assert.deepEqual(guestTrace,hostTrace,'痕跡の位置・寿命・IDを共有する');
+    const before=await host.page.evaluate(()=>gameInstance.trackEffects.traces.length);
+    await guest.page.evaluate(()=>gameInstance.updateNetworkSync(.05,performance.now()+2000));
+    await new Promise(r=>setTimeout(r,150));
+    assert.equal(await host.page.evaluate(()=>gameInstance.trackEffects.traces.length),before,'同一の発動情報を繰り返しても生成しない');
+    await host.page.evaluate(() => {
+      const g=gameInstance;g.trackEffects.traces[0].born=0;g.trackEffects.elapsed=100;g.trackEffects.update(.1);g.updateNetworkSync(.05,performance.now()+3000);
+    });
+    await waitFor(()=>guest.page.evaluate(()=>gameInstance.trackEffects.traces.length===0), {message:'期限切れをホストから共有'});
+    print('PASS: 実WebSocket経由のゲスト発動・ホスト配置・共有寿命・重複防止・期限切れ同期');
+    await host.page.evaluate(() => {
+      const g=gameInstance;for(const peer of g._trackEffectPeers.values())peer.version=0;
+      g.updateTrackEffects(0);g.updateNetworkSync(.05,performance.now()+4000);
+    });
+    await waitFor(()=>guest.page.evaluate(()=>!gameInstance.trackEffects.enabled),{message:'旧版相当のクライアント混在時に全員で新機能を無効化'});
+    print('PASS: 旧版相当のメンバー混在時はホスト・ゲスト共に新機能を無効化');
+
     // 10. ブラウザ例外が一切発生していないこと
     assert.deepEqual(host.errors, [], 'ホスト側で未捕捉のブラウザ例外が発生: ' + JSON.stringify(host.errors));
     assert.deepEqual(guest.errors, [], 'ゲスト側で未捕捉のブラウザ例外が発生: ' + JSON.stringify(guest.errors));

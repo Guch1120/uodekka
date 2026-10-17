@@ -69,7 +69,7 @@ export class HUD {
       <div class="hud-top-right">
         <!-- マシン固有スキル発動ボタン -->
         <button id="btn-hud-skill" class="hud-skill-btn locked" title="マシン固有スキル [F]">
-          <span class="skill-btn-icon" id="hud-skill-icon">⚡</span>
+          <span class="skill-btn-icon" id="hud-skill-icon">⚡</span><span class="skill-recovery-mark" aria-hidden="true">↻</span>
           <span class="skill-btn-info">
             <strong class="skill-btn-name" id="hud-skill-name">スキル</strong>
             <small class="skill-btn-cd" id="hud-skill-cd">READY</small>
@@ -532,8 +532,27 @@ export class HUD {
     }
   }
 
+  showSkillRecovery(origin, recovered) {
+    if (!this.skillBtnEl) return;
+    let x = this.skillBtnEl.offsetWidth / 2, y = this.skillBtnEl.offsetHeight / 2;
+    for (let el = this.skillBtnEl; el && el !== this.element; el = el.offsetParent) { x += el.offsetLeft; y += el.offsetTop; }
+    const start = { x: Math.max(0, Math.min(this.container.clientWidth, origin.x)),
+      y: Math.max(0, Math.min(this.container.clientHeight, origin.y)) };
+    for (let i = 0; i < 5; i++) {
+      const particle = document.createElement('span'); particle.className = 'skill-recovery-particle';
+      particle.style.left = `${start.x}px`; particle.style.top = `${start.y}px`;
+      this.element.append(particle);
+      const animation = particle.animate([{ transform: 'translate(0, 0) scale(1)', opacity: 1 },
+        { transform: `translate(${x - start.x}px, ${y - start.y}px) scale(0.3)`, opacity: 0 }],
+        { duration: 520, delay: i * 45, easing: 'ease-in', fill: 'both' });
+      animation.onfinish = () => particle.remove(); animation.oncancel = () => particle.remove();
+    }
+    this.skillBtnEl.animate([{ boxShadow: '0 0 24px #67e8f9' }, { boxShadow: '0 0 0 transparent' }], { duration: 700 });
+  }
+
   updateSkill(cooldown, maxCooldown, isActive) {
     if (!this.skillBtnEl || !this.isSkillUnlocked) return;
+    this.skillBtnEl.setAttribute('aria-label', `固有スキル：${isActive ? '発動中' : cooldown > 0 ? `あと${Math.ceil(cooldown)}秒` : '使用可能'}`);
     if (isActive) {
       this.skillBtnEl.classList.add('active');
       this.skillBtnEl.classList.remove('cooling-down');
@@ -597,6 +616,7 @@ export class HUD {
   }
 
   hide() {
+    this.element.querySelectorAll('.skill-recovery-particle').forEach(p => { p.getAnimations().forEach(a => a.cancel()); p.remove(); });
     this.hideMissionReveal();
     if (this.element) {
       this.element.classList.add('hidden');

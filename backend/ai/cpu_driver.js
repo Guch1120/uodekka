@@ -46,6 +46,9 @@ export class CPUDriver {
       targetSpeed = 38.0 * (aiKart.speedMultiplier || 1.0);
     }
 
+    // 学習ラインを基準に、近くの痕跡・再使用待ち中の回復ゲートへ寄る。
+    targetOffset = gameState?.getTrackEffectTarget?.(physics, aiKart.skillState, targetOffset, personality.style) ?? targetOffset;
+
     // ミッション形式スキルアップシステムによる最高速向上をAI目標速度にも反映
     targetSpeed = targetSpeed * (physics.missionTopSpeedMult || 1);
 
@@ -191,7 +194,8 @@ export class CPUDriver {
       && !physics.isRespawning && !physics.isFinished) {
       const vehicle = Vehicles.types[personality.vehicleKey];
       if (vehicle?.skill) {
-        activateSkill(physics, aiKart.skillState, vehicle.skill, aiKart.missionTracker);
+        if (gameState?.activateRacerSkill) gameState.activateRacerSkill(physics, aiKart.skillState, vehicle.skill, aiKart.missionTracker);
+        else activateSkill(physics, aiKart.skillState, vehicle.skill, aiKart.missionTracker);
       }
     }
 

@@ -11,6 +11,8 @@ import { Vehicles, SkillsManager } from '../frontend/vehicles/vehicles.js';
 import { MissionTracker, isCpuMissionEligible } from './missions/mission_engine.js';
 import { MISSION_SPEC_VERSION } from './missions/mission_definitions.js';
 import { createSkillState, activateSkill, tickSkill } from './skills/unique_skills.js';
+import { TrackEffects, TRACK_EFFECTS, TRACK_EFFECTS_VERSION, wrappedDistance } from './skills/track_effects.js';
+import { TrackEffectsView } from '../frontend/effects/track_effects_view.js';
 import { Courses } from '../frontend/courses/index.js';
 import { Items } from '../frontend/items/items.js';
 import { HUD } from '../frontend/ui/hud.js';
@@ -84,6 +86,11 @@ export class Game {
     this.currentGameConfig = null;
     this.currentCourseConfig = null;
     this.courseTrack = null;
+    this.trackEffects = null;
+    this.trackEffectsView = null;
+    this._trackEffectPeers = new Map();
+    this._skillActivationSequence = 0;
+    this._lastSkillActivation = null;
     this.courseObstacles = []; // 木や岩などの当たり判定オブジェクト
 
     this.localPlayerKart = null;
@@ -245,6 +252,8 @@ export class Game {
   }
 
   quitRace() {
+    this.trackEffectsView?.dispose();
+    this.trackEffectsView = null; this.trackEffects = null;
     this.isPaused = false;
     this.isRunning = false;
     if (this.pauseModal) this.pauseModal.hide();
@@ -349,6 +358,7 @@ export class Game {
         rescueActive: !!state.missionRescueActive,
         rescueKind: state.missionRescueKind || null
       };
+      this.receiveTrackEffects(peerId, state);
       peerKart.skillDisplay = {
         cooldown: state.skillCooldown || 0,
         activeTimer: state.skillActiveTimer || 0,
@@ -459,6 +469,9 @@ export class Game {
   }
 
   startRace(config) {
+    this.trackEffectsView?.dispose();
+    this._trackEffectPeers.clear();
+    this._skillActivationSequence = 0; this._lastSkillActivation = null;
     this.inputManager.resetState();
     if (this.pauseModal) this.pauseModal.hide();
     if (this.activeResultModal) {
@@ -505,6 +518,17 @@ export class Game {
 
     this.courseTrack = Courses.buildTrack(this.currentCourseConfig);
     this.scene.add(this.courseTrack.group);
+    const effectLength = this.courseTrack.curve.getLength();
+    const effectWidth = this.currentCourseConfig.trackWidth || 24;
+    const gates = [0.18, 0.5, 0.82].map((t, id) => {
+      const forward = this.courseTrack.curve.getTangentAt(t).normalize();
+      const side = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+      const bend = this.courseTrack.curve.getTangentAt((t + 0.012) % 1).dot(side);
+      return { id, t, offset: (bend > 0 ? -1 : 1) * effectWidth * 0.3 };
+    });
+    this.trackEffects = new TrackEffects(effectLength, effectWidth, gates);
+    this.trackEffects.enabled = !this.p2p.roomId;
+    this.trackEffectsView = new TrackEffectsView(this.scene, this.courseTrack.curve, this.trackEffects);
     if (this.courseTrack.jumpRamps) {
       this.jumpRamps = [...this.courseTrack.jumpRamps];
     }
@@ -744,6 +768,8 @@ export class Game {
   }
 
   playSkillSfx(type) {
+    const volume = type === 'skill_recovery' ? AudioManager.effectiveSfxVolume : 1;
+    if (volume <= 0) return;
     try {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (!AudioCtx) return;
@@ -760,6 +786,10 @@ export class Game {
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(440, now);
         osc.frequency.exponentialRampToValueAtTime(880, now + 0.5);
+      } else if (type === 'skill_recovery') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(660, now);
+        osc.frequency.exponentialRampToValueAtTime(1320, now + 0.22);
       } else if (type === 'magnet_barrier') {
         osc.type = 'sine';
         osc.frequency.setValueAtTime(587.33, now);
@@ -769,7 +799,7 @@ export class Game {
         osc.frequency.setValueAtTime(150, now);
         osc.frequency.linearRampToValueAtTime(300, now + 0.3);
       }
-      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.setValueAtTime(0.18 * volume, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
       osc.connect(gain);
       gain.connect(this._audioCtx.destination);
@@ -955,6 +985,8 @@ export class Game {
     // 6-3. カート固有スキル更新
     this.updateSkill(dt);
 
+    this.updateTrackEffects(dt);
+
     // 7. 順位計算
     const ranking = this.calculateRankings();
     const myRank = ranking.findIndex(k => k === this.localPlayerKart) + 1;
@@ -1113,7 +1145,10 @@ export class Game {
         skillCooldown: this.playerSkillState?.cooldown || 0,
         skillActiveTimer: this.playerSkillState?.activeTimer || 0,
         skillActiveType: this.playerSkillState?.activeType || null,
-        specVersion: MISSION_SPEC_VERSION
+        specVersion: MISSION_SPEC_VERSION,
+        trackEffectsVersion: TRACK_EFFECTS_VERSION,
+        skillActivation: this._lastSkillActivation,
+        trackEffects: this.p2p.isHost ? this.trackEffects?.snapshot() : undefined
       });
 
       if (this.p2p.isHost) {
@@ -1698,7 +1733,7 @@ export class Game {
     }
 
     const kart = this.localPlayerKart;
-    activateSkill(kart, this.playerSkillState, skill, this.playerMissionTracker);
+    this.activateRacerSkill(kart, this.playerSkillState, skill, this.playerMissionTracker);
     this.playSkillSfx(skill.id);
 
     if (skill.id === 'rocket_charge') {
@@ -1722,6 +1757,113 @@ export class Game {
     } else if (skill.id === 'giga_stampede') {
       this.showItemNotification(`⚡ ギガ・スタンピード発動！ 巨大化＆無敵突進！`, 2500);
     }
+  }
+
+  sampleTrackPosition(kart) {
+    const t = Number.isFinite(kart.progress) ? ((kart.progress % 1) + 1) % 1 : 0;
+    const center = this.courseTrack.curve.getPointAt(t);
+    const tangent = this.courseTrack.curve.getTangentAt(t).normalize();
+    const side = new THREE.Vector3().crossVectors(tangent, new THREE.Vector3(0, 1, 0)).normalize();
+    const offset = kart.mesh.position.clone().sub(center).dot(side);
+    return { t, offset, lap: kart.currentLap, speed: kart.speed,
+      grounded: !kart.isAirborne && !kart.isRespawning && !kart.isFinished && Math.abs(kart.mesh.position.y - center.y) < 2.5 };
+  }
+
+  addSkillTrace(sample) {
+    if (!this.trackEffects) return;
+    const point = this.trackEffectsView.frame(sample.t, sample.offset).position;
+    const occupied = [...(this.courseTrack.dashPanels || []).map(panel => panel.position),
+      ...this.trackEffects.gates.map(gate => this.trackEffectsView.frame(gate.t, gate.offset).position)];
+    if (occupied.some(other => Math.abs(point.y - other.y) < 2.5 && point.distanceTo(other) < 14)) return;
+    if (this.trackEffects.traces.some(trace => {
+      const other = this.trackEffectsView.frame(trace.t, trace.offset).position;
+      return Math.abs(point.y - other.y) < 2.5 && point.distanceTo(other) < 18;
+    })) return;
+    const tangent = this.courseTrack.curve.getTangentAt(sample.t).normalize();
+    const side = new THREE.Vector3().crossVectors(tangent, new THREE.Vector3(0, 1, 0)).normalize();
+    const bend = this.courseTrack.curve.getTangentAt((sample.t + 0.012) % 1).dot(side);
+    const outer = Math.abs(bend) > 0.005 && Math.sign(sample.offset) !== Math.sign(bend)
+      ? Math.abs(sample.offset) / (this.trackEffects.trackWidth / 2) : 0;
+    this.trackEffects.addTrace(sample, outer);
+  }
+
+  activateRacerSkill(kart, state, skill, tracker) {
+    // 滑空スキルが離陸状態へ変える前の、実際の発動地点を保存する。
+    const sample = this.sampleTrackPosition(kart);
+    const result = activateSkill(kart, state, skill, tracker);
+    if (!result) return result;
+    if (kart === this.localPlayerKart) {
+      this._lastSkillActivation = { sequence: ++this._skillActivationSequence, ...sample };
+    }
+    if (!this.p2p.roomId || this.p2p.isHost) this.addSkillTrace(sample);
+    return result;
+  }
+
+  receiveTrackEffects(peerId, packet) {
+    if (!this.trackEffects) return;
+    const previous = this._trackEffectPeers.get(peerId);
+    const sequence = Number.isSafeInteger(packet.skillActivation?.sequence) ? packet.skillActivation.sequence : 0;
+    this._trackEffectPeers.set(peerId, { version: packet.trackEffectsVersion, sequence: Math.max(previous?.sequence || 0, sequence) });
+    if (!this.p2p.isHost) {
+      if (this.p2p.members?.some(m => m.id === peerId && m.isHost)) this.trackEffects.applySnapshot(packet.trackEffects);
+      return;
+    }
+    this.trackEffects.enabled = this.trackEffectsPeersReady();
+    const sample = packet.skillActivation;
+    const skill = Vehicles.types[packet.vehicleKey]?.skill;
+    if (!skill || packet.skillActiveType !== skill.id || !Number.isFinite(packet.skillActiveTimer)
+      || packet.skillActiveTimer <= 0 || packet.skillActiveTimer > skill.duration + 1) return;
+    if (sequence <= (previous?.sequence || 0) || !this.trackEffects.validSample(sample) || sample.grounded !== true) return;
+    // 遅れて到着した発動や不正な位置で、遠方へ痕跡を作らせない。
+    if (!Number.isFinite(packet.progress) || Math.abs(wrappedDistance(sample.t * this.trackEffects.length, packet.progress * this.trackEffects.length, this.trackEffects.length)) > 60) return;
+    this.addSkillTrace(sample);
+  }
+
+  trackEffectsPeersReady() {
+    return (this.p2p.members || []).filter(m => m.id !== this.p2p.myPeerId)
+      .every(m => this._trackEffectPeers.get(m.id)?.version === TRACK_EFFECTS_VERSION);
+  }
+
+  updateTrackEffects(dt) {
+    if (!this.trackEffects || !this.localPlayerKart) return;
+    if (this.p2p.roomId && this.p2p.isHost) this.trackEffects.enabled = this.trackEffectsPeersReady();
+    this.trackEffects.update(dt);
+    const racers = [{ physics: this.localPlayerKart, skillState: this.playerSkillState },
+      ...[...this.otherPlayers.values()].filter(p => p.isAI)];
+    for (const racer of racers) {
+      const kart = racer.physics;
+      for (const event of this.trackEffects.stepRacer(kart.id, this.sampleTrackPosition(kart), racer.skillState)) {
+        if (event.type === 'trace-boost') {
+          kart.applyBoost(Math.max(TRACK_EFFECTS.boostMultiplier, kart.boostTimer > 0 ? kart.boostMultiplier : 1), Math.max(TRACK_EFFECTS.boostSeconds, kart.boostTimer || 0));
+          if (kart === this.localPlayerKart) this.showItemNotification('✦ 痕跡から飛び出して加速！', 1000);
+        } else if (kart === this.localPlayerKart) {
+          const point = this.trackEffectsView.frame(event.object.t, event.object.offset).position.clone();
+          point.y += 1.5; point.project(this.renderer.camera);
+          this.hud.showSkillRecovery({ x: (point.x * 0.5 + 0.5) * this.appContainer.clientWidth,
+            y: (-point.y * 0.5 + 0.5) * this.appContainer.clientHeight }, event.recovered);
+          this.playSkillSfx('skill_recovery');
+          this.showItemNotification(this.playerSkillState.cooldown <= 0 ? '↻ スキル準備完了！' : `↻ スキル待ち時間 −${event.recovered.toFixed(1)}秒`, 1000);
+        }
+      }
+    }
+    this.trackEffectsView.update();
+  }
+
+  getTrackEffectTarget(physics, skillState, defaultOffset, style = 'balanced') {
+    if (!this.trackEffects?.enabled) return defaultOffset;
+    const candidates = this.trackEffects.traces.map(t => ({ ...t, kind: 'trace' }));
+    const recoveryStyle = ['wide_sweeper', 'defender', 'tactician'].includes(style);
+    if (skillState?.cooldown > TRACK_EFFECTS.recoverySeconds) candidates.push(...this.trackEffects.gates.map(g => ({ ...g, kind: 'gate' })));
+    let best = null;
+    for (const object of candidates) {
+      const ahead = wrappedDistance(object.t * this.trackEffects.length, physics.progress * this.trackEffects.length, this.trackEffects.length);
+      if (ahead < -TRACK_EFFECTS.traceLength / 2 || ahead > 45) continue;
+      const lateral = Math.abs(object.offset - defaultOffset);
+      if (['line_master', 'speeder'].includes(style) && lateral > 3) continue;
+      const score = Math.max(0, ahead) + lateral * 2 - (recoveryStyle && object.kind === 'gate' ? 15 : 0);
+      if (!best || score < best.score) best = { ...object, score };
+    }
+    return best ? best.offset : defaultOffset;
   }
 
   updateSkill(dt) {

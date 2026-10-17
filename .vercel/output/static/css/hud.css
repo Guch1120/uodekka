@@ -573,3 +573,7 @@
   color: #f87171;
   border: 1px solid #ef4444;
 }
+
+/* 路面の回復ゲートとHUDを同じ記号・色で結ぶ。 */
+.skill-recovery-mark { color: #67e8f9; font-size: 17px; font-weight: 900; }
+.skill-recovery-particle { position: absolute; width: 10px; height: 10px; border-radius: 50%; background: #a5f3fc; box-shadow: 0 0 12px #22d3ee; pointer-events: none; z-index: 30; }
