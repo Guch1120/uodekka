@@ -33,3 +33,13 @@ portrait / landscape
 横持ちのコンパクト表示では、ヘッダーを除く残りを `main` に割り当て、左右の列は既存の `1.15fr : 1fr` を維持します。ホームのソロ・マルチのモードカードは概ね `1 : 1`、車体プレビューとコースプレビューは残りの領域へ伸縮します。文字・操作ボタンに最低サイズを残し、コース選択の車体情報カードは必要な場合だけ内部スクロールします。端末名による分岐や画面全体の画像的な縮小は行いません。
 
 `tests/mobile_lobby.cjs` は横持ちiPhone 16・Pixel 9相当サイズと表示高さ縮小時のホーム／シングルの主要ボタン到達性を確認します。実機Safariの検証とは区別してください。
+
+## 横画面起動とOSの入力UI
+
+起動時の縦横選択を廃止し、横画面レイアウトを既定にします。開始タップで、対応するブラウザには全画面化の完了後に `screen.orientation.lock('landscape')` を要求します。manifestにも `orientation: landscape` を指定します。
+
+iPhone 16 / iOS 26.4.2 の実機ホーム画面起動では、Web Inspectorから `screen.orientation.lock` とHTML要素の `requestFullscreen` がどちらも `undefined` であることを確認しました。この環境でCSS回転はゲームの見た目を横にしますが、OSの画面向きは固定できません。縦向きのOS上で開いたキーボード・ファイル選択をCSSで回転させることもできません。OS UIまで常に横に固定することが必須なら、横向きのみを許可したiOSネイティブのWebViewアプリ等が別途必要です。manifestの指定だけでiOSの対応を保証しないでください。
+
+通常の横持ちと、縦向きOS上でゲームだけがCSS回転している状態を区別して検証します。#59の開始ボタン欠けは後者で再現したため、コンパクト用の高さ配分をCSS回転時にも適用する回帰検証を追加しています。
+
+実機画面取得は既存のLocal_LLM_by_using_MobilePhoneプロジェクトと同じ `pymobiledevice3` のCoreDevice方式を使います。ホストの依存環境は変えず、Docker内でDDIの準備後、`developer core-device screen-capture screenshot` で取得しました。古い `idevicescreenshot` の失敗だけで、デベロッパモードや信頼設定の不足と判断しないでください。iOS 26.4.2でCoreDeviceのHIDによる遠隔タップはiOS 27以降が必要とのエラーになりましたが、Web InspectorによるゲームDOMの確認・操作は可能です。

@@ -1520,7 +1520,7 @@ body[data-is-compact="true"] .garage-course-metrics strong { display: inline; fo
 .garage-home-menu.is-measuring { display: grid !important; position: absolute !important; inset: 0 auto auto 0; width: 100% !important; visibility: hidden !important; pointer-events: none !important; }
 
 /* スマホ横画面は表示領域の残りを main に渡し、ホーム/コースとも同じ50:50規則で配置する。 */
-@media (max-width: 850px) and (orientation: landscape), (max-height: 520px) and (orientation: landscape) {
+
   body.force-landscape .garage-screen,
   body[data-is-compact="true"] .garage-screen {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
@@ -1704,7 +1704,7 @@ body[data-is-compact="true"] .garage-course-metrics strong { display: inline; fo
     padding: 8px 12px !important;
     font-size: 19px !important;
   }
-}
+
 
 /* 横持ちの切り欠き・ホームインジケータを避ける。 */
 body[data-is-compact="true"]:not(.force-landscape) .garage-shell {
@@ -1715,4 +1715,13 @@ body[data-is-compact="true"]:not(.force-landscape) .garage-shell {
 body.force-landscape .garage-shell {
   padding-left: max(14px, env(safe-area-inset-top)) !important;
   padding-right: max(14px, env(safe-area-inset-bottom)) !important;
+}
+
+/* CSS回転時も実横画面と同じ残り高さを使い、開始ボタンを押し出さない。 */
+body[data-is-compact="true"] .garage main {
+  flex: 1 1 0;
+  align-items: stretch;
+}
+body[data-is-compact="true"] .garage-screen {
+  grid-template-rows: minmax(0, 1fr);
 }

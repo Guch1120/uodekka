@@ -41,7 +41,7 @@ assert.equal(await page.evaluate(()=>gameInstance.currentGameConfig.playerName),
 await page.evaluate(()=>gameInstance.quitRace());
 for(const size of [{width:390,height:844},{width:844,height:390}]){
  await page.setViewportSize(size);
- assert(await page.evaluate(()=>document.querySelector('.garage').scrollWidth<=innerWidth));
+ assert(await page.evaluate(()=>document.querySelector('.garage').scrollWidth<=window.deviceInfo.effectiveWidth));
  await page.screenshot({path:'/tmp/uodekka-'+size.width+'.png'});
 }
 assert.deepEqual(errors,[]);

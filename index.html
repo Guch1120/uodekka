@@ -39,28 +39,6 @@
   <script>window.MULTIPLAYER_SERVER_URL = window.MULTIPLAYER_SERVER_URL || 'wss://uodekka-multiplayer.kurehiro1009.workers.dev/ws';</script>
 </head>
 <body>
-  <!-- 縦持ち時の横画面案内オーバーレイ -->
-  <div id="orientation-prompt" class="orientation-prompt">
-    <div class="rotate-phone-icon">
-      <svg viewBox="0 0 100 100" fill="none" stroke="#f1c40f" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="25" y="15" width="50" height="70" rx="8"/>
-        <line x1="45" y1="78" x2="55" y2="78" stroke-width="4"/>
-        <path d="M78 35 A 35 35 0 0 1 78 65" stroke-dasharray="6,6"/>
-        <polygon points="75,60 82,70 70,70" fill="#f1c40f"/>
-      </svg>
-    </div>
-    <h3>画面を横向きにしてください</h3>
-    <p>このゲームは横画面専用です。端末を横向きにするか、回転ロック有効時は下のボタンを押して横画面モードを有効化してください。</p>
-    <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 16px;">
-      <button id="btn-force-landscape" class="primary-btn" style="font-size: 16px; padding: 12px 24px;">
-        📱 横画面でゲームを開始
-      </button>
-      <button id="btn-dismiss-orientation" class="secondary-btn" style="font-size: 14px; padding: 10px 16px; background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; cursor: pointer;">
-        このまま続ける
-      </button>
-    </div>
-  </div>
-
   <!-- 画像と余白を含め、画面全体をタッチしてロビーへ進む -->
   <button id="title-screen" class="title-screen" type="button" aria-label="画面をタッチしてゲームをはじめる">
     <img src="frontend/images/title-screen.png" alt="UO:De Car" width="3360" height="1560" fetchpriority="high" draggable="false">
@@ -80,10 +58,8 @@
     const titleScreen = document.getElementById('title-screen');
     const status = document.getElementById('title-screen-status');
     const app = document.getElementById('app');
-    const orientationPrompt = document.getElementById('orientation-prompt');
-    const btnForceLandscape = document.getElementById('btn-force-landscape');
-    const btnDismissOrientation = document.getElementById('btn-dismiss-orientation');
-    let _forceLandscapeRequested = false;
+    // 選択画面を挟まず、起動時から横画面を基本にする。
+    let _forceLandscapeRequested = true;
 
     function detectDeviceInfo() {
       // モバイルブラウザのアドレスバー表示中は window.innerHeight と
@@ -191,63 +167,25 @@
       window.visualViewport.addEventListener('resize', handleAppResume);
     }
 
-    function enableForcedLandscape() {
+    async function enableForcedLandscape() {
       window.requestForcedLandscapeLayout();
-      if (orientationPrompt) {
-        orientationPrompt.classList.add('dismissed');
+      const root = document.documentElement;
+      const requestFullscreen = root.requestFullscreen || root.webkitRequestFullscreen;
+      if (requestFullscreen && navigator.maxTouchPoints > 0 && !document.fullscreenElement) {
+        try { await requestFullscreen.call(root); } catch { /* 非対応時は横画面レイアウトを維持する。 */ }
       }
-      if (document.documentElement.requestFullscreen) {
-        document.documentElement.requestFullscreen().catch(() => {});
-      } else if (document.documentElement.webkitRequestFullscreen) {
-        document.documentElement.webkitRequestFullscreen().catch(() => {});
+      if (typeof screen.orientation?.lock === 'function') {
+        try { await screen.orientation.lock('landscape'); } catch { /* OSの向きはブラウザの許可範囲に従う。 */ }
       }
-      if (screen.orientation && screen.orientation.lock) {
-        screen.orientation.lock('landscape').catch(() => {
-          window.requestForcedLandscapeLayout();
-          window.dispatchEvent(new Event('resize'));
-        });
-      } else {
-        window.requestForcedLandscapeLayout();
-        window.dispatchEvent(new Event('resize'));
-      }
+      syncAppLayout();
     }
-
-    if (btnForceLandscape) {
-      btnForceLandscape.addEventListener('click', (e) => {
-        e.stopPropagation();
-        enableForcedLandscape();
-      });
-    }
-    if (btnDismissOrientation) {
-      btnDismissOrientation.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (orientationPrompt) orientationPrompt.classList.add('dismissed');
-      });
-    }
-
-    // 初期ロード時にすでに横画面ならオーバーレイを非表示にしておく
-    if (window.innerWidth > window.innerHeight && orientationPrompt) {
-      orientationPrompt.classList.add('dismissed');
-    }
-
-    window.addEventListener('resize', () => {
-      if (window.innerWidth > window.innerHeight && orientationPrompt) {
-        orientationPrompt.classList.add('dismissed');
-      }
-    });
 
     titleScreen.addEventListener('click', async (event) => {
       event.stopPropagation();
       if (titleScreen.disabled) return;
 
-      if (orientationPrompt) {
-        orientationPrompt.classList.add('dismissed');
-      }
-
-      // タッチ操作時に横画面ロックを試行
-      if (screen.orientation && screen.orientation.lock) {
-        screen.orientation.lock('landscape').catch(() => {});
-      }
+      // 全画面とOSの向き固定は、開始タップの権限が有効な間に要求する。
+      void enableForcedLandscape();
       window._gameSessionStarted = true;
       titleScreen.disabled = true;
       status.textContent = '読み込み中…';

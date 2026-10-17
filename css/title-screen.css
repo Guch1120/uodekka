@@ -64,7 +64,8 @@
     height: 100dvh;
   }
 
-  body.force-landscape #app {
+  body.force-landscape #app,
+  body.force-landscape #title-screen {
     position: fixed;
     top: 0;
     left: var(--app-height, 100vw);
@@ -75,7 +76,8 @@
     overflow: hidden;
   }
 
-  body.force-landscape.rotate-reverse #app {
+  body.force-landscape.rotate-reverse #app,
+  body.force-landscape.rotate-reverse #title-screen {
     top: var(--app-width, 100dvh);
     left: 0;
     transform: rotate(-90deg);

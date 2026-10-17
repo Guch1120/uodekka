@@ -13,7 +13,7 @@ const assert = require('node:assert/strict');
    window.dispatchEvent(new Event('resize'));
   },visibleHeight);
   let size = await page.evaluate(() => ({w:document.querySelector('#app').offsetWidth,h:document.querySelector('#app').offsetHeight}));
-  assert.deepEqual(size,{w:width,h:visibleHeight},'実表示領域とルート寸法を一致させる');
+  assert.deepEqual(size,width < height ? {w:visibleHeight,h:width} : {w:width,h:visibleHeight},'起動時から実表示領域に合わせて横画面にする');
   if (width < height) {
    await page.evaluate(() => window.requestForcedLandscapeLayout());
    size = await page.evaluate(() => ({w:document.querySelector('#app').offsetWidth,h:document.querySelector('#app').offsetHeight}));

@@ -3,14 +3,19 @@ const assert = require('node:assert/strict');
 (async () => {
  const browser = await chromium.launch({ headless:true, args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader'] });
  const page = await browser.newPage({ viewport:{width:852,height:393}, hasTouch:true });
+ // iPhone相当の全画面非対応経路を固定し、CSS横画面も検証する。
+ await page.addInitScript(() => { Element.prototype.requestFullscreen = undefined; Element.prototype.webkitRequestFullscreen = undefined; });
+ if (process.env.BASELINE) await page.route('**/css/lobby.css', route => route.fulfill({contentType:'text/css',body:require('node:fs').readFileSync('/tmp/uodekka-lobby-before.css')}));
  await page.goto('http://localhost:8099');
+ assert.equal(await page.locator('#btn-dismiss-orientation').count(),0);
+ assert.equal(await page.locator('#btn-force-landscape').count(),0);
  await page.evaluate(async () => {
    const { UPDATE_NOTIFICATION } = await import('/frontend/data/updates.js');
    localStorage.setItem('kart_last_read_update_version', UPDATE_NOTIFICATION.version);
  });
  await page.click('#title-screen');
  await page.waitForFunction(() => !!window.gameInstance);
- for (const [width,height,visibleHeight] of [[852,393,393],[915,412,412],[852,393,330]]) {
+ for (const [width,height,visibleHeight] of [[852,393,393],[915,412,412],[852,393,330],[393,852,852],[393,852,720]]) {
    await page.setViewportSize({width,height});
    await page.evaluate(h => { Object.defineProperty(window,'innerHeight',{configurable:true,value:h}); Object.defineProperty(window.visualViewport,'height',{configurable:true,value:h}); window.dispatchEvent(new Event('resize')); },visibleHeight);
    for (const [screen,selector] of [['home','#tab-solo'],['solo','#btn-start-solo']]) {

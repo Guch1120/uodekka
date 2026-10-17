@@ -13,7 +13,7 @@ const assert = require('node:assert/strict');
   await page.goto(process.env.GAME_URL || 'http://localhost:8099');
 
   await page.evaluate(() => {
-    document.querySelector('#orientation-prompt').classList.add('dismissed');
+    document.querySelector('#orientation-prompt')?.classList.add('dismissed');
     window.requestForcedLandscapeLayout();
   });
   const before = await page.evaluate(() => ({
@@ -55,7 +55,7 @@ const assert = require('node:assert/strict');
     document.dispatchEvent(new Event('visibilitychange'));
   });
   await naturalPage.waitForTimeout(700);
-  assert.equal(await naturalPage.evaluate(() => document.body.dataset.isLandscape), 'false');
+  assert.equal(await naturalPage.evaluate(() => document.body.dataset.isLandscape), 'true');
   await naturalPage.evaluate(() => { window.__resumeTestSize = [844, 390]; });
   await naturalPage.waitForTimeout(650);
   assert.equal(await naturalPage.evaluate(() => document.body.dataset.isLandscape), 'true');
