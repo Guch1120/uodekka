@@ -10,6 +10,7 @@
 // このマシンのIPアドレスに向けて上書きすること。
 
 const http = require('node:http');
+const { publicDiagnostics, readImages } = require('../api/feedback.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -24,7 +25,7 @@ function sanitizeText(value, maxLength) {
   return String(value ?? '').replace(/\r\n/g, '\n').trim().slice(0, maxLength);
 }
 
-function appendFeedback({ category, name, message, image }) {
+function appendFeedback({ category, name, message, steps, images, diagnostics }) {
   const safeCategory = CATEGORIES.includes(category) ? category : 'その他';
   const safeName = sanitizeText(name, MAX_NAME_LENGTH) || '匿名';
   const timestamp = new Date().toISOString();
@@ -33,8 +34,9 @@ function appendFeedback({ category, name, message, image }) {
     fs.writeFileSync(NEEDS_FILE, '# ユーザーからのご意見・ご要望\n\nゲーム内フィードバックフォームからの送信を自動的に追記します。\n', 'utf8');
   }
 
-  const imageLine = image ? `\n\n![添付画像](${image})\n` : '';
-  const block = `\n## ${timestamp}\n\n- **カテゴリ**: ${safeCategory}\n- **お名前**: ${safeName}\n\n${message}${imageLine}\n---\n`;
+  const imageLine = images.map((image, i) => `\n\n![添付画像 ${i + 1}](${image})`).join('');
+  const context = diagnostics ? `\n\n### 動作情報（公開用）\n\n${JSON.stringify(diagnostics, null, 2)}` : '';
+  const block = `\n## ${timestamp}\n\n- **カテゴリ**: ${safeCategory}\n- **お名前**: ${safeName}\n\n${message}${steps ? '\n\n### 再現手順\n'+sanitizeText(steps,500) : ''}${context}${imageLine}\n---\n`;
   fs.appendFileSync(NEEDS_FILE, block, 'utf8');
 }
 
@@ -75,11 +77,10 @@ const server = http.createServer((req, res) => {
         res.end(JSON.stringify({ error: 'message is required' }));
         return;
       }
-      const image = typeof data.image === 'string' && /^data:image\/(png|jpeg|gif|webp);base64,[A-Za-z0-9+/=]+$/.test(data.image)
-        ? data.image : '';
-      appendFeedback({ category: data.category, name: data.name, message, image });
+      const images = readImages(data);
+      appendFeedback({ category: data.category, name: data.name, message, steps: data.steps, images, diagnostics: publicDiagnostics(data.diagnostics) });
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true }));
+      res.end(JSON.stringify({ ok: true, storage: 'local', imageReceived: images.length > 0, imageAttached: images.length > 0, imagesReceived: images.length, imagesAttached: images.length }));
     } catch {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'invalid request' }));

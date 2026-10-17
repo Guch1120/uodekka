@@ -168,3 +168,20 @@
   border-radius: 6px;
   margin-bottom: 4px;
 }
+
+.feedback-images { display: flex; gap: 10px; overflow-x: auto; padding: 4px; min-height: 0; }
+.feedback-image-preview { position: relative; flex: 0 0 104px; width: 104px; margin: 0; }
+.feedback-image-preview img { display: block; width: 104px; height: 78px; object-fit: cover; border-radius: 6px; }
+.feedback-image-preview figcaption { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: #cbd5e1; }
+.feedback-image-remove { position: absolute; top: 0; right: 0; width: 36px; height: 36px; border: 2px solid white; border-radius: 50%; background: #b91c1c; color: white; font-size: 24px; cursor: pointer; touch-action: manipulation; }
+.feedback-image-remove:disabled { opacity: .5; cursor: wait; }
+.feedback-privacy { font-size: 11px; color: #cbd5e1; }
+.feedback-privacy summary { cursor: pointer; padding: 6px 0; }
+.feedback-privacy p { line-height: 1.5; }
+.feedback-privacy pre { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 8px; }
+@media (pointer: coarse) { .feedback-image-remove { width: 44px; height: 44px; } }
+
+.feedback-native-orientation { grid-column: 1 / -1; font-size: 11px; color: #fde68a; line-height: 1.4; }
+
+.feedback-steps-row { grid-column: 1 / -1; }
+.feedback-steps-input { min-height: 60px; }

@@ -3,7 +3,7 @@
   "outputDirectory": "dist",
   "functions": {
     "api/feedback.cjs": {
-      "maxDuration": 30
+      "maxDuration": 60
     }
   }
 }
