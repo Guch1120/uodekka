@@ -981,6 +981,7 @@ export class Game {
       return this.localPlayerKart.mesh.position.distanceTo(ramp.position) < (ramp.radius * 2.2);
     }) || false;
 
+    this.inputManager.updateDriftFeedback(this.localPlayerKart);
     this.hud.update({
       position: myRank,
       currentLap: this.localPlayerKart.currentLap,

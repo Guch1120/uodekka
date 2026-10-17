@@ -13,6 +13,12 @@ for (const file of sources) {
   const copy = resolve(output, relative(root, file));
   if (!existsSync(copy) || !readFileSync(file).equals(readFileSync(copy))) failures.push(`配信コピー不一致: ${relative(root, file)}`);
 }
+// APIも静的ファイルと同様に、古い配信コピーをリリース前に検出する。
+for (const name of ['feedback', 'ice-servers']) {
+  const source = resolve(root, `api/${name}.cjs`);
+  const copy = resolve(root, `.vercel/output/functions/api/${name}.func/index.cjs`);
+  if (!existsSync(copy) || !readFileSync(source).equals(readFileSync(copy))) failures.push(`API配信コピー不一致: ${name}`);
+}
 for (const file of [...sources, ...walk(output), ...walk(resolve(root, 'worker'))]) {
   if (!/\.(js|mjs|cjs|html|css|json)$/.test(file)) continue;
   const text = readFileSync(file, 'utf8');

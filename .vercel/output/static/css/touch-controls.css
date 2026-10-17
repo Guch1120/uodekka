@@ -145,3 +145,10 @@
   font-weight: 800;
 }
 
+
+/* 押下・成立・ターボ準備を同じボタン上で判別できるようにする。 */
+.btn-drift { flex-direction: column; gap: 2px; }
+.btn-drift small { font-size: 9px; font-weight: 600; }
+.btn-drift.drift-active { border-color: #70dcff; box-shadow: 0 0 16px #29b6f6; }
+.btn-drift.drift-charged { background: #1474bb; }
+.btn-drift.drift-super { background: #b94b00; border-color: #ffd166; box-shadow: 0 0 20px #ff9b21; }

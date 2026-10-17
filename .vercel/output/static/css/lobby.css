@@ -1,7 +1,7 @@
 /* Pre-race screens: shared garage, course selection and room lobby. */
 .garage {
   --ink: #14293b; --muted: #667887; --line: #dce5eb; --orange: #ff773e;
-  position: fixed; inset: 0; z-index: 45; overflow: auto;
+  position: absolute; inset: 0; z-index: 45; overflow: auto;
   color: var(--ink); background: #142c42;
   background-image: radial-gradient(ellipse at 5% 0, #284c64 0, transparent 65%);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans JP", sans-serif;
@@ -1378,4 +1378,72 @@ body[data-is-compact="true"] .garage-course-metrics strong { display: inline; fo
   .garage .garage-coin-badge { padding: 4px 6px; font-size: 11px; }
   .garage .garage-course-panel .garage-section-heading h1 { font-size: 16px; }
   .garage .garage-course-panel .garage-section-heading > .garage-chip { font-size: 9px; padding: 5px; }
+}
+
+/* 横持ちの切り欠き・ホームインジケータを避け、表示領域内に操作を収める。 */
+body[data-is-compact="true"]:not(.force-landscape) .garage-shell {
+  padding-left: max(14px, env(safe-area-inset-left)) !important;
+  padding-right: max(14px, env(safe-area-inset-right)) !important;
+  padding-bottom: max(6px, env(safe-area-inset-bottom)) !important;
+}
+body.force-landscape .garage-shell {
+  padding-left: max(14px, env(safe-area-inset-top)) !important;
+  padding-right: max(14px, env(safe-area-inset-bottom)) !important;
+}
+body[data-is-compact="true"] .garage-setup-side,
+body.force-landscape .garage-setup-side {
+  min-height: 0;
+  overflow: hidden;
+}
+body[data-is-compact="true"] .garage-setup-side > .garage-specs,
+body.force-landscape .garage-setup-side > .garage-specs {
+  min-height: 0;
+  overflow-y: auto;
+}
+body[data-is-compact="true"] .garage-setup-side > :not(.garage-specs),
+body.force-landscape .garage-setup-side > :not(.garage-specs) {
+  flex-shrink: 0;
+}
+
+/* 端末名ではなく、実表示領域を親とする比率で横画面を構成する。 */
+body[data-is-landscape="true"][data-is-compact="true"] .garage-screen {
+  grid-template-rows: minmax(0, 1fr);
+  flex: 1 1 0;
+  height: auto !important;
+}
+body[data-is-landscape="true"][data-is-compact="true"] .garage-machine-panel,
+body[data-is-landscape="true"][data-is-compact="true"] .garage-course-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+body[data-is-landscape="true"][data-is-compact="true"] .garage-showroom {
+  flex: 1 1 0;
+  min-height: 0;
+}
+body[data-is-landscape="true"][data-is-compact="true"] .garage-vehicle-stage {
+  height: auto !important;
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+}
+body[data-is-landscape="true"][data-is-compact="true"] .garage-mode-panel {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(70px, 3fr) minmax(100px, 2fr) minmax(58px, 1fr);
+}
+body[data-is-landscape="true"][data-is-compact="true"] .garage-mode-solo {
+  min-height: 0 !important;
+}
+body[data-is-landscape="true"][data-is-compact="true"] .garage-course-panel .garage-map-card {
+  height: auto !important;
+  min-height: 0 !important;
+  flex: 1 1 0;
+}
+body[data-is-landscape="true"][data-is-compact="true"] .garage-course-panel > :not(.garage-map-card) {
+  flex-shrink: 0;
+}
+body[data-is-landscape="true"][data-is-compact="true"] .garage main {
+  min-height: 0;
+  flex: 1 1 0;
+  align-items: stretch;
 }

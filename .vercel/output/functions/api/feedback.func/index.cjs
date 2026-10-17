@@ -7,10 +7,11 @@
 //   GITHUB_TOKEN          issuesへの書き込み権限を持つFine-grained PAT（このリポジトリに限定推奨）
 // 任意環境変数:
 //   GITHUB_FEEDBACK_REPO  "owner/repo" 形式。未設定時は Guch1120/uodekka を使用
+const crypto = require('node:crypto');
 const CATEGORIES = ['不具合報告', '新機能の要望', '操作性・UI改善', 'その他'];
 const MAX_MESSAGE_LENGTH = 1000;
 const MAX_NAME_LENGTH = 20;
-const MAX_BODY_BYTES = 20_000;
+const MAX_BODY_BYTES = 3_000_000;
 
 function sanitize(value, maxLength) {
   return String(value ?? '').replace(/\r\n/g, '\n').trim().slice(0, maxLength);
@@ -46,6 +47,34 @@ async function createIssue({ token, repo, title, body, labels }) {
     body: JSON.stringify(labels ? { title, body, labels } : { title, body }),
     signal: AbortSignal.timeout(8000)
   });
+}
+
+async function uploadImage({ token, repo, image }) {
+  if (!image) return '';
+  const [, encoded] = image.split(',', 2);
+  const path = `feedback-assets/${Date.now()}-${crypto.randomBytes(6).toString('hex')}.jpg`;
+  const response = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/vnd.github+json',
+      'Content-Type': 'application/json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      'User-Agent': 'uodekka-feedback-form'
+    },
+    body: JSON.stringify({
+      message: `chore: add feedback image ${path.split('/').pop()}`,
+      content: encoded
+    }),
+    signal: AbortSignal.timeout(12000)
+  });
+  if (!response.ok) {
+    console.error('[feedback] GitHub asset upload failed', response.status);
+    throw new Error(`GitHub asset upload error: ${response.status}`);
+  }
+  // Contents APIのレスポンスにdownload_urlが含まれない場合があるため、
+  // 保存先が確定した時点でraw.githubusercontent.comのURLを組み立てる。
+  return `https://raw.githubusercontent.com/${repo}/main/${path}`;
 }
 
 async function createGitHubIssue({ token, repo, title, body }) {
@@ -102,6 +131,13 @@ async function handler(req, res) {
   const name = sanitize(data.name, MAX_NAME_LENGTH) || '匿名';
 
   const titleExcerpt = message.replace(/\n/g, ' ').slice(0, 60);
+  const imageData = typeof data.image === 'string' && /^data:image\/[^;]+;base64,/.test(data.image)
+    ? data.image : '';
+  console.info('[feedback] image input', {
+    received: Boolean(data.image),
+    accepted: Boolean(imageData),
+    chars: imageData.length
+  });
   const title = `[フィードバック/${category}] ${titleExcerpt}${message.length > 60 ? '…' : ''}`;
   const body = [
     `- **カテゴリ**: ${category}`,
@@ -112,9 +148,16 @@ async function handler(req, res) {
   ].join('\n');
 
   try {
-    const issue = await createGitHubIssue({ token, repo, title, body });
+    const imageUrl = await uploadImage({ token, repo, image: imageData });
+    const bodyWithImage = imageUrl ? `${body}\n\n![添付画像](${imageUrl})` : body;
+    const issue = await createGitHubIssue({ token, repo, title, body: bodyWithImage });
     res.statusCode = 200;
-    res.end(JSON.stringify({ ok: true, issueUrl: issue.html_url }));
+    res.end(JSON.stringify({
+      ok: true,
+      issueUrl: issue.html_url,
+      imageReceived: Boolean(imageData),
+      imageAttached: Boolean(imageUrl)
+    }));
   } catch {
     // GitHubトークンや上流のエラー詳細はクライアントへ漏らさない。
     res.statusCode = 502;

@@ -61,22 +61,22 @@
     overflow: hidden;
     position: fixed;
     width: 100vw;
-    height: 100vh;
+    height: 100dvh;
   }
 
   body.force-landscape #app {
     position: fixed;
     top: 0;
-    left: 100vw;
-    width: 100vh;
-    height: 100vw;
+    left: var(--app-height, 100vw);
+    width: var(--app-width, 100dvh);
+    height: var(--app-height, 100vw);
     transform-origin: 0 0;
     transform: rotate(90deg);
     overflow: hidden;
   }
 
   body.force-landscape.rotate-reverse #app {
-    top: 100vh;
+    top: var(--app-width, 100dvh);
     left: 0;
     transform: rotate(-90deg);
   }
@@ -93,8 +93,8 @@
     position: relative !important;
     top: 0 !important;
     left: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
+    width: var(--app-width, 100vw) !important;
+    height: var(--app-height, 100dvh) !important;
     transform: none !important;
   }
 

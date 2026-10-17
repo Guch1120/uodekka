@@ -15,6 +15,7 @@ export class InputManager {
     // キーボードとマウス/タッチが同時にアイテムを保持できるよう、
     // どちらか一方が離れただけでは発射させず、全ソースが離れたときだけ発射判定する。
     this._itemHeldSources = new Set();
+    this._pointerDriftHeld = false;
 
     // 入力状態
     this.state = {
@@ -306,6 +307,7 @@ export class InputManager {
     this.keyboardSteering = false;
     this._stickY = 0;
     this._itemHeldSources.clear();
+    this._pointerDriftHeld = false;
     Object.assign(this.state, {
       steering: 0, accelerating: 0, braking: 0, drift: false,
       itemHeld: false, useItemTrigger: false, isForwardThrow: false,
@@ -381,7 +383,7 @@ export class InputManager {
 
     this.state.accelerating = (keys['ArrowUp'] || keys['KeyW']) ? 1 : 0;
     this.state.braking = (keys['ArrowDown'] || keys['KeyS']) ? 1 : 0;
-    this.state.drift = !!keys['ShiftLeft'] || !!keys['ShiftRight'] || !!keys['Space'];
+    this.state.drift = this._pointerDriftHeld || !!keys['ShiftLeft'] || !!keys['ShiftRight'] || !!keys['Space'];
 
     // キーボードのアイテム長押し判定 (E/Q/Enter)
     // マウス/タッチによる保持と独立管理し、片方の入力で他方の保持を誤って発射させない。
@@ -425,7 +427,8 @@ export class InputManager {
     const btnDrift = document.createElement('button');
     btnDrift.id = 'ctrl-drift';
     btnDrift.className = 'touch-control-element touch-btn btn-drift';
-    btnDrift.innerHTML = '<span>ドリフト</span>';
+    btnDrift.innerHTML = '<span>ドリフト</span><small id="ctrl-drift-status">旋回中に長押し</small>';
+    btnDrift.setAttribute('aria-label', 'ドリフト：速度を上げ、旋回しながら長押し。離すとターボ');
     root.appendChild(btnDrift);
 
     this.container.appendChild(root);
@@ -504,8 +507,8 @@ export class InputManager {
 
     // ドリフト
     bindPress(btnDrift,
-      () => { this.state.drift = true; btnDrift.classList.add('pressed'); },
-      () => { this.state.drift = false; btnDrift.classList.remove('pressed'); }
+      () => { this._pointerDriftHeld = true; this.state.drift = true; btnDrift.classList.add('pressed'); },
+      () => { this._pointerDriftHeld = false; this.state.drift = !!this.keyboardKeys.ShiftLeft || !!this.keyboardKeys.ShiftRight || !!this.keyboardKeys.Space; btnDrift.classList.remove('pressed'); }
     );
 
     // アイテム（長押しで後方保持、離した瞬間に使用。単押し=後方、長押し保持後リリース=前方投げ）
@@ -769,6 +772,19 @@ export class InputManager {
         }
       }
     });
+  }
+
+  updateDriftFeedback(kart) {
+    const button = this.controlsRoot.querySelector('#ctrl-drift');
+    const status = button.querySelector('#ctrl-drift-status');
+    const level = kart.driftSparkLevel || 0;
+    const text = kart.isDrifting
+      ? (level === 2 ? '離して強ターボ' : level === 1 ? '離してターボ' : 'チャージ中')
+      : this.state.drift ? (Math.abs(kart.speed) <= 12 ? '速度を上げて' : '旋回して') : '旋回中に長押し';
+    if (status.textContent !== text) status.textContent = text;
+    button.classList.toggle('drift-active', !!kart.isDrifting);
+    button.classList.toggle('drift-charged', level > 0);
+    button.classList.toggle('drift-super', level === 2);
   }
 
   startLayoutCustomization() {

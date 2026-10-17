@@ -38,6 +38,21 @@ const assert = require('node:assert/strict');
  await page.mouse.move(640,360); await page.mouse.up();
  assert.equal((await getState()).accelerating,0);
  console.log('PASS: ポーズ中の入力遮断とボタン外での解放');
+ const driftResult = await page.evaluate(() => {
+   const game = gameInstance;
+   game.isPaused = true;
+   const kart = game.localPlayerKart;
+   kart.speed = 25; kart.isSpinning = false; kart.isRespawning = false;
+   kart.update(1/60, { accelerating:1, steering:0.6, drift:true }, game.courseTrack.curve, game.currentCourseConfig.trackWidth, game);
+   const started = kart.isDrifting;
+   kart.driftTime = 1.7; kart.speed = 25;
+   kart.update(1/60, { accelerating:1, steering:0.6, drift:true }, game.courseTrack.curve, game.currentCourseConfig.trackWidth, game);
+   const charged = kart.driftSparkLevel;
+   kart.update(1/60, { accelerating:1, steering:0.6, drift:false }, game.courseTrack.curve, game.currentCourseConfig.trackWidth, game);
+   return { started, charged, released:!kart.isDrifting, boosted:kart.boostTimer>0 };
+ });
+ assert.deepEqual(driftResult, { started:true, charged:2, released:true, boosted:true });
+ console.log('PASS: 実ゲーム物理でドリフト成立・強ターボ蓄積・解放時のブースト（時間は模擬）');
  const hudResult=await page.evaluate(()=>{
   const hud=gameInstance.hud; gameInstance.isPaused=true;
   const state={holdingItem:{icon:'banana'},boostTimer:1};
